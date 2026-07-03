@@ -83,11 +83,11 @@ export const useBlockStore = create<BlockStore>()(
           overflowBehavior: 'drop',
           blockStickiness: 60,
         },
-        // === Friday afternoon block ===
+        // === Friday game block (attached to Game anchor) ===
         {
-          id: 'block-fri-afternoon',
-          name: 'Friday Afternoon',
-          anchorId: 'anchor-work-end',
+          id: 'block-fri-game',
+          name: 'Friday Game',
+          anchorId: 'anchor-game',
           entries: [
             e('t-football', 0),
             e('t-bath-fri', 1),

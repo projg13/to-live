@@ -36,7 +36,7 @@ export const useRoutineStore = create<RoutineStore>()(
         {
           id: 'routine-friday',
           name: 'Friday',
-          blockIds: ['block-morning-fri', 'block-fri-afternoon', 'block-evening'],
+          blockIds: ['block-morning-fri', 'block-fri-game', 'block-evening'],
           recurrence: { pattern: 'weekly', daysOfWeek: [5] },
           idealSpawnTime: 360,
           enabled: true,
