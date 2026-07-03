@@ -170,16 +170,17 @@ function resolveDay(
 
     // Collect tasks from routines → blocks
     for (const routine of activeRoutines) {
-      // Each routine starts at its own idealSpawnTime
+      // Each routine starts at its own idealSpawnTime OR the pushed anchor time (whichever is later)
       let routineStart = routine.idealSpawnTime
 
-      // If this routine's block has a matching confirmed anchor, use that time instead
+      // Check if this routine's block anchor has been pushed (by overflow or confirmation)
       for (const blockId of routine.blockIds) {
         const block = context.blocks.find((b) => b.id === blockId)
         if (!block) continue
         const matchedAnchor = resolvedAnchors.find((a) => a.anchorId === block.anchorId)
-        if (matchedAnchor && matchedAnchor.actualTime !== matchedAnchor.idealTime) {
-          routineStart = matchedAnchor.actualTime
+        if (matchedAnchor) {
+          // Use the later of idealSpawnTime or the anchor's actual (pushed) time
+          routineStart = Math.max(routineStart, matchedAnchor.actualTime)
           break
         }
       }
@@ -258,15 +259,14 @@ function resolveDay(
           }
         }
 
-        // After placing block tasks, check if cursor overflowed past next anchor
-        // If block has overflowBehavior: 'push', push the next anchor forward
-        if (block.overflowBehavior === 'push' || cursor > routineStart) {
-          // Find next anchor after this block's anchor
-          const blockAnchorIdx = resolvedAnchors.findIndex((a) => a.anchorId === block.anchorId)
-          if (blockAnchorIdx >= 0 && blockAnchorIdx < resolvedAnchors.length - 1) {
-            const nextAnchor = resolvedAnchors[blockAnchorIdx + 1]
-            if (cursor > nextAnchor.actualTime) {
-              nextAnchor.actualTime = cursor
+        // After placing block tasks, if cursor overflowed past next anchor, push it
+        // This always happens — the next slot starts when this one finishes
+        const blockAnchorIdx = resolvedAnchors.findIndex((a) => a.anchorId === block.anchorId)
+        if (blockAnchorIdx >= 0) {
+          // Push ALL subsequent anchors that are now in the past
+          for (let ai = blockAnchorIdx + 1; ai < resolvedAnchors.length; ai++) {
+            if (cursor > resolvedAnchors[ai].actualTime) {
+              resolvedAnchors[ai].actualTime = cursor
             }
           }
         }
