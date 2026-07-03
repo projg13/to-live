@@ -14,49 +14,121 @@ export const useRoutineStore = create<RoutineStore>()(
   persist(
     (set) => ({
       routines: [
-        // Mon/Wed
+        // Mon/Wed morning
         {
-          id: 'routine-gym-day',
-          name: 'Gym Day (Mon/Wed)',
-          blockIds: ['block-morning-gym', 'block-evening'],
+          id: 'routine-gym-morning',
+          name: 'Gym Morning (Mon/Wed)',
+          blockIds: ['block-morning-gym'],
           recurrence: { pattern: 'weekly', daysOfWeek: [1, 3] },
-          idealSpawnTime: 360, // 6 AM
+          idealSpawnTime: 360, // Wake @ 6 AM
           enabled: true,
         },
-        // Tue/Thu
+        // Mon/Wed evening
         {
-          id: 'routine-study-day',
-          name: 'Study Day (Tue/Thu)',
-          blockIds: ['block-morning-study', 'block-evening'],
+          id: 'routine-gym-evening',
+          name: 'Evening (Mon/Wed)',
+          blockIds: ['block-evening'],
+          recurrence: { pattern: 'weekly', daysOfWeek: [1, 3] },
+          idealSpawnTime: 1080, // Work End @ 6 PM
+          enabled: true,
+        },
+        // Tue/Thu morning
+        {
+          id: 'routine-study-morning',
+          name: 'Study Morning (Tue/Thu)',
+          blockIds: ['block-morning-study'],
           recurrence: { pattern: 'weekly', daysOfWeek: [2, 4] },
-          idealSpawnTime: 360,
+          idealSpawnTime: 360, // Wake @ 6 AM
           enabled: true,
         },
-        // Friday
+        // Tue/Thu evening
         {
-          id: 'routine-friday',
-          name: 'Friday',
-          blockIds: ['block-morning-fri', 'block-fri-game', 'block-fri-post-game', 'block-evening'],
+          id: 'routine-study-evening',
+          name: 'Evening (Tue/Thu)',
+          blockIds: ['block-evening'],
+          recurrence: { pattern: 'weekly', daysOfWeek: [2, 4] },
+          idealSpawnTime: 1080, // Work End @ 6 PM
+          enabled: true,
+        },
+        // Friday morning
+        {
+          id: 'routine-fri-morning',
+          name: 'Friday Morning',
+          blockIds: ['block-morning-fri'],
           recurrence: { pattern: 'weekly', daysOfWeek: [5] },
-          idealSpawnTime: 360,
+          idealSpawnTime: 360, // Wake @ 6 AM
           enabled: true,
         },
-        // Saturday
+        // Friday game
         {
-          id: 'routine-saturday',
-          name: 'Saturday',
-          blockIds: ['block-morning-sat', 'block-evening'],
+          id: 'routine-fri-game',
+          name: 'Friday Game',
+          blockIds: ['block-fri-game'],
+          recurrence: { pattern: 'weekly', daysOfWeek: [5] },
+          idealSpawnTime: 810, // Game Start @ 1:30 PM
+          enabled: true,
+        },
+        // Friday post-game
+        {
+          id: 'routine-fri-post-game',
+          name: 'Friday Post-Game',
+          blockIds: ['block-fri-post-game'],
+          recurrence: { pattern: 'weekly', daysOfWeek: [5] },
+          idealSpawnTime: 990, // Game End @ 4:30 PM
+          enabled: true,
+        },
+        // Friday evening
+        {
+          id: 'routine-fri-evening',
+          name: 'Friday Evening',
+          blockIds: ['block-evening'],
+          recurrence: { pattern: 'weekly', daysOfWeek: [5] },
+          idealSpawnTime: 1080, // Work End @ 6 PM
+          enabled: true,
+        },
+        // Saturday morning
+        {
+          id: 'routine-sat-morning',
+          name: 'Saturday Morning',
+          blockIds: ['block-morning-sat'],
           recurrence: { pattern: 'weekly', daysOfWeek: [6] },
-          idealSpawnTime: 360,
+          idealSpawnTime: 360, // Wake @ 6 AM
           enabled: true,
         },
-        // Sunday
+        // Saturday evening
         {
-          id: 'routine-sunday',
-          name: 'Sunday',
-          blockIds: ['block-morning-sun', 'block-sun-pre-evening', 'block-evening'],
+          id: 'routine-sat-evening',
+          name: 'Saturday Evening',
+          blockIds: ['block-evening'],
+          recurrence: { pattern: 'weekly', daysOfWeek: [6] },
+          idealSpawnTime: 1080, // 6 PM
+          enabled: true,
+        },
+        // Sunday morning
+        {
+          id: 'routine-sun-morning',
+          name: 'Sunday Morning',
+          blockIds: ['block-morning-sun'],
           recurrence: { pattern: 'weekly', daysOfWeek: [0] },
-          idealSpawnTime: 360,
+          idealSpawnTime: 360, // Wake @ 6 AM
+          enabled: true,
+        },
+        // Sunday pre-evening (groceries)
+        {
+          id: 'routine-sun-groceries',
+          name: 'Sunday Groceries',
+          blockIds: ['block-sun-pre-evening'],
+          recurrence: { pattern: 'weekly', daysOfWeek: [0] },
+          idealSpawnTime: 1020, // 5 PM (before evening)
+          enabled: true,
+        },
+        // Sunday evening
+        {
+          id: 'routine-sun-evening',
+          name: 'Sunday Evening',
+          blockIds: ['block-evening'],
+          recurrence: { pattern: 'weekly', daysOfWeek: [0] },
+          idealSpawnTime: 1080, // 6 PM
           enabled: true,
         },
       ],

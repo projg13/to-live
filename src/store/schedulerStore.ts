@@ -168,9 +168,19 @@ function resolveDay(
 
     // Collect tasks from routines → blocks
     for (const routine of activeRoutines) {
-      // Start from Wake anchor's actual time (or routine idealSpawnTime)
-      const wakeAnchor = resolvedAnchors.find((a) => a.anchorName === 'Wake')
-      let routineStart = wakeAnchor?.actualTime ?? routine.idealSpawnTime
+      // Each routine starts at its own idealSpawnTime
+      let routineStart = routine.idealSpawnTime
+
+      // If this routine's block has a matching confirmed anchor, use that time instead
+      for (const blockId of routine.blockIds) {
+        const block = context.blocks.find((b) => b.id === blockId)
+        if (!block) continue
+        const matchedAnchor = resolvedAnchors.find((a) => a.anchorId === block.anchorId)
+        if (matchedAnchor && matchedAnchor.actualTime !== matchedAnchor.idealTime) {
+          routineStart = matchedAnchor.actualTime
+          break
+        }
+      }
 
       // lastDoneAt takes priority if later
       let cursor = lastDoneAt !== undefined && lastDoneAt > routineStart
