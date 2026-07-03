@@ -88,6 +88,21 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* Factory reset */}
+      <div style={{ padding: 16, textAlign: 'center' }}>
+        <button
+          onClick={() => {
+            if (confirm('Clear ALL data and reload? This cannot be undone.')) {
+              localStorage.clear()
+              window.location.reload()
+            }
+          }}
+          style={{ background: '#c00', color: '#fff', border: 'none', padding: '8px 16px', cursor: 'pointer' }}
+        >
+          Factory Reset
+        </button>
+      </div>
     </div>
   )
 }
