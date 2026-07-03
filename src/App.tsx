@@ -7,6 +7,8 @@ import RoutinePanel from './components/RoutinePanel'
 import ObligationPanel from './components/ObligationPanel'
 import DayPlannerPanel from './components/DayPlannerPanel'
 import EventPanel from './components/EventPanel'
+import RecoveryPanel from './components/RecoveryPanel'
+import RotPanel from './components/RotPanel'
 
 const managePanels = [
   'Tasks',
@@ -77,7 +79,9 @@ function App() {
             {activePanel === 'Routines' && <RoutinePanel />}
             {activePanel === 'Obligations' && <ObligationPanel />}
             {activePanel === 'Events' && <EventPanel />}
-            {!['Anchors', 'Day Planner', 'Tasks', 'Blocks', 'Routines', 'Obligations', 'Events'].includes(activePanel) && (
+            {activePanel === 'Recovery Plans' && <RecoveryPanel />}
+            {activePanel === 'Rot' && <RotPanel />}
+            {!['Anchors', 'Day Planner', 'Tasks', 'Blocks', 'Routines', 'Obligations', 'Events', 'Recovery Plans', 'Rot'].includes(activePanel) && (
               <p>Hello World - {activePanel}</p>
             )}
           </div>
