@@ -32,9 +32,12 @@ function Dashboard() {
   const [doneAtTime, setDoneAtTime] = useState('')
   const [showInsertAt, setShowInsertAt] = useState<{ taskId: string; position: 'above' | 'below' } | null>(null)
 
+  const { templates } = useAnchorStore()
+
   const buildContext = (): ResolveContext => ({
     tasks: JSON.parse(JSON.stringify(tasks)),
     anchors: JSON.parse(JSON.stringify(anchors)),
+    templates,
     blocks,
     routines,
     obligations,
@@ -58,14 +61,10 @@ function Dashboard() {
   // Build timeline: interleave anchors + tasks + done items
   const timelineItems: { type: 'anchor' | 'task'; time: number; data: any }[] = []
 
-  // Get current template from day plan
-  const { templates } = useAnchorStore.getState()
-  const currentTemplate = templates[0] // default to first template for now
-  if (currentTemplate) {
-    const sorted = [...currentTemplate.entries].sort((a, b) => a.spikeTime - b.spikeTime)
-    for (const entry of sorted) {
-      const anchor = anchors.find((a) => a.id === entry.anchorId)
-      timelineItems.push({ type: 'anchor', time: entry.spikeTime, data: { id: entry.anchorId, name: anchor?.name ?? '?', spikeTime: entry.spikeTime } })
+  // Use resolved anchors from the schedule (they shift with overflow)
+  if (daySchedule?.resolvedAnchors) {
+    for (const ra of daySchedule.resolvedAnchors) {
+      timelineItems.push({ type: 'anchor', time: ra.actualTime, data: { id: ra.anchorId, name: ra.anchorName, spikeTime: ra.actualTime } })
     }
   }
 

@@ -33,11 +33,19 @@ export interface WeekSchedule {
   generated: string          // ISO timestamp of when this was computed
 }
 
+export interface ResolvedAnchor {
+  anchorId: string
+  anchorName: string
+  idealTime: number          // from template
+  actualTime: number         // after overflow/confirmation adjustments
+}
+
 export interface DaySchedule {
   date: string               // ISO date
   dayPlanId: string          // which day plan applies
   dayPlanName: string
   confirmedAnchors: AnchorConfirmation[]
+  resolvedAnchors: ResolvedAnchor[]  // actual anchor positions after overflow
   items: ScheduledItem[]     // resolved task placements, sorted by startMinutes
   adhocTasks: AdhocTask[]    // user-added on-the-fly tasks
 }

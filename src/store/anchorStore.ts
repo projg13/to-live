@@ -34,13 +34,14 @@ export const useAnchorStore = create<AnchorStore>()(
         { id: 'slot-evening', name: 'Evening' },
         { id: 'slot-game', name: 'Game Time' },
         { id: 'slot-free', name: 'Free Time' },
+        { id: 'slot-sleep', name: 'Sleep' },
       ],
       templates: [
         {
           id: 'tpl-workday',
           name: 'Workday',
           entries: [
-            { anchorId: 'anchor-sleep', spikeTime: toMinutes(21, 0), slotId: 'slot-evening' },
+            { anchorId: 'anchor-sleep', spikeTime: toMinutes(21, 0), slotId: 'slot-sleep' },
             { anchorId: 'anchor-wake', spikeTime: toMinutes(6, 0), slotId: 'slot-morning' },
             { anchorId: 'anchor-work-start', spikeTime: toMinutes(9, 0), slotId: 'slot-work' },
             { anchorId: 'anchor-work-end', spikeTime: toMinutes(18, 0), slotId: 'slot-evening' },
@@ -50,7 +51,7 @@ export const useAnchorStore = create<AnchorStore>()(
           id: 'tpl-friday',
           name: 'Friday',
           entries: [
-            { anchorId: 'anchor-sleep', spikeTime: toMinutes(21, 0), slotId: 'slot-evening' },
+            { anchorId: 'anchor-sleep', spikeTime: toMinutes(21, 0), slotId: 'slot-sleep' },
             { anchorId: 'anchor-wake', spikeTime: toMinutes(6, 0), slotId: 'slot-morning' },
             { anchorId: 'anchor-work-start', spikeTime: toMinutes(9, 0), slotId: 'slot-work' },
             { anchorId: 'anchor-game', spikeTime: toMinutes(13, 30), slotId: 'slot-game' },
@@ -61,7 +62,7 @@ export const useAnchorStore = create<AnchorStore>()(
           id: 'tpl-weekend',
           name: 'Weekend',
           entries: [
-            { anchorId: 'anchor-sleep', spikeTime: toMinutes(21, 0), slotId: 'slot-free' },
+            { anchorId: 'anchor-sleep', spikeTime: toMinutes(21, 0), slotId: 'slot-sleep' },
             { anchorId: 'anchor-wake', spikeTime: toMinutes(6, 0), slotId: 'slot-morning' },
           ],
         },

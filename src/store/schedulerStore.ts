@@ -11,7 +11,6 @@ import type { DayPlan, CalendarEvent } from '../types/planner'
 import { getActiveBracket, getObligationWeight } from '../types/obligation'
 import { getRecoveryWeight } from '../types/recovery'
 import { getSlotWeight } from '../types/routine'
-import { findSlots } from '../components/DayPlanner'
 
 interface SchedulerStore {
   schedule: WeekSchedule | null
@@ -44,6 +43,7 @@ interface SchedulerStore {
 export interface ResolveContext {
   tasks: Task[]
   anchors: Anchor[]
+  templates: { id: string; name: string; entries: { anchorId: string; spikeTime: number; slotId: string }[] }[]
   blocks: Block[]
   routines: Routine[]
   obligations: Obligation[]
@@ -95,13 +95,28 @@ function resolveDay(
   const dayPlan = context.dayPlans.find((p) => p.id === dayPlanId)
   if (dayPlan) dayPlanName = dayPlan.name
 
-  // Get anchors for this day plan
-  const dayAnchors = dayPlan
-    ? context.anchors.filter((a) => dayPlan.anchorIds.includes(a.id))
-    : context.anchors
+  // Get template for this day (find matching template from anchorIds)
+  const templates = context.templates ?? []
+  // Match template by finding one whose anchors match the day plan's anchorIds
+  const dayTemplate = templates.find((t) =>
+    t.entries.every((e) => dayPlan?.anchorIds.includes(e.anchorId))
+  ) ?? templates[0]
 
-  // Get slots from anchors
-  const slots = findSlots(dayAnchors)
+  // Build resolved anchor times (template ideal → adjusted by confirmations/overflow)
+  const resolvedAnchors: { anchorId: string; anchorName: string; idealTime: number; actualTime: number }[] = []
+  if (dayTemplate) {
+    const sorted = [...dayTemplate.entries].sort((a, b) => a.spikeTime - b.spikeTime)
+    for (const entry of sorted) {
+      const anchor = context.anchors.find((a) => a.id === entry.anchorId)
+      const conf = dayConfirmations.find((c) => c.anchorId === entry.anchorId)
+      resolvedAnchors.push({
+        anchorId: entry.anchorId,
+        anchorName: anchor?.name ?? '?',
+        idealTime: entry.spikeTime,
+        actualTime: conf?.actualTime ?? entry.spikeTime,
+      })
+    }
+  }
 
   // Get confirmed anchors for this day
   const dayConfirmations = confirmedAnchors.filter((c) => c.day === dayIndex)
@@ -152,22 +167,10 @@ function resolveDay(
     )
 
     // Collect tasks from routines → blocks
-    // Determine start cursor: confirmed anchor > lastDoneAt > idealSpawnTime
     for (const routine of activeRoutines) {
-      let routineStart = routine.idealSpawnTime
-
-      // Any confirmed anchor on this day overrides the routine start
-      // The user edits anchor time to say "my actual day started here"
-      if (dayConfirmations.length > 0) {
-        // Use the earliest confirmation that's after midnight as the routine start
-        const relevantConfs = dayConfirmations
-          .map((c) => c.actualTime)
-          .filter((t) => t > 0)
-          .sort((a, b) => a - b)
-        if (relevantConfs.length > 0) {
-          routineStart = relevantConfs[0]
-        }
-      }
+      // Start from Wake anchor's actual time (or routine idealSpawnTime)
+      const wakeAnchor = resolvedAnchors.find((a) => a.anchorName === 'Wake')
+      let routineStart = wakeAnchor?.actualTime ?? routine.idealSpawnTime
 
       // lastDoneAt takes priority if later
       let cursor = lastDoneAt !== undefined && lastDoneAt > routineStart
@@ -228,6 +231,19 @@ function resolveDay(
               day: dayIndex,
             })
             cursor = idealStart + task.durationMinutes
+          }
+        }
+
+        // After placing block tasks, check if cursor overflowed past next anchor
+        // If block has overflowBehavior: 'push', push the next anchor forward
+        if (block.overflowBehavior === 'push' || cursor > routineStart) {
+          // Find next anchor after this block's anchor
+          const blockAnchorIdx = resolvedAnchors.findIndex((a) => a.anchorId === block.anchorId)
+          if (blockAnchorIdx >= 0 && blockAnchorIdx < resolvedAnchors.length - 1) {
+            const nextAnchor = resolvedAnchors[blockAnchorIdx + 1]
+            if (cursor > nextAnchor.actualTime) {
+              nextAnchor.actualTime = cursor
+            }
           }
         }
       }
@@ -291,13 +307,14 @@ function resolveDay(
   }
 
   // Sort by weight descending, then place sequentially into available time
-  const placed = placeItems(items, slots, dayAnchors, dayConfirmations)
+  const placed = placeItems(items, [], [], dayConfirmations)
 
   return {
     date: dateStr,
     dayPlanId,
     dayPlanName,
     confirmedAnchors: dayConfirmations,
+    resolvedAnchors,
     items: placed,
     adhocTasks: dayAdhocs,
   }

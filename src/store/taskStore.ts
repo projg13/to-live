@@ -62,6 +62,9 @@ export const useTaskStore = create<TaskStore>()(
         { id: 't-groceries-sun', title: 'Groceries (Sunday - weekly)', weight: 75, durationMinutes: 45, knobs: k },
         { id: 't-read', title: 'Read', weight: 60, durationMinutes: 130, knobs: k },
 
+        // === Sleep ===
+        { id: 't-sleep', title: 'Sleep', weight: 1000, durationMinutes: 540, knobs: k },
+
         // === Recovery tasks ===
         { id: 't-garbage', title: 'Garbage collection', weight: 80, durationMinutes: 15, knobs: k },
         { id: 't-kitchen-clean', title: 'Kitchen cleaning', weight: 70, durationMinutes: 30, knobs: k },
