@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import AnchorPanel from './components/AnchorPanel'
-import DayPlanner from './components/DayPlanner' // slot timeline view
+import DayPlanner from './components/DayPlanner' // slot timeline view (exports findSlots)
+import Dashboard from './components/Dashboard'
 import TaskPanel from './components/TaskPanel'
 import BlockPanel from './components/BlockPanel'
 import RoutinePanel from './components/RoutinePanel'
@@ -52,7 +53,7 @@ function App() {
 
       {/* Content */}
       <main className="p-4 md:p-6 max-w-3xl mx-auto w-full">
-        {tab === 'dashboard' && <p>Dashboard (coming soon)</p>}
+        {tab === 'dashboard' && <Dashboard />}
         {tab === 'manage' && (
           <div>
             {/* Sub-panel tabs */}

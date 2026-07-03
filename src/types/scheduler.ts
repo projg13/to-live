@@ -1,0 +1,43 @@
+// A resolved task placement on the timeline
+export interface ScheduledItem {
+  taskId: string
+  title: string
+  startMinutes: number       // minutes from midnight
+  endMinutes: number         // startMinutes + duration
+  isBackground: boolean      // passive/ghost task
+  source: 'routine' | 'obligation' | 'recovery' | 'adhoc' | 'event'
+  weight: number             // resolved weight at placement time
+  day: number                // 0 = today, 1 = tomorrow, etc.
+}
+
+// An anchor confirmation (user-reported actual transition)
+export interface AnchorConfirmation {
+  anchorId: string
+  actualTime: number         // minutes from midnight (actual, not ideal)
+  day: number                // which day (0 = today)
+}
+
+// An ad-hoc task added on the fly
+export interface AdhocTask {
+  id: string
+  title: string
+  durationMinutes: number
+  startTime: number          // minutes from midnight (user specified)
+  day: number                // which day
+  weight: number
+}
+
+// The full resolved schedule for the week
+export interface WeekSchedule {
+  days: DaySchedule[]        // 7 days
+  generated: string          // ISO timestamp of when this was computed
+}
+
+export interface DaySchedule {
+  date: string               // ISO date
+  dayPlanId: string          // which day plan applies
+  dayPlanName: string
+  confirmedAnchors: AnchorConfirmation[]
+  items: ScheduledItem[]     // resolved task placements, sorted by startMinutes
+  adhocTasks: AdhocTask[]    // user-added on-the-fly tasks
+}
