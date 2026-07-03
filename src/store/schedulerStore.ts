@@ -204,6 +204,12 @@ function resolveDay(
           let weight = task.weight
           const taskConfig = routine.taskConfigs?.find((tc) => tc.taskId === task.id)
 
+          // Check expiry: if task would start after its expiry time, skip it
+          if (taskConfig?.expiresAfterMinutes !== undefined) {
+            const expiryTime = routineStart + taskConfig.expiresAfterMinutes
+            if (cursor >= expiryTime) continue
+          }
+
           if (taskConfig?.slotWeights) {
             const anchorId = block.anchorId
             const slotCurve = taskConfig.slotWeights[anchorId]
@@ -217,6 +223,12 @@ function resolveDay(
           const idealStart = taskConfig?.idealTime
             ? Math.max(taskConfig.idealTime, cursor)
             : cursor
+
+          // Double-check expiry against actual placement time
+          if (taskConfig?.expiresAfterMinutes !== undefined) {
+            const expiryTime = routineStart + taskConfig.expiresAfterMinutes
+            if (idealStart >= expiryTime) continue
+          }
 
           if (weight <= 0) continue
 
