@@ -201,6 +201,9 @@ function resolveDay(
           const task = context.tasks.find((t) => t.id === entry.taskId)
           if (!task) continue
 
+          // If task has a parent, skip it if parent is skipped/not scheduled
+          if (task.parentId && skippedTaskIds.includes(task.parentId)) continue
+
           // Resolve weight considering routine's slot weight overrides
           let weight = task.weight
           const taskConfig = routine.taskConfigs?.find((tc) => tc.taskId === task.id)
@@ -473,10 +476,15 @@ export const useSchedulerStore = create<SchedulerStore>()(
       removeAdhocTask: (id) =>
         set((state) => ({ adhocTasks: state.adhocTasks.filter((t) => t.id !== id) })),
 
-      skipTask: (taskId) =>
+      skipTask: (taskId) => {
+        // Also skip child tasks (those with parentId = this task)
+        const allTasks = JSON.parse(localStorage.getItem('to-live-tasks') ?? '{}')?.state?.tasks ?? []
+        const children = allTasks.filter((t: any) => t.parentId === taskId).map((t: any) => t.id)
+
         set((state) => ({
-          skippedTaskIds: [...state.skippedTaskIds.filter((id) => id !== taskId), taskId],
-        })),
+          skippedTaskIds: [...new Set([...state.skippedTaskIds, taskId, ...children])],
+        }))
+      },
 
       unskipTask: (taskId) =>
         set((state) => ({
@@ -490,33 +498,9 @@ export const useSchedulerStore = create<SchedulerStore>()(
           const newDoneItems = item
             ? [...state.doneItems.filter((i) => i.taskId !== taskId), item]
             : state.doneItems
-
-          // Trigger linked tasks — inject as adhoc after this task's end time
-          const allTasks = JSON.parse(localStorage.getItem('to-live-tasks') ?? '{}')?.state?.tasks ?? []
-          const task = allTasks.find((t: any) => t.id === taskId)
-          const newAdhocs = [...state.adhocTasks]
-          if (task?.links) {
-            const endTime = item?.endMinutes ?? 0
-            const day = item?.day ?? 0
-            for (const link of task.links) {
-              const linked = allTasks.find((t: any) => t.id === link.linkedTaskId)
-              if (linked) {
-                newAdhocs.push({
-                  id: `link-${taskId}-${linked.id}-${Date.now()}`,
-                  title: linked.title,
-                  durationMinutes: linked.durationMinutes,
-                  startTime: endTime,
-                  day,
-                  weight: linked.weight,
-                })
-              }
-            }
-          }
-
           return {
             doneTasks: [...state.doneTasks.filter((id) => id !== taskId), taskId],
             doneItems: newDoneItems,
-            adhocTasks: newAdhocs,
           }
         }),
 
@@ -542,29 +526,8 @@ export const useSchedulerStore = create<SchedulerStore>()(
             }
           }
 
-          // Trigger linked tasks from the completed task
-          const allTasks = JSON.parse(localStorage.getItem('to-live-tasks') ?? '{}')?.state?.tasks ?? []
-          const task = allTasks.find((t: any) => t.id === taskId)
-          const newAdhocs = [...state.adhocTasks]
-          if (task?.links) {
-            for (const link of task.links) {
-              const linked = allTasks.find((t: any) => t.id === link.linkedTaskId)
-              if (linked) {
-                newAdhocs.push({
-                  id: `link-${taskId}-${linked.id}-${Date.now()}`,
-                  title: linked.title,
-                  durationMinutes: linked.durationMinutes,
-                  startTime: doneAtMinutes,
-                  day,
-                  weight: linked.weight,
-                })
-              }
-            }
-          }
-
           return {
             doneTasks: allDoneIds,
-            adhocTasks: newAdhocs,
             doneItems: newDoneItems,
             lastDoneAt: { ...state.lastDoneAt, [day]: doneAtMinutes },
           }

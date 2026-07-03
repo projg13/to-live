@@ -96,16 +96,16 @@ export const useBlockStore = create<BlockStore>()(
           blockStickiness: 90,
         },
         // === Friday post-game block (attached to Game End → Work 2 slot) ===
-        // Bath is linked to football — only appears if football was done
         {
           id: 'block-fri-post-game',
           name: 'Friday Post-Game',
           anchorId: 'anchor-game-end',
           entries: [
-            e('t-eat-fri', 0),
-            e('t-work-fri-eve', 1),
+            e('t-bath-fri', 0),       // vanishes if football skipped/expired
+            e('t-eat-fri', 1),
+            e('t-work-fri-eve', 2),
           ],
-          expectedDurationMinutes: 70,
+          expectedDurationMinutes: 90,
           overflowBehavior: 'push',
           blockStickiness: 70,
         },
