@@ -122,10 +122,10 @@ export const useRoutineStore = create<RoutineStore>()(
           recurrence: { pattern: 'weekly', daysOfWeek: [6] },
           idealSpawnTime: 360,
           taskConfigs: [
-            { taskId: 't-cook', expiresAfterMinutes: 240 },
-            { taskId: 't-sandhi-am', expiresAfterMinutes: 120 },
-            { taskId: 't-protein-am', expiresAfterMinutes: 180 },
-            { taskId: 't-eat-am', expiresAfterMinutes: 240 },
+            { taskId: 't-cook', expiresAfterMinutes: 540 },       // dead after 3 PM
+            { taskId: 't-sandhi-am', expiresAfterMinutes: 420 },  // dead after 1 PM
+            { taskId: 't-protein-am', expiresAfterMinutes: 540 },
+            { taskId: 't-eat-am', expiresAfterMinutes: 540 },
           ],
           enabled: true,
         },
@@ -149,10 +149,10 @@ export const useRoutineStore = create<RoutineStore>()(
           recurrence: { pattern: 'weekly', daysOfWeek: [0] },
           idealSpawnTime: 360,
           taskConfigs: [
-            { taskId: 't-cook', expiresAfterMinutes: 240 },
-            { taskId: 't-sandhi-am', expiresAfterMinutes: 120 },
-            { taskId: 't-protein-am', expiresAfterMinutes: 180 },
-            { taskId: 't-eat-am', expiresAfterMinutes: 240 },
+            { taskId: 't-cook', expiresAfterMinutes: 540 },       // dead after 3 PM
+            { taskId: 't-sandhi-am', expiresAfterMinutes: 420 },  // dead after 1 PM
+            { taskId: 't-protein-am', expiresAfterMinutes: 540 },
+            { taskId: 't-eat-am', expiresAfterMinutes: 540 },
           ],
           enabled: true,
         },
