@@ -30,6 +30,7 @@ function Dashboard() {
   const [preponeTime, setPreponeTime] = useState('')
   const [showDoneAt, setShowDoneAt] = useState<string | null>(null)
   const [doneAtTime, setDoneAtTime] = useState('')
+  const [showInsertAt, setShowInsertAt] = useState<{ taskId: string; position: 'above' | 'below' } | null>(null)
 
   const buildContext = (): ResolveContext => ({
     tasks: JSON.parse(JSON.stringify(tasks)),
@@ -221,7 +222,7 @@ function Dashboard() {
                       </span>
                       <span style={{ fontSize: 11 }}>w:{Math.round(item.weight)}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: 4 }}>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       {!isDone && !isPostponed && !isSkipped && (
                         <>
                           <button onClick={() => setShowDoneAt(showDoneAt === item.taskId ? null : item.taskId)} style={{ fontSize: 11 }}>done</button>
@@ -239,6 +240,8 @@ function Dashboard() {
                       {item.source === 'adhoc' && (
                         <button onClick={() => scheduler.removeAdhocTask(item.taskId)} style={{ fontSize: 11 }}>x</button>
                       )}
+                      <button onClick={() => setShowInsertAt({ taskId: item.taskId, position: 'above' })} style={{ fontSize: 11 }}>+above</button>
+                      <button onClick={() => setShowInsertAt({ taskId: item.taskId, position: 'below' })} style={{ fontSize: 11 }}>+below</button>
                     </div>
                   </div>
 
@@ -290,6 +293,21 @@ function Dashboard() {
                       <button onClick={() => { setShowPrepone(null); setPreponeTime('') }} style={{ fontSize: 11 }}>cancel</button>
                     </div>
                   )}
+
+                  {/* Insert above/below */}
+                  {showInsertAt?.taskId === item.taskId && (
+                    <InlineInsertForm
+                      tasks={tasks}
+                      targetTime={showInsertAt.position === 'above' ? item.startMinutes : item.endMinutes}
+                      label={showInsertAt.position === 'above' ? `Insert above (@ ${formatTime(item.startMinutes)})` : `Insert below (@ ${formatTime(item.endMinutes)})`}
+                      day={selectedDay}
+                      onInsert={(taskId, startTime) => {
+                        scheduler.insertTask(taskId, startTime, selectedDay)
+                        setShowInsertAt(null)
+                      }}
+                      onCancel={() => setShowInsertAt(null)}
+                    />
+                  )}
                 </div>
               )
             })}
@@ -330,6 +348,56 @@ function AdhocTaskForm({
           }
         }}>Add</button>
         <button onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+function InlineInsertForm({
+  tasks,
+  targetTime,
+  label,
+  day,
+  onInsert,
+  onCancel,
+}: {
+  tasks: { id: string; title: string; durationMinutes: number }[]
+  targetTime: number
+  label: string
+  day: number
+  onInsert: (taskId: string, startTime: number) => void
+  onCancel: () => void
+}) {
+  const [search, setSearch] = useState('')
+  const filtered = tasks.filter((t) =>
+    t.title.toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <div style={{ padding: '4px 0 8px 48px' }}>
+      <span style={{ fontSize: 12, fontWeight: 'bold' }}>{label}</span>
+      <div style={{ marginTop: 4 }}>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search tasks..."
+          style={{ width: '100%' }}
+        />
+        {search && filtered.length > 0 && (
+          <div style={{ maxHeight: 100, overflow: 'auto', border: '1px solid #ccc', padding: 4, marginTop: 2 }}>
+            {filtered.slice(0, 8).map((t) => (
+              <div
+                key={t.id}
+                onClick={() => onInsert(t.id, targetTime)}
+                style={{ padding: '2px 4px', cursor: 'pointer', fontSize: 12 }}
+              >
+                {t.title} ({t.durationMinutes}min)
+              </div>
+            ))}
+          </div>
+        )}
+        <button onClick={onCancel} style={{ marginTop: 4, fontSize: 11 }}>cancel</button>
       </div>
     </div>
   )
