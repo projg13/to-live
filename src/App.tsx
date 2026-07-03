@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import AnchorPanel from './components/AnchorPanel'
-import DayPlanner from './components/DayPlanner'
+import DayPlanner from './components/DayPlanner' // slot timeline view
 import TaskPanel from './components/TaskPanel'
 import BlockPanel from './components/BlockPanel'
 import RoutinePanel from './components/RoutinePanel'
+import ObligationPanel from './components/ObligationPanel'
+import DayPlannerPanel from './components/DayPlannerPanel'
+import EventPanel from './components/EventPanel'
 
 const managePanels = [
   'Tasks',
@@ -68,11 +71,13 @@ function App() {
             </div>
 
             {activePanel === 'Anchors' && <AnchorPanel />}
-            {activePanel === 'Day Planner' && <DayPlanner />}
+            {activePanel === 'Day Planner' && <DayPlannerPanel />}
             {activePanel === 'Tasks' && <TaskPanel />}
             {activePanel === 'Blocks' && <BlockPanel />}
             {activePanel === 'Routines' && <RoutinePanel />}
-            {!['Anchors', 'Day Planner', 'Tasks', 'Blocks', 'Routines'].includes(activePanel) && (
+            {activePanel === 'Obligations' && <ObligationPanel />}
+            {activePanel === 'Events' && <EventPanel />}
+            {!['Anchors', 'Day Planner', 'Tasks', 'Blocks', 'Routines', 'Obligations', 'Events'].includes(activePanel) && (
               <p>Hello World - {activePanel}</p>
             )}
           </div>
