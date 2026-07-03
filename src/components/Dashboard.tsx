@@ -7,9 +7,9 @@ import { useRoutineStore } from '../store/routineStore'
 import { useObligationStore } from '../store/obligationStore'
 import { useRecoveryStore } from '../store/recoveryStore'
 import { usePlannerStore } from '../store/plannerStore'
-import { formatTime, getWeight } from '../types/anchor'
+import { formatTime } from '../types/anchor'
 import { findSlots } from './DayPlanner'
-import type { AdhocTask, AnchorConfirmation } from '../types/scheduler'
+import type { AdhocTask, AnchorConfirmation, ScheduledItem } from '../types/scheduler'
 import type { ResolveContext } from '../store/schedulerStore'
 
 function Dashboard() {
@@ -24,10 +24,11 @@ function Dashboard() {
 
   const [selectedDay, setSelectedDay] = useState(0)
   const [showAdhocForm, setShowAdhocForm] = useState(false)
-  const [showAnchorConfirm, setShowAnchorConfirm] = useState(false)
-  const [virtualTime, setVirtualTime] = useState(360) // 6 AM default
+  const [virtualTime, setVirtualTime] = useState(360)
   const [showPrepone, setShowPrepone] = useState<string | null>(null)
   const [preponeTime, setPreponeTime] = useState('')
+  const [showDoneAt, setShowDoneAt] = useState<string | null>(null)
+  const [doneAtTime, setDoneAtTime] = useState('')
 
   const buildContext = (): ResolveContext => ({
     tasks: JSON.parse(JSON.stringify(tasks)),
@@ -41,18 +42,35 @@ function Dashboard() {
     calendarEvents,
   })
 
-  // Auto-resolve on any change
   useEffect(() => {
     scheduler.resolve(buildContext())
-  }, [tasks, anchors, blocks, routines, obligations, recoveryPlans, dayPlans, weekPlan, calendarEvents, scheduler.confirmedAnchors, scheduler.adhocTasks, scheduler.skippedTaskIds, scheduler.doneTasks, scheduler.postponedTasks])
+  }, [tasks, anchors, blocks, routines, obligations, recoveryPlans, dayPlans, weekPlan, calendarEvents, scheduler.confirmedAnchors, scheduler.adhocTasks, scheduler.skippedTaskIds, scheduler.doneTasks, scheduler.postponedTasks, scheduler.lastDoneAt])
 
   const schedule = scheduler.schedule
   const daySchedule = schedule?.days[selectedDay]
 
-  // Compute max weight across all items for gradient display
   const maxWeight = daySchedule
     ? Math.max(...daySchedule.items.map((i) => i.weight), 1)
     : 1
+
+  // Build timeline: interleave anchors + tasks
+  const slots = findSlots(anchors)
+  const timelineItems: { type: 'anchor' | 'task'; time: number; data: any }[] = []
+
+  // Add anchor markers
+  for (const slot of slots) {
+    timelineItems.push({ type: 'anchor', time: slot.startTime, data: slot })
+  }
+
+  // Add tasks
+  if (daySchedule) {
+    for (const item of daySchedule.items) {
+      timelineItems.push({ type: 'task', time: item.startMinutes, data: item })
+    }
+  }
+
+  // Sort by time
+  timelineItems.sort((a, b) => a.time - b.time)
 
   return (
     <div>
@@ -97,23 +115,9 @@ function Dashboard() {
               <strong>{daySchedule.dayPlanName}</strong>
               <span style={{ fontSize: 12, marginLeft: 8 }}>{daySchedule.date}</span>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setShowAnchorConfirm(!showAnchorConfirm)}>Confirm Anchor</button>
-              <button onClick={() => setShowAdhocForm(!showAdhocForm)}>+ Ad-hoc</button>
-            </div>
+            <button onClick={() => setShowAdhocForm(!showAdhocForm)}>+ Ad-hoc</button>
           </div>
 
-          {/* Anchor confirmation */}
-          {showAnchorConfirm && (
-            <AnchorConfirmForm
-              anchors={anchors}
-              day={selectedDay}
-              onConfirm={(conf) => { scheduler.confirmAnchor(conf); setShowAnchorConfirm(false) }}
-              onCancel={() => setShowAnchorConfirm(false)}
-            />
-          )}
-
-          {/* Adhoc task form */}
           {showAdhocForm && (
             <AdhocTaskForm
               day={selectedDay}
@@ -122,37 +126,52 @@ function Dashboard() {
             />
           )}
 
-          {/* Anchor slots / time blocks */}
-          <div style={{ marginBottom: 12 }}>
-            {(() => {
-              const slots = findSlots(anchors)
-              return slots.map((slot, i) => {
-                const isActive = virtualTime >= slot.startTime && virtualTime < slot.endTime
+          {/* Timeline: anchors + tasks interleaved */}
+          <div>
+            {timelineItems.length === 0 && (
+              <p style={{ fontSize: 12, fontStyle: 'italic' }}>No items.</p>
+            )}
+            {timelineItems.map((entry, i) => {
+              if (entry.type === 'anchor') {
+                const slot = entry.data
+                const conf = daySchedule.confirmedAnchors.find((c) => {
+                  const a = anchors.find((an) => an.id === c.anchorId)
+                  return a?.name === slot.anchorName
+                })
+                const anchor = anchors.find((a) => a.name === slot.anchorName)
+                const displayTime = conf?.actualTime ?? slot.startTime
+
                 return (
-                  <div key={i} style={{
+                  <div key={`anchor-${i}`} style={{
+                    padding: '6px 0',
+                    borderTop: '2px solid #333',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 8,
-                    padding: '4px 0',
-                    borderLeft: isActive ? '3px solid #333' : '3px solid transparent',
-                    paddingLeft: 8,
                   }}>
-                    <span style={{ fontFamily: 'monospace', fontSize: 12, width: 120 }}>
-                      {formatTime(slot.startTime)} – {formatTime(slot.endTime)}
+                    <span style={{ fontFamily: 'monospace', fontSize: 13 }}>
+                      {formatTime(displayTime)}
                     </span>
-                    <strong style={{ fontSize: 13 }}>{slot.anchorName}</strong>
+                    <strong>{slot.anchorName}</strong>
+                    {/* Inline time edit for anchor */}
+                    <input
+                      type="time"
+                      value={toTimeStr(displayTime)}
+                      onChange={(e) => {
+                        if (anchor && e.target.value) {
+                          const [h, m] = e.target.value.split(':').map(Number)
+                          scheduler.confirmAnchor({ anchorId: anchor.id, actualTime: (h || 0) * 60 + (m || 0), day: selectedDay })
+                        }
+                      }}
+                      style={{ fontSize: 11, width: 90 }}
+                    />
+                    {conf && <span style={{ fontSize: 11 }}>(edited)</span>}
                   </div>
                 )
-              })
-            })()}
-          </div>
+              }
 
-          {/* Timeline */}
-          <div>
-            {daySchedule.items.length === 0 && (
-              <p style={{ fontSize: 12, fontStyle: 'italic' }}>No tasks scheduled.</p>
-            )}
-            {daySchedule.items.map((item, i) => {
+              // Task item
+              const item: ScheduledItem = entry.data
               const isDone = scheduler.doneTasks.includes(item.taskId)
               const isPostponed = scheduler.postponedTasks.includes(item.taskId)
               const isSkipped = scheduler.skippedTaskIds.includes(item.taskId)
@@ -160,11 +179,11 @@ function Dashboard() {
               const weightPct = Math.round((item.weight / maxWeight) * 100)
 
               return (
-                <div key={`${item.taskId}-${i}`}>
+                <div key={`task-${item.taskId}-${i}`}>
                   <div
                     style={{
-                      borderTop: '1px solid #ccc',
-                      padding: '8px 0',
+                      borderTop: '1px solid #eee',
+                      padding: '6px 0',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
@@ -175,7 +194,6 @@ function Dashboard() {
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {/* Weight gradient bar */}
                       <div style={{ width: 40, height: 12, border: '1px solid #999', position: 'relative' }}>
                         <div style={{ width: `${weightPct}%`, height: '100%', background: '#333' }} />
                       </div>
@@ -189,14 +207,12 @@ function Dashboard() {
                         {isDone && ' [done]'}
                         {isPostponed && ' [postponed]'}
                       </span>
-                      <span style={{ fontSize: 11 }}>
-                        [{item.source}] w:{Math.round(item.weight)}
-                      </span>
+                      <span style={{ fontSize: 11 }}>w:{Math.round(item.weight)}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 4 }}>
                       {!isDone && !isPostponed && !isSkipped && (
                         <>
-                          <button onClick={() => scheduler.markDone(item.taskId)} style={{ fontSize: 11 }}>done</button>
+                          <button onClick={() => setShowDoneAt(showDoneAt === item.taskId ? null : item.taskId)} style={{ fontSize: 11 }}>done</button>
                           <button onClick={() => scheduler.postpone(item.taskId)} style={{ fontSize: 11 }}>postpone</button>
                           <button onClick={() => setShowPrepone(showPrepone === item.taskId ? null : item.taskId)} style={{ fontSize: 11 }}>prepone</button>
                           <button onClick={() => scheduler.skipTask(item.taskId)} style={{ fontSize: 11 }}>skip</button>
@@ -214,6 +230,34 @@ function Dashboard() {
                     </div>
                   </div>
 
+                  {/* Done at time picker */}
+                  {showDoneAt === item.taskId && (
+                    <div style={{ padding: '4px 0 8px 48px', display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ fontSize: 12 }}>Done at:</span>
+                      <input
+                        type="time"
+                        value={doneAtTime}
+                        onChange={(e) => setDoneAtTime(e.target.value)}
+                      />
+                      <button onClick={() => {
+                        if (doneAtTime) {
+                          const [h, m] = doneAtTime.split(':').map(Number)
+                          scheduler.markDoneAt(item.taskId, (h || 0) * 60 + (m || 0), selectedDay)
+                        } else {
+                          scheduler.markDone(item.taskId)
+                        }
+                        setShowDoneAt(null)
+                        setDoneAtTime('')
+                      }} style={{ fontSize: 11 }}>confirm</button>
+                      <button onClick={() => {
+                        scheduler.markDone(item.taskId)
+                        setShowDoneAt(null)
+                        setDoneAtTime('')
+                      }} style={{ fontSize: 11 }}>now</button>
+                      <button onClick={() => { setShowDoneAt(null); setDoneAtTime('') }} style={{ fontSize: 11 }}>cancel</button>
+                    </div>
+                  )}
+
                   {/* Prepone form */}
                   {showPrepone === item.taskId && (
                     <div style={{ padding: '4px 0 8px 48px', display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -226,8 +270,7 @@ function Dashboard() {
                       <button onClick={() => {
                         if (preponeTime) {
                           const [h, m] = preponeTime.split(':').map(Number)
-                          const targetTime = (h || 0) * 60 + (m || 0)
-                          scheduler.preponeTask(item.taskId, targetTime, selectedDay)
+                          scheduler.preponeTask(item.taskId, (h || 0) * 60 + (m || 0), selectedDay)
                           setShowPrepone(null)
                           setPreponeTime('')
                         }
@@ -239,59 +282,8 @@ function Dashboard() {
               )
             })}
           </div>
-
-          {/* Confirmed anchors */}
-          {daySchedule.confirmedAnchors.length > 0 && (
-            <div style={{ marginTop: 12, fontSize: 12 }}>
-              <strong>Confirmed:</strong>
-              {daySchedule.confirmedAnchors.map((c, i) => {
-                const anchor = anchors.find((a) => a.id === c.anchorId)
-                return (
-                  <span key={i} style={{ marginLeft: 8 }}>
-                    {anchor?.name ?? c.anchorId} @ {formatTime(c.actualTime)}
-                  </span>
-                )
-              })}
-            </div>
-          )}
         </div>
       )}
-    </div>
-  )
-}
-
-// --- Sub-components ---
-
-function AnchorConfirmForm({
-  anchors,
-  day,
-  onConfirm,
-  onCancel,
-}: {
-  anchors: { id: string; name: string }[]
-  day: number
-  onConfirm: (conf: AnchorConfirmation) => void
-  onCancel: () => void
-}) {
-  const [anchorId, setAnchorId] = useState('')
-  const [time, setTime] = useState('')
-
-  return (
-    <div style={{ border: '1px solid #999', padding: 8, marginBottom: 8 }}>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <select value={anchorId} onChange={(e) => setAnchorId(e.target.value)}>
-          <option value="">-- anchor --</option>
-          {anchors.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
-        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-        <button onClick={() => {
-          if (anchorId && time) {
-            const [h, m] = time.split(':').map(Number)
-            onConfirm({ anchorId, actualTime: (h || 0) * 60 + (m || 0), day })
-          }
-        }}>Confirm</button>
-        <button onClick={onCancel}>Cancel</button>
-      </div>
     </div>
   )
 }
@@ -329,6 +321,12 @@ function AdhocTaskForm({
       </div>
     </div>
   )
+}
+
+function toTimeStr(mins: number): string {
+  const h = Math.floor(mins / 60) % 24
+  const m = mins % 60
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
 }
 
 export default Dashboard

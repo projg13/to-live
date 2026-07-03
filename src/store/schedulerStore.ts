@@ -21,6 +21,7 @@ interface SchedulerStore {
   skippedTaskIds: string[]
   doneTasks: string[]
   postponedTasks: string[]
+  lastDoneAt: Record<number, number>  // day → minutes from midnight (latest done-at time)
 
   // Actions
   resolve: (context: ResolveContext) => void
@@ -30,6 +31,7 @@ interface SchedulerStore {
   skipTask: (taskId: string) => void
   unskipTask: (taskId: string) => void
   markDone: (taskId: string) => void
+  markDoneAt: (taskId: string, doneAtMinutes: number, day: number) => void
   postpone: (taskId: string) => void
   preponeTask: (taskId: string, targetTime: number, day: number) => void
   unmarkTask: (taskId: string) => void
@@ -66,7 +68,8 @@ function resolveDay(
   context: ResolveContext,
   confirmedAnchors: AnchorConfirmation[],
   adhocTasks: AdhocTask[],
-  skippedTaskIds: string[]
+  skippedTaskIds: string[],
+  lastDoneAt?: number
 ): DaySchedule {
   const dayOfWeek = getDayOfWeek(dateStr)
 
@@ -147,9 +150,11 @@ function resolveDay(
     )
 
     // Collect tasks from routines → blocks
-    // Place them sequentially from routine's idealSpawnTime, respecting block order
+    // Place them sequentially from routine's idealSpawnTime (or lastDoneAt if later)
     for (const routine of activeRoutines) {
-      let cursor = routine.idealSpawnTime
+      let cursor = lastDoneAt !== undefined && lastDoneAt > routine.idealSpawnTime
+        ? lastDoneAt
+        : routine.idealSpawnTime
 
       for (const blockId of routine.blockIds) {
         const block = context.blocks.find((b) => b.id === blockId)
@@ -344,6 +349,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
       skippedTaskIds: [],
       doneTasks: [],
       postponedTasks: [],
+      lastDoneAt: {},
 
       resolve: (context) => {
         const state = get()
@@ -357,7 +363,8 @@ export const useSchedulerStore = create<SchedulerStore>()(
             context,
             state.confirmedAnchors,
             state.adhocTasks,
-            [...state.skippedTaskIds, ...state.doneTasks, ...state.postponedTasks]
+            [...state.skippedTaskIds, ...state.doneTasks, ...state.postponedTasks],
+            state.lastDoneAt[i]
           ))
         }
 
@@ -400,6 +407,13 @@ export const useSchedulerStore = create<SchedulerStore>()(
           doneTasks: [...state.doneTasks.filter((id) => id !== taskId), taskId],
         })),
 
+      // Mark done at specific time — remaining tasks recalibrate from here
+      markDoneAt: (taskId, doneAtMinutes, day) =>
+        set((state) => ({
+          doneTasks: [...state.doneTasks.filter((id) => id !== taskId), taskId],
+          lastDoneAt: { ...state.lastDoneAt, [day]: doneAtMinutes },
+        })),
+
       postpone: (taskId) =>
         set((state) => ({
           postponedTasks: [...state.postponedTasks.filter((id) => id !== taskId), taskId],
@@ -427,7 +441,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
         })),
 
       clearSchedule: () =>
-        set({ schedule: null, confirmedAnchors: [], adhocTasks: [], skippedTaskIds: [], doneTasks: [], postponedTasks: [] }),
+        set({ schedule: null, confirmedAnchors: [], adhocTasks: [], skippedTaskIds: [], doneTasks: [], postponedTasks: [], lastDoneAt: {} }),
     }),
     { name: 'to-live-scheduler' }
   )
