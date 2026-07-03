@@ -95,6 +95,9 @@ function resolveDay(
   const dayPlan = context.dayPlans.find((p) => p.id === dayPlanId)
   if (dayPlan) dayPlanName = dayPlan.name
 
+  // Get confirmed anchors for this day
+  const dayConfirmations = confirmedAnchors.filter((c) => c.day === dayIndex)
+
   // Get template for this day (find matching template from anchorIds)
   const templates = context.templates ?? []
   // Match template by finding one whose anchors match the day plan's anchorIds
@@ -117,9 +120,6 @@ function resolveDay(
       })
     }
   }
-
-  // Get confirmed anchors for this day
-  const dayConfirmations = confirmedAnchors.filter((c) => c.day === dayIndex)
 
   // Get adhoc tasks for this day
   const dayAdhocs = adhocTasks.filter((a) => a.day === dayIndex)
