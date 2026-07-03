@@ -426,32 +426,49 @@ export const useSchedulerStore = create<SchedulerStore>()(
           doneTasks: [...state.doneTasks.filter((id) => id !== taskId), taskId],
         })),
 
-      // Mark done at specific time — remaining tasks recalibrate from here
+      // Mark done at specific time — all tasks scheduled before this time
+      // are also marked done, and remaining tasks recalibrate from here
       markDoneAt: (taskId, doneAtMinutes, day) =>
-        set((state) => ({
-          doneTasks: [...state.doneTasks.filter((id) => id !== taskId), taskId],
-          lastDoneAt: { ...state.lastDoneAt, [day]: doneAtMinutes },
-        })),
+        set((state) => {
+          // Find all tasks that were scheduled before doneAtMinutes and mark them done too
+          const schedule = state.schedule
+          const dayItems = schedule?.days[day]?.items ?? []
+          const tasksBefore = dayItems
+            .filter((item) => item.endMinutes <= doneAtMinutes && !item.isBackground)
+            .map((item) => item.taskId)
+
+          const allDone = [...new Set([...state.doneTasks, ...tasksBefore, taskId])]
+
+          return {
+            doneTasks: allDone,
+            lastDoneAt: { ...state.lastDoneAt, [day]: doneAtMinutes },
+          }
+        }),
 
       postpone: (taskId) =>
         set((state) => ({
           postponedTasks: [...state.postponedTasks.filter((id) => id !== taskId), taskId],
         })),
 
-      preponeTask: (taskId, targetTime, day) =>
+      preponeTask: (taskId, targetTime, day) => {
+        // Find actual task to get title and duration
+        const schedule = get().schedule
+        const item = schedule?.days[day]?.items.find((i) => i.taskId === taskId)
+        const duration = item ? (item.endMinutes - item.startMinutes) : 30
+        const title = item?.title ?? taskId
+
         set((state) => ({
-          // Add as adhoc at target time with high weight to force placement
           adhocTasks: [...state.adhocTasks, {
             id: `prepone-${taskId}-${Date.now()}`,
-            title: `[preponed] ${taskId}`,
-            durationMinutes: 0, // will be resolved from original task
+            title: `[preponed] ${title}`,
+            durationMinutes: duration,
             startTime: targetTime,
             day,
-            weight: 9999, // force placement at this time
+            weight: 9999,
           }],
-          // Remove from normal scheduling so it doesn't double-appear
           skippedTaskIds: [...state.skippedTaskIds.filter((id) => id !== taskId), taskId],
-        })),
+        }))
+      },
 
       unmarkTask: (taskId) =>
         set((state) => ({
@@ -459,17 +476,24 @@ export const useSchedulerStore = create<SchedulerStore>()(
           postponedTasks: state.postponedTasks.filter((id) => id !== taskId),
         })),
 
-      insertTask: (taskId, startTime, day) =>
+      insertTask: (taskId, startTime, day) => {
+        // Find actual task to get title and duration from context
+        const allTasks = JSON.parse(localStorage.getItem('to-live-tasks') ?? '{}')?.state?.tasks ?? []
+        const task = allTasks.find((t: any) => t.id === taskId)
+        const title = task?.title ?? taskId
+        const duration = task?.durationMinutes ?? 30
+
         set((state) => ({
           adhocTasks: [...state.adhocTasks, {
             id: `insert-${taskId}-${Date.now()}`,
-            title: taskId, // will be resolved to actual title by dashboard display
-            durationMinutes: 0, // placeholder — scheduler uses actual task duration
+            title,
+            durationMinutes: duration,
             startTime,
             day,
-            weight: 500, // high weight to force placement
+            weight: 500,
           }],
-        })),
+        }))
+      },
 
       undo: () =>
         set((state) => {
