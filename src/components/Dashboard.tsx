@@ -25,6 +25,7 @@ function Dashboard() {
   const [selectedDay, setSelectedDay] = useState(0)
   const [showAdhocForm, setShowAdhocForm] = useState(false)
   const [showInsertForm, setShowInsertForm] = useState(false)
+  const [showRecovery, setShowRecovery] = useState(false)
   const [virtualTime, setVirtualTime] = useState(360)
   const [showPrepone, setShowPrepone] = useState<string | null>(null)
   const [preponeTime, setPreponeTime] = useState('')
@@ -127,7 +128,8 @@ function Dashboard() {
               <span style={{ fontSize: 12, marginLeft: 8 }}>{daySchedule.date}</span>
             </div>
             <button onClick={() => setShowAdhocForm(!showAdhocForm)}>+ Ad-hoc</button>
-            <button onClick={() => setShowInsertForm(!showInsertForm)}>+ Insert Task</button>
+            <button onClick={() => setShowInsertForm(!showInsertForm)}>+ Insert</button>
+            <button onClick={() => setShowRecovery(!showRecovery)}>Recovery</button>
           </div>
 
           {showAdhocForm && (
@@ -145,6 +147,10 @@ function Dashboard() {
               onInsert={(taskId, startTime) => { scheduler.insertTask(taskId, startTime, selectedDay); setShowInsertForm(false) }}
               onCancel={() => setShowInsertForm(false)}
             />
+          )}
+
+          {showRecovery && (
+            <RecoveryQuickPanel onClose={() => setShowRecovery(false)} />
           )}
 
           {/* Timeline: anchors + tasks interleaved */}
@@ -470,6 +476,36 @@ function InsertTaskForm({
       {!selectedTaskId && (
         <button onClick={onCancel} style={{ marginTop: 4 }}>Cancel</button>
       )}
+    </div>
+  )
+}
+
+function RecoveryQuickPanel({ onClose }: { onClose: () => void }) {
+  const { plans, trigger, resolve } = useRecoveryStore()
+
+  return (
+    <div style={{ border: '1px solid #999', padding: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <strong style={{ fontSize: 13 }}>Recovery Plans</strong>
+        <button onClick={onClose} style={{ fontSize: 11 }}>close</button>
+      </div>
+      {plans.map((plan) => (
+        <div key={plan.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderTop: '1px solid #eee' }}>
+          <div>
+            <span>{plan.name}</span>
+            {plan.triggered && <span style={{ fontSize: 11, marginLeft: 8 }}>[ACTIVE]</span>}
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {!plan.triggered && (
+              <button onClick={() => trigger(plan.id)} style={{ fontSize: 11 }}>Trigger</button>
+            )}
+            {plan.triggered && (
+              <button onClick={() => resolve(plan.id)} style={{ fontSize: 11 }}>Resolve</button>
+            )}
+          </div>
+        </div>
+      ))}
+      {plans.length === 0 && <p style={{ fontSize: 12, fontStyle: 'italic' }}>No recovery plans defined.</p>}
     </div>
   )
 }
