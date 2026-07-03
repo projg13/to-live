@@ -14,69 +14,60 @@ export const useRoutineStore = create<RoutineStore>()(
   persist(
     (set) => ({
       routines: [
+        // Mon/Wed
         {
-          id: 'routine-morning',
-          name: 'Daily Morning',
-          blockIds: ['block-morning'],
-          recurrence: { pattern: 'daily' },
-          idealSpawnTime: 360,
-          taskConfigs: [
-            {
-              taskId: 'task-brush',
-              // During work slot: weight 0 the whole time
-              slotWeights: { 'anchor-work': [{ offsetMinutes: 0, value: 0 }] },
-              expiresAfterMinutes: 720,
-              idealTime: 370,
-            },
-            {
-              taskId: 'task-bath',
-              slotWeights: { 'anchor-work': [{ offsetMinutes: 0, value: 0 }] },
-              expiresAfterMinutes: 720,
-              idealTime: 390,
-            },
-            {
-              taskId: 'task-breakfast',
-              // During work slot: starts low, ramps up toward lunch (hunger)
-              slotWeights: { 'anchor-work': [
-                { offsetMinutes: 0, value: 10 },
-                { offsetMinutes: 120, value: 50 },
-                { offsetMinutes: 180, value: 80 },
-              ]},
-              expiresAfterMinutes: 480,
-            },
-          ],
+          id: 'routine-gym-day',
+          name: 'Gym Day (Mon/Wed)',
+          blockIds: ['block-morning-gym', 'block-evening'],
+          recurrence: { pattern: 'weekly', daysOfWeek: [1, 3] },
+          idealSpawnTime: 360, // 6 AM
           enabled: true,
         },
+        // Tue/Thu
         {
-          id: 'routine-evening-cook',
-          name: 'Evening Cook',
-          blockIds: ['block-evening-cook'],
-          recurrence: { pattern: 'daily' },
-          idealSpawnTime: 1080, // 6 PM
-          taskConfigs: [
-            {
-              taskId: 'task-cook-prep',
-              expiresAfterMinutes: 240,
-              idealTime: 1080,
-            },
-          ],
+          id: 'routine-study-day',
+          name: 'Study Day (Tue/Thu)',
+          blockIds: ['block-morning-study', 'block-evening'],
+          recurrence: { pattern: 'weekly', daysOfWeek: [2, 4] },
+          idealSpawnTime: 360,
+          enabled: true,
+        },
+        // Friday
+        {
+          id: 'routine-friday',
+          name: 'Friday',
+          blockIds: ['block-morning-fri', 'block-fri-afternoon', 'block-evening'],
+          recurrence: { pattern: 'weekly', daysOfWeek: [5] },
+          idealSpawnTime: 360,
+          enabled: true,
+        },
+        // Saturday
+        {
+          id: 'routine-saturday',
+          name: 'Saturday',
+          blockIds: ['block-morning-sat', 'block-evening'],
+          recurrence: { pattern: 'weekly', daysOfWeek: [6] },
+          idealSpawnTime: 360,
+          enabled: true,
+        },
+        // Sunday
+        {
+          id: 'routine-sunday',
+          name: 'Sunday',
+          blockIds: ['block-morning-sun', 'block-sun-pre-evening', 'block-evening'],
+          recurrence: { pattern: 'weekly', daysOfWeek: [0] },
+          idealSpawnTime: 360,
           enabled: true,
         },
       ],
       addRoutine: (routine) =>
         set((state) => ({ routines: [...state.routines, routine] })),
       updateRoutine: (id, updates) =>
-        set((state) => ({
-          routines: state.routines.map((r) => (r.id === id ? { ...r, ...updates } : r)),
-        })),
+        set((state) => ({ routines: state.routines.map((r) => (r.id === id ? { ...r, ...updates } : r)) })),
       deleteRoutine: (id) =>
         set((state) => ({ routines: state.routines.filter((r) => r.id !== id) })),
       toggleEnabled: (id) =>
-        set((state) => ({
-          routines: state.routines.map((r) =>
-            r.id === id ? { ...r, enabled: !r.enabled } : r
-          ),
-        })),
+        set((state) => ({ routines: state.routines.map((r) => r.id === id ? { ...r, enabled: !r.enabled } : r) })),
     }),
     { name: 'to-live-routines' }
   )

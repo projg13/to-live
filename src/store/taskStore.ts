@@ -11,200 +11,87 @@ interface TaskStore {
   getChildrenOf: (parentId: string) => Task[]
 }
 
+const k = { scheduled: false, isMother: false, hasWeightCurve: false, hasExpiry: false, hasStickiness: false }
+
 export const useTaskStore = create<TaskStore>()(
   persist(
     (set, get) => ({
       tasks: [
-        // Laundry chain: load → run (passive) → unload → hang
-        {
-          id: 'task-laundry-load',
-          title: 'Laundry: load machine',
-          weight: 80,
-          durationMinutes: 10,
-          links: [
-            { linkedTaskId: 'task-laundry-run', linkType: 'passive', continuity: 'continuous' },
-          ],
-          knobs: { scheduled: false, isMother: true, hasWeightCurve: false, hasExpiry: false, hasStickiness: false },
-        },
-        {
-          id: 'task-laundry-run',
-          title: 'Laundry: machine running',
-          weight: 10,
-          durationMinutes: 45,
-          links: [
-            { linkedTaskId: 'task-laundry-unload', linkType: 'active' },
-          ],
-          knobs: { scheduled: false, isMother: true, hasWeightCurve: false, hasExpiry: false, hasStickiness: false },
-        },
-        {
-          id: 'task-laundry-unload',
-          title: 'Laundry: unload',
-          weight: 70,
-          durationMinutes: 5,
-          links: [
-            { linkedTaskId: 'task-hang-clothes', linkType: 'active' },
-          ],
-          knobs: { scheduled: false, isMother: true, hasWeightCurve: false, hasExpiry: false, hasStickiness: false },
-        },
-        {
-          id: 'task-hang-clothes',
-          title: 'Hang clothes',
-          weight: 70,
-          durationMinutes: 15,
-          knobs: { scheduled: false, isMother: false, hasWeightCurve: false, hasExpiry: false, hasStickiness: false },
-        },
-        // Morning workout
-        {
-          id: 'task-morning-workout',
-          title: 'Morning workout',
-          weight: 90,
-          durationMinutes: 45,
-          knobs: { scheduled: true, isMother: false, hasWeightCurve: false, hasExpiry: false, hasStickiness: true },
-          start: '2026-07-03T06:30:00',
-          end: '2026-07-03T07:15:00',
-          stickiness: 80,
-        },
-        // Cook dinner: prep → cooking (passive) → plate
-        {
-          id: 'task-cook-prep',
-          title: 'Cook: prep ingredients',
-          weight: 75,
-          durationMinutes: 15,
-          links: [
-            { linkedTaskId: 'task-cook-cooking', linkType: 'passive', continuity: 'continuous' },
-          ],
-          knobs: { scheduled: false, isMother: true, hasWeightCurve: false, hasExpiry: false, hasStickiness: false },
-        },
-        {
-          id: 'task-cook-cooking',
-          title: 'Cook: on stove',
-          weight: 10,
-          durationMinutes: 20,
-          links: [
-            { linkedTaskId: 'task-cook-plate', linkType: 'active' },
-          ],
-          knobs: { scheduled: false, isMother: true, hasWeightCurve: false, hasExpiry: false, hasStickiness: false },
-        },
-        {
-          id: 'task-cook-plate',
-          title: 'Cook: plate & serve',
-          weight: 60,
-          durationMinutes: 5,
-          knobs: { scheduled: false, isMother: false, hasWeightCurve: false, hasExpiry: false, hasStickiness: false },
-        },
-        // Simple tasks
-        {
-          id: 'task-read-book',
-          title: 'Read book',
-          weight: 40,
-          durationMinutes: 30,
-          knobs: { scheduled: false, isMother: false, hasWeightCurve: false, hasExpiry: true, hasStickiness: false },
-          expiresAt: '2026-07-10T23:59:00',
-        },
-        {
-          id: 'task-email-replies',
-          title: 'Email replies',
-          weight: 60,
-          durationMinutes: 20,
-          knobs: { scheduled: false, isMother: false, hasWeightCurve: true, hasExpiry: true, hasStickiness: true },
-          weightCurve: [
-            { datetime: '2026-07-03T09:00:00', value: 30 },
-            { datetime: '2026-07-03T12:00:00', value: 80 },
-            { datetime: '2026-07-03T17:00:00', value: 100 },
-          ],
-          expiresAt: '2026-07-03T18:00:00',
-          stickiness: 20,
-        },
-        {
-          id: 'task-brush',
-          title: 'Brush teeth',
-          weight: 50,
-          durationMinutes: 5,
-          knobs: { scheduled: false, isMother: false, hasWeightCurve: false, hasExpiry: false, hasStickiness: false },
-        },
-        {
-          id: 'task-bath',
-          title: 'Bath',
-          weight: 50,
-          durationMinutes: 20,
-          knobs: { scheduled: false, isMother: false, hasWeightCurve: false, hasExpiry: false, hasStickiness: false },
-        },
-        {
-          id: 'task-breakfast',
-          title: 'Eat breakfast',
-          weight: 40,
-          durationMinutes: 20,
-          knobs: { scheduled: false, isMother: false, hasWeightCurve: false, hasExpiry: false, hasStickiness: false },
-        },
+        // === Morning routine tasks ===
+        { id: 't-brush', title: 'Brush', weight: 80, durationMinutes: 10, knobs: k },
+        { id: 't-protein-am', title: 'Protein', weight: 70, durationMinutes: 10, knobs: k },
+        { id: 't-gym', title: 'Gym', weight: 90, durationMinutes: 130, knobs: k },
+        { id: 't-study', title: 'Study', weight: 85, durationMinutes: 130, knobs: k },
+        { id: 't-heater-relax', title: 'Turn on heater & relax', weight: 50, durationMinutes: 20, knobs: k },
+        { id: 't-bath', title: 'Bath', weight: 75, durationMinutes: 20, knobs: k },
+        { id: 't-oil-bath', title: 'Oil bath', weight: 75, durationMinutes: 60, knobs: k },
+        { id: 't-bath-groom', title: 'Bath + Grooming', weight: 75, durationMinutes: 60, knobs: k },
+        { id: 't-sandhi-am', title: 'Sandhi (AM)', weight: 70, durationMinutes: 15, knobs: k },
+        { id: 't-cook', title: 'Cook', weight: 80, durationMinutes: 60, knobs: k },
+        { id: 't-eat-am', title: 'Eat (morning)', weight: 70, durationMinutes: 15, knobs: k },
+        { id: 't-change', title: 'Change', weight: 60, durationMinutes: 10, knobs: k },
+        { id: 't-walk-office', title: 'Walk to office', weight: 90, durationMinutes: 10, knobs: k },
+
+        // === Work ===
+        { id: 't-work', title: 'Work', weight: 100, durationMinutes: 480, knobs: k },
+        { id: 't-work-fri-am', title: 'Work (Fri morning)', weight: 100, durationMinutes: 210, knobs: k },
+        { id: 't-work-fri-eve', title: 'Work (Fri post-game)', weight: 90, durationMinutes: 60, knobs: k },
+
+        // === Friday extras ===
+        { id: 't-football', title: 'Football', weight: 95, durationMinutes: 180, knobs: k },
+        { id: 't-bath-fri', title: 'Bath (post-football)', weight: 75, durationMinutes: 20, knobs: k },
+        { id: 't-eat-fri', title: 'Eat (post-football)', weight: 70, durationMinutes: 10, knobs: k },
+
+        // === Evening routine tasks ===
+        { id: 't-come-home', title: 'Come home', weight: 80, durationMinutes: 10, knobs: k },
+        { id: 't-protein-pm', title: 'Protein (PM)', weight: 70, durationMinutes: 10, knobs: k },
+        { id: 't-sandhi-pm', title: 'Sandhi (PM)', weight: 70, durationMinutes: 20, knobs: k },
+        { id: 't-dinner-prep', title: 'Dinner prep', weight: 75, durationMinutes: 30, knobs: k },
+        { id: 't-eat-pm', title: 'Eat (dinner)', weight: 70, durationMinutes: 15, knobs: k },
+
+        // === Laundry chain ===
+        { id: 't-laundry-wash', title: 'Laundry: wash', weight: 60, durationMinutes: 5, knobs: { ...k, isMother: true }, links: [{ linkedTaskId: 't-laundry-machine', linkType: 'passive', continuity: 'continuous' }] },
+        { id: 't-laundry-machine', title: 'Laundry: machine running', weight: 10, durationMinutes: 45, knobs: { ...k, isMother: true }, links: [{ linkedTaskId: 't-laundry-fold', linkType: 'active' }] },
+        { id: 't-laundry-fold', title: 'Laundry: fold', weight: 60, durationMinutes: 15, knobs: k },
+        { id: 't-laundry-prep', title: 'Laundry: prep (iron/sort)', weight: 55, durationMinutes: 30, knobs: k },
+        { id: 't-laundry-hang', title: 'Laundry: hang', weight: 55, durationMinutes: 10, knobs: k },
+
+        // === Misc ===
+        { id: 't-relax', title: 'Relax', weight: 30, durationMinutes: 30, knobs: k },
+        { id: 't-groceries-sat', title: 'Groceries (Saturday)', weight: 70, durationMinutes: 30, knobs: k },
+        { id: 't-groceries-sun', title: 'Groceries (Sunday - weekly)', weight: 75, durationMinutes: 45, knobs: k },
+        { id: 't-read', title: 'Read', weight: 60, durationMinutes: 130, knobs: k },
+
+        // === Recovery tasks ===
+        { id: 't-garbage', title: 'Garbage collection', weight: 80, durationMinutes: 15, knobs: k },
+        { id: 't-kitchen-clean', title: 'Kitchen cleaning', weight: 70, durationMinutes: 30, knobs: k },
+        { id: 't-get-ready', title: 'Get ready', weight: 60, durationMinutes: 15, knobs: k },
+        { id: 't-water-can', title: 'Water can', weight: 65, durationMinutes: 10, knobs: k },
       ],
       addTask: (task) => set((state) => ({ tasks: [...state.tasks, task] })),
       updateTask: (id, updates) =>
-        set((state) => ({
-          tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
-        })),
+        set((state) => ({ tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)) })),
       deleteTask: (id) =>
         set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) })),
       triggerLink: (parentId, linkedTaskId) => {
         const state = get()
         const parent = state.tasks.find((t) => t.id === parentId)
-        if (!parent || !parent.links) return
-
+        if (!parent?.links) return
         const link = parent.links.find((l) => l.linkedTaskId === linkedTaskId)
         if (!link) return
-
-        // Check if already triggered
         if (parent.spawnedIds?.includes(linkedTaskId)) return
-
-        // Find the linked task
         const linked = state.tasks.find((t) => t.id === linkedTaskId)
         if (!linked) return
-
-        // Set parent relationship and schedule if parent is scheduled
-        const updates: Partial<Task> = { parentId }
-        if (parent.start) {
-          const parentStart = new Date(parent.start).getTime()
-          const childStart = new Date(parentStart + parent.durationMinutes * 60000)
-          updates.start = childStart.toISOString()
-          updates.end = new Date(childStart.getTime() + linked.durationMinutes * 60000).toISOString()
-          updates.knobs = { ...linked.knobs, scheduled: true }
-        }
-
-        set((state) => ({
-          tasks: state.tasks.map((t) => {
-            if (t.id === parentId) {
-              return { ...t, spawnedIds: [...(t.spawnedIds || []), linkedTaskId] }
-            }
-            if (t.id === linkedTaskId) {
-              return { ...t, ...updates }
-            }
+        set((s) => ({
+          tasks: s.tasks.map((t) => {
+            if (t.id === parentId) return { ...t, spawnedIds: [...(t.spawnedIds || []), linkedTaskId] }
+            if (t.id === linkedTaskId) return { ...t, parentId }
             return t
           }),
         }))
       },
       getChildrenOf: (parentId) => get().tasks.filter((t) => t.parentId === parentId),
     }),
-    {
-      name: 'to-live-tasks',
-      version: 2,
-      migrate: (persisted: any, version: number) => {
-        if (version < 2) {
-          const state = persisted as any
-          state.tasks = (state.tasks || []).map((t: any) => {
-            let durationMinutes = 30
-            if (t.start && t.end) {
-              durationMinutes = Math.round(
-                (new Date(t.end).getTime() - new Date(t.start).getTime()) / 60000
-              )
-            }
-            return {
-              ...t,
-              durationMinutes,
-              knobs: { scheduled: !!(t.start && t.end), hasPhases: false, isMother: false },
-            }
-          })
-        }
-        return persisted
-      },
-    }
+    { name: 'to-live-tasks', version: 3 }
   )
 )
