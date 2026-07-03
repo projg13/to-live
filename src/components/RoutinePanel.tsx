@@ -3,7 +3,7 @@ import { useRoutineStore } from '../store/routineStore'
 import { useBlockStore } from '../store/blockStore'
 import { useTaskStore } from '../store/taskStore'
 import { useAnchorStore } from '../store/anchorStore'
-import type { Routine, RecurrenceConfig, RecurrencePattern, RoutineTaskConfig, SlotWeightPoint } from '../types/routine'
+import type { Routine, RecurrenceConfig, RecurrencePattern, RoutineTaskConfig } from '../types/routine'
 import { formatTime } from '../types/anchor'
 
 function RoutinePanel() {
@@ -290,7 +290,6 @@ function RoutineEditor({
                     return (
                       <div key={a.id} style={{ marginLeft: 12, marginTop: 8, paddingLeft: 8, borderLeft: '1px solid #999' }}>
                         <span style={{ fontSize: 13, fontWeight: 'bold' }}>{a.name}</span>
-                        <span style={{ fontSize: 12, marginLeft: 8 }}>starts @ {formatTime(a.spikeTime)}</span>
                         {points.map((pt, pi) => (
                           <div key={pi} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
                             <label style={{ fontSize: 13 }}>+</label>

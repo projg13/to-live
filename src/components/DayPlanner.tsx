@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAnchorStore } from '../store/anchorStore'
 import { formatTime } from '../types/anchor'
-import type { Anchor, Slot as SlotType, AnchorTemplate, AnchorTemplateEntry } from '../types/anchor'
+import type { Anchor, Slot as SlotType, AnchorTemplate } from '../types/anchor'
 
 export interface ResolvedSlot {
   startTime: number

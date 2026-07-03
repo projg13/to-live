@@ -3,7 +3,6 @@ import { useRecoveryStore } from '../store/recoveryStore'
 import { useTaskStore } from '../store/taskStore'
 import { useBlockStore } from '../store/blockStore'
 import type { RecoveryPlan, TriggerType, AutoTriggerCondition, TimeWeight } from '../types/recovery'
-import { formatTime } from '../types/anchor'
 
 function RecoveryPanel() {
   const { plans, addPlan, updatePlan, deletePlan, trigger, resolve } = useRecoveryStore()

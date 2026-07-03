@@ -61,7 +61,7 @@ function SimpleList({
   addLabel,
 }: {
   items: { id: string; name: string }[]
-  renderItem: (item: { id: string; name: string }) => JSX.Element
+  renderItem: (item: { id: string; name: string }) => React.ReactNode
   onAdd: () => void
   onDelete: (id: string) => void
   onRename: (id: string, name: string) => void

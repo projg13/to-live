@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import AnchorPanel from './components/AnchorPanel'
-import DayPlanner from './components/DayPlanner' // slot timeline view (exports findSlots)
+// DayPlanner used via manage tab
 import Dashboard from './components/Dashboard'
 import TaskPanel from './components/TaskPanel'
 import BlockPanel from './components/BlockPanel'

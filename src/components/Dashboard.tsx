@@ -8,7 +8,7 @@ import { useObligationStore } from '../store/obligationStore'
 import { useRecoveryStore } from '../store/recoveryStore'
 import { usePlannerStore } from '../store/plannerStore'
 import { formatTime } from '../types/anchor'
-import type { AdhocTask, AnchorConfirmation, ScheduledItem } from '../types/scheduler'
+import type { AdhocTask, ScheduledItem } from '../types/scheduler'
 import type { ResolveContext } from '../store/schedulerStore'
 
 function Dashboard() {
@@ -146,7 +146,6 @@ function Dashboard() {
           {showInsertForm && (
             <InsertTaskForm
               tasks={tasks}
-              day={selectedDay}
               onInsert={(taskId, startTime) => { scheduler.insertTask(taskId, startTime, selectedDay); setShowInsertForm(false) }}
               onCancel={() => setShowInsertForm(false)}
             />
@@ -312,7 +311,6 @@ function Dashboard() {
                       tasks={tasks}
                       targetTime={showInsertAt.position === 'above' ? item.startMinutes : item.endMinutes}
                       label={showInsertAt.position === 'above' ? `Insert above (@ ${formatTime(item.startMinutes)})` : `Insert below (@ ${formatTime(item.endMinutes)})`}
-                      day={selectedDay}
                       onInsert={(taskId, startTime) => {
                         scheduler.insertTask(taskId, startTime, selectedDay)
                         setShowInsertAt(null)
@@ -369,14 +367,12 @@ function InlineInsertForm({
   tasks,
   targetTime,
   label,
-  day,
   onInsert,
   onCancel,
 }: {
   tasks: { id: string; title: string; durationMinutes: number }[]
   targetTime: number
   label: string
-  day: number
   onInsert: (taskId: string, startTime: number) => void
   onCancel: () => void
 }) {
@@ -417,12 +413,10 @@ function InlineInsertForm({
 
 function InsertTaskForm({
   tasks,
-  day,
   onInsert,
   onCancel,
 }: {
   tasks: { id: string; title: string; durationMinutes: number }[]
-  day: number
   onInsert: (taskId: string, startTime: number) => void
   onCancel: () => void
 }) {

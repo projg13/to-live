@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useObligationStore } from '../store/obligationStore'
 import { useTaskStore } from '../store/taskStore'
-import type { Obligation, ObligationTask, WeightBracket, TimeWeight, ObligationRecurrence } from '../types/obligation'
+import type { Obligation, ObligationTask, WeightBracket, ObligationRecurrence } from '../types/obligation'
 import { formatTime } from '../types/anchor'
 
 function ObligationPanel() {
