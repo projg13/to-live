@@ -31,13 +31,13 @@ export const usePlannerStore = create<PlannerStore>()(
         {
           id: 'dp-bangalore-work',
           name: 'Bangalore Work Day',
-          anchorIds: ['sleep-default'],
+          anchorIds: ['anchor-wake', 'anchor-work-start', 'anchor-work-end', 'anchor-sleep'],
           routineIds: ['routine-morning', 'routine-evening-cook'],
         },
         {
           id: 'dp-hometown',
           name: 'Hometown Day',
-          anchorIds: ['sleep-default'],
+          anchorIds: ['anchor-wake', 'anchor-work-start', 'anchor-work-end', 'anchor-sleep'],
           routineIds: ['routine-morning'],
         },
       ],

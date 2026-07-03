@@ -5,7 +5,6 @@ import { useTaskStore } from '../store/taskStore'
 import { useAnchorStore } from '../store/anchorStore'
 import type { Routine, RecurrenceConfig, RecurrencePattern, RoutineTaskConfig, SlotWeightPoint } from '../types/routine'
 import { formatTime } from '../types/anchor'
-import { findSlots } from './DayPlanner'
 
 function RoutinePanel() {
   const { routines, addRoutine, updateRoutine, deleteRoutine, toggleEnabled } = useRoutineStore()
@@ -288,13 +287,10 @@ function RoutineEditor({
                   <span style={{ fontSize: 14, fontWeight: 'bold' }}>Slot weights (from slot ideal start):</span>
                   {anchors.map((a) => {
                     const points = config?.slotWeights?.[a.id] ?? []
-                    const slots = findSlots(anchors)
-                    const slot = slots.find((s) => s.anchorName === a.name)
-                    const slotStart = slot ? formatTime(slot.startTime) : '?'
                     return (
                       <div key={a.id} style={{ marginLeft: 12, marginTop: 8, paddingLeft: 8, borderLeft: '1px solid #999' }}>
                         <span style={{ fontSize: 13, fontWeight: 'bold' }}>{a.name}</span>
-                        <span style={{ fontSize: 12, marginLeft: 8 }}>starts @ {slotStart}</span>
+                        <span style={{ fontSize: 12, marginLeft: 8 }}>starts @ {formatTime(a.spikeTime)}</span>
                         {points.map((pt, pi) => (
                           <div key={pi} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
                             <label style={{ fontSize: 13 }}>+</label>

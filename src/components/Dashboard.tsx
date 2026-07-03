@@ -8,7 +8,6 @@ import { useObligationStore } from '../store/obligationStore'
 import { useRecoveryStore } from '../store/recoveryStore'
 import { usePlannerStore } from '../store/plannerStore'
 import { formatTime } from '../types/anchor'
-import { findSlots } from './DayPlanner'
 import type { AdhocTask, AnchorConfirmation, ScheduledItem } from '../types/scheduler'
 import type { ResolveContext } from '../store/schedulerStore'
 
@@ -57,12 +56,12 @@ function Dashboard() {
     : 1
 
   // Build timeline: interleave anchors + tasks + done items
-  const slots = findSlots(anchors)
   const timelineItems: { type: 'anchor' | 'task'; time: number; data: any }[] = []
 
-  // Add anchor markers
-  for (const slot of slots) {
-    timelineItems.push({ type: 'anchor', time: slot.startTime, data: slot })
+  // Add anchor markers (sorted by spike time)
+  const sortedAnchors = [...anchors].sort((a, b) => a.spikeTime - b.spikeTime)
+  for (const anchor of sortedAnchors) {
+    timelineItems.push({ type: 'anchor', time: anchor.spikeTime, data: anchor })
   }
 
   // Add done items (greyed out, from stored positions)
@@ -160,13 +159,9 @@ function Dashboard() {
             )}
             {timelineItems.map((entry, i) => {
               if (entry.type === 'anchor') {
-                const slot = entry.data
-                const conf = daySchedule.confirmedAnchors.find((c) => {
-                  const a = anchors.find((an) => an.id === c.anchorId)
-                  return a?.name === slot.anchorName
-                })
-                const anchor = anchors.find((a) => a.name === slot.anchorName)
-                const displayTime = conf?.actualTime ?? slot.startTime
+                const anchor = entry.data as { id: string; name: string; spikeTime: number }
+                const conf = daySchedule.confirmedAnchors.find((c) => c.anchorId === anchor.id)
+                const displayTime = conf?.actualTime ?? anchor.spikeTime
 
                 return (
                   <div key={`anchor-${i}`} style={{
@@ -179,13 +174,12 @@ function Dashboard() {
                     <span style={{ fontFamily: 'monospace', fontSize: 13 }}>
                       {formatTime(displayTime)}
                     </span>
-                    <strong>{slot.anchorName}</strong>
-                    {/* Inline time edit for anchor */}
+                    <strong>{anchor.name}</strong>
                     <input
                       type="time"
                       value={toTimeStr(displayTime)}
                       onChange={(e) => {
-                        if (anchor && e.target.value) {
+                        if (e.target.value) {
                           const [h, m] = e.target.value.split(':').map(Number)
                           scheduler.confirmAnchor({ anchorId: anchor.id, actualTime: (h || 0) * 60 + (m || 0), day: selectedDay })
                         }

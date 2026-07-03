@@ -23,7 +23,7 @@ export const useBlockStore = create<BlockStore>()(
         {
           id: 'block-morning',
           name: 'Morning Routine',
-          anchorId: 'sleep-default',
+          anchorId: 'anchor-wake',
           entries: [
             { taskId: 'task-brush', order: 0, isBackground: false, mandatory: true },
             { taskId: 'task-laundry-load', order: 1, isBackground: false, mandatory: false },
@@ -42,7 +42,7 @@ export const useBlockStore = create<BlockStore>()(
         {
           id: 'block-evening-cook',
           name: 'Evening Cook',
-          anchorId: 'sleep-default',
+          anchorId: 'anchor-wake',
           entries: [
             { taskId: 'task-cook-prep', order: 0, isBackground: false, mandatory: true },
             { taskId: 'task-cook-cooking', order: 1, isBackground: true, mandatory: true },
