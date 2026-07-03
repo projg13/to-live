@@ -14,7 +14,6 @@ export const useAnchorStore = create<AnchorStore>()(
   persist(
     (set) => ({
       anchors: [
-        // Default example: Sleep anchor
         {
           id: 'sleep-default',
           name: 'Sleep',
@@ -23,6 +22,22 @@ export const useAnchorStore = create<AnchorStore>()(
             { time: toMinutes(21, 0), value: 100 },
             { time: toMinutes(22, 0), value: 200 },
             { time: toMinutes(23, 0), value: 300 },
+          ],
+        },
+        {
+          id: 'anchor-work-start',
+          name: 'Work Start',
+          weightCurve: [
+            { time: toMinutes(9, 0), value: 0 },
+            { time: toMinutes(9, 15), value: 100 },
+          ],
+        },
+        {
+          id: 'anchor-work-end',
+          name: 'Work End',
+          weightCurve: [
+            { time: toMinutes(17, 0), value: 0 },
+            { time: toMinutes(17, 15), value: 100 },
           ],
         },
       ],
