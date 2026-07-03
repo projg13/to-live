@@ -53,7 +53,7 @@ export const useTaskStore = create<TaskStore>()(
         { id: 't-laundry-wash', title: 'Laundry: wash', weight: 60, durationMinutes: 5, knobs: { ...k, isMother: true }, links: [{ linkedTaskId: 't-laundry-machine', linkType: 'passive', continuity: 'continuous' }] },
         { id: 't-laundry-machine', title: 'Laundry: machine running', weight: 10, durationMinutes: 45, knobs: { ...k, isMother: true }, links: [{ linkedTaskId: 't-laundry-fold', linkType: 'active' }] },
         { id: 't-laundry-fold', title: 'Laundry: fold', weight: 60, durationMinutes: 15, knobs: k },
-        { id: 't-laundry-prep', title: 'Laundry: prep (iron/sort)', weight: 55, durationMinutes: 30, knobs: k },
+        { id: 't-veg-prep', title: 'Veg prep (cut/sort)', weight: 55, durationMinutes: 30, knobs: k },
         { id: 't-laundry-hang', title: 'Laundry: hang', weight: 55, durationMinutes: 10, knobs: k },
 
         // === Misc ===

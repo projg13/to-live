@@ -35,7 +35,7 @@ export const useRecoveryStore = create<RecoveryStore>()(
         {
           id: 'recovery-laundry',
           name: 'Laundry Recovery',
-          taskIds: ['t-laundry-wash', 't-laundry-fold', 't-laundry-prep', 't-laundry-hang'],
+          taskIds: ['t-laundry-wash', 't-laundry-fold', 't-laundry-hang'],
           blockIds: [],
           triggerType: 'auto' as const,
           autoCondition: { taskId: 't-laundry-wash', consecutiveMisses: 3 },

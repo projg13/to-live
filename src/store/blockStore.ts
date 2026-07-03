@@ -162,7 +162,7 @@ export const useBlockStore = create<BlockStore>()(
             e('t-laundry-wash', 5),
             e('t-laundry-machine', 6, true, true), // background
             e('t-laundry-fold', 7),
-            e('t-laundry-prep', 8, false),
+            e('t-veg-prep', 8, false),
             e('t-laundry-hang', 9),
             e('t-relax', 10, false),
           ],
