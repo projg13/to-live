@@ -1,16 +1,26 @@
+// Anchor: a named time marker (no time here — time is set per template)
 export interface Anchor {
   id: string
-  name: string           // anchor name (e.g., "Wake", "Work Start")
-  slotName?: string      // name for the slot that starts here (e.g., "Morning Routine", "Work Hours")
-  spikeTime: number      // minutes from midnight — when this anchor activates
-  weight: number         // dominance value at spike
+  name: string       // e.g., "Wake", "Work Start", "Work End", "Sleep"
 }
 
-// A template: named set of anchors for a day type
+// Slot: a named period (independent entity, reusable)
+export interface Slot {
+  id: string
+  name: string       // e.g., "Morning", "Work Hours", "Evening", "Night"
+}
+
+// Anchor Template: assigns times to anchors and maps slots between them
+export interface AnchorTemplateEntry {
+  anchorId: string
+  spikeTime: number    // minutes from midnight — specific to this template
+  slotId: string       // which slot starts at this anchor in this template
+}
+
 export interface AnchorTemplate {
   id: string
-  name: string           // e.g., "Bangalore Workday", "Weekend", "Travel Day"
-  anchorIds: string[]    // which anchors belong to this template
+  name: string                     // e.g., "Workday", "Weekend"
+  entries: AnchorTemplateEntry[]   // ordered anchor+time+slot assignments
 }
 
 // Helper: convert hours + minutes to minutes-from-midnight

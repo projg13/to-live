@@ -1,54 +1,62 @@
 import { useState } from 'react'
 import { useAnchorStore } from '../store/anchorStore'
 import { formatTime } from '../types/anchor'
-import type { Anchor } from '../types/anchor'
+import type { Anchor, Slot as SlotType, AnchorTemplate, AnchorTemplateEntry } from '../types/anchor'
 
-export interface Slot {
-  startTime: number       // minutes from midnight
-  endTime: number         // minutes from midnight
-  startAnchorId: string   // anchor that starts this slot
-  endAnchorId: string     // anchor that ends this slot
-  startAnchorName: string
-  endAnchorName: string
-  name: string            // "Wake → Work Start"
+export interface ResolvedSlot {
+  startTime: number
+  endTime: number
+  slotId: string
+  slotName: string
+  anchorId: string
+  anchorName: string
 }
 
-// Find slots: periods defined between consecutive anchors
-export function findSlots(anchors: Anchor[]): Slot[] {
-  if (anchors.length < 2) return []
+// Find resolved slots from a template
+export function findSlots(template: AnchorTemplate, anchors: Anchor[], slots: SlotType[]): ResolvedSlot[] {
+  if (!template || template.entries.length < 2) return []
 
-  const sorted = [...anchors].sort((a, b) => a.spikeTime - b.spikeTime)
+  const sorted = [...template.entries].sort((a, b) => a.spikeTime - b.spikeTime)
 
-  const slots: Slot[] = []
+  const resolved: ResolvedSlot[] = []
   for (let i = 0; i < sorted.length; i++) {
     const current = sorted[i]
     const next = sorted[(i + 1) % sorted.length]
-    const endTime = i === sorted.length - 1 ? next.spikeTime : next.spikeTime
+    const anchor = anchors.find((a) => a.id === current.anchorId)
+    const slot = slots.find((s) => s.id === current.slotId)
 
-    slots.push({
+    resolved.push({
       startTime: current.spikeTime,
-      endTime,
-      startAnchorId: current.id,
-      endAnchorId: next.id,
-      startAnchorName: current.name,
-      endAnchorName: next.name,
-      name: current.slotName || `${current.name} → ${next.name}`,
+      endTime: next.spikeTime,
+      slotId: current.slotId,
+      slotName: slot?.name ?? '?',
+      anchorId: current.anchorId,
+      anchorName: anchor?.name ?? '?',
     })
   }
 
-  return slots
+  return resolved
 }
 
 function DayPlanner() {
-  const { anchors } = useAnchorStore()
+  const { anchors, slots, templates } = useAnchorStore()
+  const [selectedTemplate, setSelectedTemplate] = useState(templates[0]?.id ?? '')
   const [virtualTime, setVirtualTime] = useState(360)
-  const [editingSlot, setEditingSlot] = useState<number | null>(null)
 
-  const slots = findSlots(anchors)
+  const template = templates.find((t) => t.id === selectedTemplate)
+  const resolvedSlots = template ? findSlots(template, anchors, slots) : []
 
   return (
     <div>
       <h3 style={{ marginBottom: 8 }}>Day Planner</h3>
+
+      {/* Template selector */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontSize: 13 }}>Template: </label>
+        <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
+          {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+      </div>
 
       <div style={{ marginBottom: 16 }}>
         <span>Virtual Time: <strong>{formatTime(virtualTime)}</strong></span>
@@ -64,10 +72,9 @@ function DayPlanner() {
       </div>
 
       <div>
-        {slots.length === 0 && <p>No anchors defined.</p>}
-        {slots.map((slot, i) => {
+        {resolvedSlots.length === 0 && <p>Select a template with at least 2 anchors.</p>}
+        {resolvedSlots.map((slot, i) => {
           const isActive = virtualTime >= slot.startTime && virtualTime < slot.endTime
-          const isEditing = editingSlot === i
 
           return (
             <div
@@ -78,30 +85,15 @@ function DayPlanner() {
                 fontWeight: isActive ? 'bold' : 'normal',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>
-                  {isActive && <span>&#9654; </span>}
-                  <span style={{ fontFamily: 'monospace', fontSize: 12 }}>
-                    {formatTime(slot.startTime)} — {formatTime(slot.endTime)}
-                  </span>
-                  {' '}
-                  <strong>{slot.name}</strong>
+              <span>
+                {isActive && <span>&#9654; </span>}
+                <span style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                  {formatTime(slot.startTime)} — {formatTime(slot.endTime)}
                 </span>
-                <button
-                  onClick={() => setEditingSlot(isEditing ? null : i)}
-                  style={{ fontSize: 12 }}
-                >
-                  {isEditing ? 'close' : 'edit'}
-                </button>
-              </div>
-
-              {isEditing && (
-                <div style={{ marginTop: 8, paddingLeft: 16, borderLeft: '2px solid #999' }}>
-                  <p style={{ fontSize: 12, fontStyle: 'italic', margin: 0 }}>
-                    Slot items: tasks, blocks, routines, obligations (coming soon)
-                  </p>
-                </div>
-              )}
+                {' '}
+                <strong>{slot.slotName}</strong>
+                <span style={{ fontSize: 11, marginLeft: 8 }}>({slot.anchorName})</span>
+              </span>
             </div>
           )
         })}

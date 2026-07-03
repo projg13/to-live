@@ -1,174 +1,163 @@
 import { useState } from 'react'
 import { useAnchorStore } from '../store/anchorStore'
 import { formatTime, toMinutes } from '../types/anchor'
-import type { Anchor, AnchorTemplate } from '../types/anchor'
+import type { Anchor, Slot, AnchorTemplate, AnchorTemplateEntry } from '../types/anchor'
 
 function AnchorPanel() {
-  const { anchors, templates, addAnchor, updateAnchor, deleteAnchor, addTemplate, updateTemplate, deleteTemplate } = useAnchorStore()
-  const [editing, setEditing] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false)
-  const [editingTemplate, setEditingTemplate] = useState<string | null>(null)
-  const [creatingTemplate, setCreatingTemplate] = useState(false)
-
-  const sorted = [...anchors].sort((a, b) => a.spikeTime - b.spikeTime)
+  const store = useAnchorStore()
+  const { anchors, slots, templates } = store
 
   return (
     <div>
-      <h3 style={{ marginBottom: 8 }}>Anchors</h3>
-
-      {!creating && (
-        <button onClick={() => setCreating(true)} style={{ marginBottom: 12 }}>
-          + New Anchor
-        </button>
-      )}
-
-      {creating && (
-        <AnchorEditor
-          onSave={(anchor) => { addAnchor(anchor); setCreating(false) }}
-          onCancel={() => setCreating(false)}
+      {/* Anchors */}
+      <section style={{ marginBottom: 24 }}>
+        <h3 style={{ marginBottom: 8 }}>Anchors</h3>
+        <SimpleList
+          items={anchors}
+          renderItem={(a) => <strong>{a.name}</strong>}
+          onAdd={() => store.addAnchor({ id: crypto.randomUUID(), name: 'New Anchor' })}
+          onDelete={(id) => store.deleteAnchor(id)}
+          onRename={(id, name) => store.updateAnchor(id, { name })}
+          addLabel="+ New Anchor"
         />
-      )}
+      </section>
 
-      <div>
-        {sorted.map((anchor) => {
-          if (editing === anchor.id) {
-            return (
-              <AnchorEditor
-                key={anchor.id}
-                initial={anchor}
-                onSave={(updated) => { updateAnchor(anchor.id, updated); setEditing(null) }}
-                onCancel={() => setEditing(null)}
-                onDelete={() => { deleteAnchor(anchor.id); setEditing(null) }}
-              />
-            )
-          }
-
-          return (
-            <div
-              key={anchor.id}
-              onClick={() => setEditing(anchor.id)}
-              style={{ borderTop: '1px solid #ccc', padding: '8px 0', cursor: 'pointer' }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>
-                  <strong>{anchor.name}</strong>
-                  {anchor.slotName && <span style={{ fontSize: 12, marginLeft: 8 }}>({anchor.slotName})</span>}
-                </span>
-                <span style={{ fontFamily: 'monospace', fontSize: 12 }}>
-                  @ {formatTime(anchor.spikeTime)}
-                </span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      {/* Slots */}
+      <section style={{ marginBottom: 24 }}>
+        <h3 style={{ marginBottom: 8 }}>Slots</h3>
+        <SimpleList
+          items={slots}
+          renderItem={(s) => <strong>{s.name}</strong>}
+          onAdd={() => store.addSlot({ id: crypto.randomUUID(), name: 'New Slot' })}
+          onDelete={(id) => store.deleteSlot(id)}
+          onRename={(id, name) => store.updateSlot(id, { name })}
+          addLabel="+ New Slot"
+        />
+      </section>
 
       {/* Templates */}
-      <h3 style={{ marginTop: 24, marginBottom: 8 }}>Anchor Templates</h3>
-
-      {!creatingTemplate && (
-        <button onClick={() => setCreatingTemplate(true)} style={{ marginBottom: 12 }}>
-          + New Template
-        </button>
-      )}
-
-      {creatingTemplate && (
-        <TemplateEditor
+      <section>
+        <h3 style={{ marginBottom: 8 }}>Anchor Templates</h3>
+        <TemplateSection
+          templates={templates}
           anchors={anchors}
-          onSave={(tpl) => { addTemplate(tpl); setCreatingTemplate(false) }}
-          onCancel={() => setCreatingTemplate(false)}
+          slots={slots}
+          onAdd={(tpl) => store.addTemplate(tpl)}
+          onUpdate={(id, updates) => store.updateTemplate(id, updates)}
+          onDelete={(id) => store.deleteTemplate(id)}
         />
-      )}
-
-      <div>
-        {templates.map((tpl) => {
-          if (editingTemplate === tpl.id) {
-            return (
-              <TemplateEditor
-                key={tpl.id}
-                initial={tpl}
-                anchors={anchors}
-                onSave={(updated) => { updateTemplate(tpl.id, updated); setEditingTemplate(null) }}
-                onCancel={() => setEditingTemplate(null)}
-                onDelete={() => { deleteTemplate(tpl.id); setEditingTemplate(null) }}
-              />
-            )
-          }
-          return (
-            <div
-              key={tpl.id}
-              onClick={() => setEditingTemplate(tpl.id)}
-              style={{ borderTop: '1px solid #ccc', padding: '8px 0', cursor: 'pointer' }}
-            >
-              <strong>{tpl.name}</strong>
-              <span style={{ fontSize: 12, marginLeft: 8 }}>
-                ({tpl.anchorIds.length} anchors: {tpl.anchorIds.map((id) => anchors.find((a) => a.id === id)?.name ?? '?').join(', ')})
-              </span>
-            </div>
-          )
-        })}
-      </div>
+      </section>
     </div>
   )
 }
 
-function AnchorEditor({
-  initial,
-  onSave,
-  onCancel,
+// --- Simple editable name list ---
+function SimpleList({
+  items,
+  renderItem,
+  onAdd,
   onDelete,
+  onRename,
+  addLabel,
 }: {
-  initial?: Anchor
-  onSave: (anchor: Anchor) => void
-  onCancel: () => void
-  onDelete?: () => void
+  items: { id: string; name: string }[]
+  renderItem: (item: { id: string; name: string }) => JSX.Element
+  onAdd: () => void
+  onDelete: (id: string) => void
+  onRename: (id: string, name: string) => void
+  addLabel: string
 }) {
-  const [name, setName] = useState(initial?.name ?? '')
-  const [slotName, setSlotName] = useState(initial?.slotName ?? '')
-  const [time, setTime] = useState(initial ? toTimeStr(initial.spikeTime) : '06:00')
-  const [weight, setWeight] = useState(initial?.weight ?? 100)
-
-  const handleSave = () => {
-    if (!name.trim()) return
-    const [h, m] = time.split(':').map(Number)
-    onSave({
-      id: initial?.id ?? crypto.randomUUID(),
-      name: name.trim(),
-      slotName: slotName.trim() || undefined,
-      spikeTime: toMinutes(h || 0, m || 0),
-      weight,
-    })
-  }
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
 
   return (
-    <div style={{ border: '2px solid #333', padding: 12, marginBottom: 12 }}>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 13 }}>Anchor Name</label><br />
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ width: '100%' }} />
+    <div>
+      {items.map((item) => (
+        <div key={item.id} style={{ borderTop: '1px solid #ccc', padding: '6px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {editingId === item.id ? (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} />
+              <button onClick={() => { onRename(item.id, editName); setEditingId(null) }}>save</button>
+              <button onClick={() => setEditingId(null)}>cancel</button>
+            </div>
+          ) : (
+            <>
+              {renderItem(item)}
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button onClick={() => { setEditingId(item.id); setEditName(item.name) }} style={{ fontSize: 11 }}>edit</button>
+                <button onClick={() => onDelete(item.id)} style={{ fontSize: 11 }}>x</button>
+              </div>
+            </>
+          )}
         </div>
-        <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 13 }}>Slot Name</label><br />
-          <input type="text" value={slotName} onChange={(e) => setSlotName(e.target.value)} placeholder="e.g. Morning" style={{ width: '100%' }} />
-        </div>
-      </div>
+      ))}
+      <button onClick={onAdd} style={{ marginTop: 8 }}>{addLabel}</button>
+    </div>
+  )
+}
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
-        <div>
-          <label style={{ fontSize: 13 }}>Time</label><br />
-          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-        </div>
-        <div>
-          <label style={{ fontSize: 13 }}>Weight</label><br />
-          <input type="number" value={weight} onChange={(e) => setWeight(Number(e.target.value) || 0)} style={{ width: 60 }} />
-        </div>
-      </div>
+// --- Template Section ---
+function TemplateSection({
+  templates,
+  anchors,
+  slots,
+  onAdd,
+  onUpdate,
+  onDelete,
+}: {
+  templates: AnchorTemplate[]
+  anchors: Anchor[]
+  slots: Slot[]
+  onAdd: (tpl: AnchorTemplate) => void
+  onUpdate: (id: string, updates: Partial<AnchorTemplate>) => void
+  onDelete: (id: string) => void
+}) {
+  const [editing, setEditing] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
 
-      <div>
-        <button onClick={handleSave} style={{ marginRight: 8 }}>Save Changes</button>
-        <button onClick={onCancel} style={{ marginRight: 8 }}>Discard</button>
-        {onDelete && <button onClick={onDelete}>Delete</button>}
-      </div>
+  return (
+    <div>
+      {!creating && (
+        <button onClick={() => setCreating(true)} style={{ marginBottom: 12 }}>+ New Template</button>
+      )}
+
+      {creating && (
+        <TemplateEditor
+          anchors={anchors}
+          slots={slots}
+          onSave={(tpl) => { onAdd(tpl); setCreating(false) }}
+          onCancel={() => setCreating(false)}
+        />
+      )}
+
+      {templates.map((tpl) => {
+        if (editing === tpl.id) {
+          return (
+            <TemplateEditor
+              key={tpl.id}
+              initial={tpl}
+              anchors={anchors}
+              slots={slots}
+              onSave={(updated) => { onUpdate(tpl.id, updated); setEditing(null) }}
+              onCancel={() => setEditing(null)}
+              onDelete={() => { onDelete(tpl.id); setEditing(null) }}
+            />
+          )
+        }
+
+        return (
+          <div key={tpl.id} onClick={() => setEditing(tpl.id)} style={{ borderTop: '1px solid #ccc', padding: '8px 0', cursor: 'pointer' }}>
+            <strong>{tpl.name}</strong>
+            <div style={{ fontSize: 12 }}>
+              {tpl.entries.map((e) => {
+                const a = anchors.find((x) => x.id === e.anchorId)
+                const s = slots.find((x) => x.id === e.slotId)
+                return `${a?.name ?? '?'} @ ${formatTime(e.spikeTime)} → ${s?.name ?? '?'}`
+              }).join(' | ')}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -176,43 +165,73 @@ function AnchorEditor({
 function TemplateEditor({
   initial,
   anchors,
+  slots,
   onSave,
   onCancel,
   onDelete,
 }: {
   initial?: AnchorTemplate
   anchors: Anchor[]
+  slots: Slot[]
   onSave: (tpl: AnchorTemplate) => void
   onCancel: () => void
   onDelete?: () => void
 }) {
   const [name, setName] = useState(initial?.name ?? '')
-  const [anchorIds, setAnchorIds] = useState<string[]>(initial?.anchorIds ?? [])
+  const [entries, setEntries] = useState<AnchorTemplateEntry[]>(initial?.entries ?? [])
 
   const handleSave = () => {
-    if (!name.trim() || anchorIds.length === 0) return
-    onSave({ id: initial?.id ?? crypto.randomUUID(), name: name.trim(), anchorIds })
+    if (!name.trim() || entries.length === 0) return
+    onSave({ id: initial?.id ?? crypto.randomUUID(), name: name.trim(), entries })
+  }
+
+  const updateEntry = (i: number, updates: Partial<AnchorTemplateEntry>) => {
+    const updated = [...entries]
+    updated[i] = { ...updated[i], ...updates }
+    setEntries(updated)
+  }
+
+  const toTimeStr = (mins: number) => {
+    const h = Math.floor(mins / 60) % 24
+    const m = mins % 60
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
   }
 
   return (
     <div style={{ border: '2px solid #333', padding: 12, marginBottom: 12 }}>
       <div style={{ marginBottom: 8 }}>
         <label style={{ fontSize: 13 }}>Template Name</label><br />
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Workday, Weekend" style={{ width: '100%' }} />
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ width: '100%' }} />
       </div>
 
       <div style={{ marginBottom: 8 }}>
-        <label style={{ fontSize: 13 }}>Anchors</label>
-        {anchorIds.map((aid, i) => (
-          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
-            <select value={aid} onChange={(e) => { const u = [...anchorIds]; u[i] = e.target.value; setAnchorIds(u) }}>
-              <option value="">-- select --</option>
-              {anchors.map((a) => <option key={a.id} value={a.id}>{a.name} @ {formatTime(a.spikeTime)}</option>)}
+        <label style={{ fontSize: 13, fontWeight: 'bold' }}>Entries (Anchor + Time + Slot)</label>
+        {entries.map((entry, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+            <select value={entry.anchorId} onChange={(e) => updateEntry(i, { anchorId: e.target.value })}>
+              <option value="">-- anchor --</option>
+              {anchors.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
-            <button onClick={() => setAnchorIds(anchorIds.filter((_, j) => j !== i))}>x</button>
+            <span>@</span>
+            <input
+              type="time"
+              value={toTimeStr(entry.spikeTime)}
+              onChange={(e) => {
+                const [h, m] = e.target.value.split(':').map(Number)
+                updateEntry(i, { spikeTime: toMinutes(h || 0, m || 0) })
+              }}
+            />
+            <span>→</span>
+            <select value={entry.slotId} onChange={(e) => updateEntry(i, { slotId: e.target.value })}>
+              <option value="">-- slot --</option>
+              {slots.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <button onClick={() => setEntries(entries.filter((_, j) => j !== i))}>x</button>
           </div>
         ))}
-        <button onClick={() => setAnchorIds([...anchorIds, ''])} style={{ marginTop: 4 }}>+ Add anchor</button>
+        <button onClick={() => setEntries([...entries, { anchorId: '', spikeTime: 360, slotId: '' }])} style={{ marginTop: 8 }}>
+          + Add entry
+        </button>
       </div>
 
       <div>
@@ -222,12 +241,6 @@ function TemplateEditor({
       </div>
     </div>
   )
-}
-
-function toTimeStr(mins: number): string {
-  const h = Math.floor(mins / 60) % 24
-  const m = mins % 60
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
 }
 
 export default AnchorPanel

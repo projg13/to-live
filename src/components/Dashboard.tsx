@@ -58,10 +58,15 @@ function Dashboard() {
   // Build timeline: interleave anchors + tasks + done items
   const timelineItems: { type: 'anchor' | 'task'; time: number; data: any }[] = []
 
-  // Add anchor markers (sorted by spike time)
-  const sortedAnchors = [...anchors].sort((a, b) => a.spikeTime - b.spikeTime)
-  for (const anchor of sortedAnchors) {
-    timelineItems.push({ type: 'anchor', time: anchor.spikeTime, data: anchor })
+  // Get current template from day plan
+  const { templates } = useAnchorStore.getState()
+  const currentTemplate = templates[0] // default to first template for now
+  if (currentTemplate) {
+    const sorted = [...currentTemplate.entries].sort((a, b) => a.spikeTime - b.spikeTime)
+    for (const entry of sorted) {
+      const anchor = anchors.find((a) => a.id === entry.anchorId)
+      timelineItems.push({ type: 'anchor', time: entry.spikeTime, data: { id: entry.anchorId, name: anchor?.name ?? '?', spikeTime: entry.spikeTime } })
+    }
   }
 
   // Add done items (greyed out, from stored positions)
