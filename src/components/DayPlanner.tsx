@@ -4,30 +4,35 @@ import { formatTime } from '../types/anchor'
 import type { Anchor } from '../types/anchor'
 
 export interface Slot {
-  startTime: number // minutes from midnight
-  endTime: number   // minutes from midnight (next anchor takes over)
-  anchorName: string
-  anchorId: string
+  startTime: number       // minutes from midnight
+  endTime: number         // minutes from midnight
+  startAnchorId: string   // anchor that starts this slot
+  endAnchorId: string     // anchor that ends this slot
+  startAnchorName: string
+  endAnchorName: string
+  name: string            // "Wake → Work Start"
 }
 
-// Find slots: simply sort anchors by spike time, each anchor starts a slot
+// Find slots: periods defined between consecutive anchors
 export function findSlots(anchors: Anchor[]): Slot[] {
-  if (anchors.length === 0) return []
+  if (anchors.length < 2) return []
 
   const sorted = [...anchors].sort((a, b) => a.spikeTime - b.spikeTime)
 
   const slots: Slot[] = []
   for (let i = 0; i < sorted.length; i++) {
+    const current = sorted[i]
     const next = sorted[(i + 1) % sorted.length]
-    const endTime = i === sorted.length - 1
-      ? sorted[0].spikeTime  // wraps to first anchor
-      : next.spikeTime
+    const endTime = i === sorted.length - 1 ? next.spikeTime : next.spikeTime
 
     slots.push({
-      startTime: sorted[i].spikeTime,
-      endTime: endTime === sorted[i].spikeTime ? 1440 : endTime,
-      anchorName: sorted[i].name,
-      anchorId: sorted[i].id,
+      startTime: current.spikeTime,
+      endTime,
+      startAnchorId: current.id,
+      endAnchorId: next.id,
+      startAnchorName: current.name,
+      endAnchorName: next.name,
+      name: `${current.name} → ${next.name}`,
     })
   }
 
@@ -80,7 +85,7 @@ function DayPlanner() {
                     {formatTime(slot.startTime)} — {formatTime(slot.endTime)}
                   </span>
                   {' '}
-                  <strong>{slot.anchorName}</strong>
+                  <strong>{slot.name}</strong>
                 </span>
                 <button
                   onClick={() => setEditingSlot(isEditing ? null : i)}
