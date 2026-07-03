@@ -307,11 +307,16 @@ function resolveDay(
   }
 
   // Recovery plans (triggered only)
+  // Recovery tasks start from Wake anchor and have high priority
+  const wakeAnchor = resolvedAnchors.find((a) => a.anchorName === 'Wake')
+  const recoveryStart = wakeAnchor?.actualTime ?? 360
+
   for (const plan of context.recoveryPlans) {
     if (!plan.triggered) continue
     const weight = getRecoveryWeight(plan, 720, dateStr)
     if (weight <= 0) continue
 
+    let recoveryCursor = recoveryStart
     for (const tid of plan.taskIds) {
       if (skippedTaskIds.includes(tid)) continue
       const task = context.tasks.find((t) => t.id === tid)
@@ -320,13 +325,14 @@ function resolveDay(
       items.push({
         taskId: task.id,
         title: `[R] ${task.title}`,
-        startMinutes: 0,
-        endMinutes: task.durationMinutes,
+        startMinutes: recoveryCursor,
+        endMinutes: recoveryCursor + task.durationMinutes,
         isBackground: false,
         source: 'recovery',
         weight,
         day: dayIndex,
       })
+      recoveryCursor += task.durationMinutes
     }
   }
 
