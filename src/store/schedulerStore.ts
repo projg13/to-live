@@ -19,6 +19,8 @@ interface SchedulerStore {
   confirmedAnchors: AnchorConfirmation[]
   adhocTasks: AdhocTask[]
   skippedTaskIds: string[]
+  doneTasks: string[]
+  postponedTasks: string[]
 
   // Actions
   resolve: (context: ResolveContext) => void
@@ -27,6 +29,10 @@ interface SchedulerStore {
   removeAdhocTask: (id: string) => void
   skipTask: (taskId: string) => void
   unskipTask: (taskId: string) => void
+  markDone: (taskId: string) => void
+  postpone: (taskId: string) => void
+  preponeTask: (taskId: string, targetTime: number, day: number) => void
+  unmarkTask: (taskId: string) => void
   clearSchedule: () => void
 }
 
@@ -330,6 +336,8 @@ export const useSchedulerStore = create<SchedulerStore>()(
       confirmedAnchors: [],
       adhocTasks: [],
       skippedTaskIds: [],
+      doneTasks: [],
+      postponedTasks: [],
 
       resolve: (context) => {
         const state = get()
@@ -343,7 +351,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
             context,
             state.confirmedAnchors,
             state.adhocTasks,
-            state.skippedTaskIds
+            [...state.skippedTaskIds, ...state.doneTasks, ...state.postponedTasks]
           ))
         }
 
@@ -381,8 +389,39 @@ export const useSchedulerStore = create<SchedulerStore>()(
           skippedTaskIds: state.skippedTaskIds.filter((id) => id !== taskId),
         })),
 
+      markDone: (taskId) =>
+        set((state) => ({
+          doneTasks: [...state.doneTasks.filter((id) => id !== taskId), taskId],
+        })),
+
+      postpone: (taskId) =>
+        set((state) => ({
+          postponedTasks: [...state.postponedTasks.filter((id) => id !== taskId), taskId],
+        })),
+
+      preponeTask: (taskId, targetTime, day) =>
+        set((state) => ({
+          // Add as adhoc at target time with high weight to force placement
+          adhocTasks: [...state.adhocTasks, {
+            id: `prepone-${taskId}-${Date.now()}`,
+            title: `[preponed] ${taskId}`,
+            durationMinutes: 0, // will be resolved from original task
+            startTime: targetTime,
+            day,
+            weight: 9999, // force placement at this time
+          }],
+          // Remove from normal scheduling so it doesn't double-appear
+          skippedTaskIds: [...state.skippedTaskIds.filter((id) => id !== taskId), taskId],
+        })),
+
+      unmarkTask: (taskId) =>
+        set((state) => ({
+          doneTasks: state.doneTasks.filter((id) => id !== taskId),
+          postponedTasks: state.postponedTasks.filter((id) => id !== taskId),
+        })),
+
       clearSchedule: () =>
-        set({ schedule: null, confirmedAnchors: [], adhocTasks: [], skippedTaskIds: [] }),
+        set({ schedule: null, confirmedAnchors: [], adhocTasks: [], skippedTaskIds: [], doneTasks: [], postponedTasks: [] }),
     }),
     { name: 'to-live-scheduler' }
   )
