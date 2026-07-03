@@ -304,60 +304,74 @@ function resolveDay(
   }
 }
 
-// Place items: routine items keep their pre-computed positions,
-// obligations/recovery get placed in first available gaps
+// Place items: sort all by weight, place highest weight first at their ideal time.
+// Lower weight items that conflict get pushed to next available gap.
 function placeItems(
   items: ScheduledItem[],
-  slots: { startTime: number; endTime: number; anchorName: string }[],
+  _slots: { startTime: number; endTime: number; anchorName: string }[],
   _anchors: Anchor[],
   _confirmations: AnchorConfirmation[]
 ): ScheduledItem[] {
-  // Pre-placed items: adhoc + routine (they have valid startMinutes)
-  const prePlaced = items.filter((i) => i.source === 'adhoc' || i.source === 'routine' || i.source === 'event')
-  const floating = items.filter((i) => i.source === 'obligation' || i.source === 'recovery')
+  const background = items.filter((i) => i.isBackground)
+  const active = items.filter((i) => !i.isBackground)
 
-  // Sort floating by weight descending
-  floating.sort((a, b) => b.weight - a.weight)
+  // Sort by weight descending — highest weight gets first pick of time
+  active.sort((a, b) => b.weight - a.weight)
 
-  // Track occupied time ranges (only non-background items occupy time)
-  const occupied: { start: number; end: number }[] = prePlaced
-    .filter((i) => !i.isBackground)
-    .map((f) => ({ start: f.startMinutes, end: f.endMinutes }))
+  const occupied: { start: number; end: number }[] = []
+  const placed: ScheduledItem[] = [...background]
 
-  const placed: ScheduledItem[] = [...prePlaced]
+  for (const item of active) {
+    const duration = item.endMinutes - item.startMinutes
 
-  // Place floating items in gaps
-  for (const item of floating) {
-    if (item.isBackground) {
+    // Try placing at ideal startMinutes first
+    let start = item.startMinutes
+    if (!hasConflict(start, duration, occupied)) {
+      item.startMinutes = start
+      item.endMinutes = start + duration
+      occupied.push({ start, end: start + duration })
       placed.push(item)
       continue
     }
 
-    const duration = item.endMinutes - item.startMinutes || item.endMinutes // duration
-    let bestStart = -1
-
-    // Scan from 6 AM to midnight for first gap
-    let cursor = 360 // start searching from 6 AM
+    // Conflict at ideal time — find next available gap from ideal start
+    let cursor = start
+    let found = false
     while (cursor + duration <= 1440) {
-      const conflicts = occupied.some(
-        (o) => cursor < o.end && cursor + duration > o.start
-      )
-      if (!conflicts) {
-        bestStart = cursor
+      if (!hasConflict(cursor, duration, occupied)) {
+        item.startMinutes = cursor
+        item.endMinutes = cursor + duration
+        occupied.push({ start: cursor, end: cursor + duration })
+        placed.push(item)
+        found = true
         break
       }
       cursor += 5
     }
 
-    if (bestStart >= 0) {
-      item.startMinutes = bestStart
-      item.endMinutes = bestStart + duration
-      occupied.push({ start: item.startMinutes, end: item.endMinutes })
-      placed.push(item)
+    // If no space after ideal, try before (wrap search from day start)
+    if (!found) {
+      cursor = 0
+      while (cursor + duration <= start) {
+        if (!hasConflict(cursor, duration, occupied)) {
+          item.startMinutes = cursor
+          item.endMinutes = cursor + duration
+          occupied.push({ start: cursor, end: cursor + duration })
+          placed.push(item)
+          found = true
+          break
+        }
+        cursor += 5
+      }
     }
+    // If still not found, task is dropped (no space in the day)
   }
 
   return placed.sort((a, b) => a.startMinutes - b.startMinutes)
+}
+
+function hasConflict(start: number, duration: number, occupied: { start: number; end: number }[]): boolean {
+  return occupied.some((o) => start < o.end && start + duration > o.start)
 }
 
 export const useSchedulerStore = create<SchedulerStore>()(
