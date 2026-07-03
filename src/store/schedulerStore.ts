@@ -201,8 +201,15 @@ function resolveDay(
           const task = context.tasks.find((t) => t.id === entry.taskId)
           if (!task) continue
 
-          // If task has a parent, skip it if parent is skipped/not scheduled
-          if (task.parentId && skippedTaskIds.includes(task.parentId)) continue
+          // If any ancestor is skipped, skip this task too
+          let ancestor = task.parentId
+          let ancestorSkipped = false
+          while (ancestor) {
+            if (skippedTaskIds.includes(ancestor)) { ancestorSkipped = true; break }
+            const parentTask = context.tasks.find((t) => t.id === ancestor)
+            ancestor = parentTask?.parentId
+          }
+          if (ancestorSkipped) continue
 
           // Resolve weight considering routine's slot weight overrides
           let weight = task.weight
@@ -477,12 +484,21 @@ export const useSchedulerStore = create<SchedulerStore>()(
         set((state) => ({ adhocTasks: state.adhocTasks.filter((t) => t.id !== id) })),
 
       skipTask: (taskId) => {
-        // Also skip child tasks (those with parentId = this task)
+        // Recursively skip all descendants (children, grandchildren, etc.)
         const allTasks = JSON.parse(localStorage.getItem('to-live-tasks') ?? '{}')?.state?.tasks ?? []
-        const children = allTasks.filter((t: any) => t.parentId === taskId).map((t: any) => t.id)
+        const toSkip: string[] = [taskId]
+
+        const collectDescendants = (parentId: string) => {
+          const children = allTasks.filter((t: any) => t.parentId === parentId)
+          for (const child of children) {
+            toSkip.push(child.id)
+            collectDescendants(child.id)
+          }
+        }
+        collectDescendants(taskId)
 
         set((state) => ({
-          skippedTaskIds: [...new Set([...state.skippedTaskIds, taskId, ...children])],
+          skippedTaskIds: [...new Set([...state.skippedTaskIds, ...toSkip])],
         }))
       },
 
