@@ -35,6 +35,8 @@ interface SchedulerStore {
   postpone: (taskId: string) => void
   preponeTask: (taskId: string, targetTime: number, day: number) => void
   unmarkTask: (taskId: string) => void
+  insertTask: (taskId: string, startTime: number, day: number) => void
+  undo: () => void
   clearSchedule: () => void
 }
 
@@ -150,11 +152,24 @@ function resolveDay(
     )
 
     // Collect tasks from routines → blocks
-    // Place them sequentially from routine's idealSpawnTime (or lastDoneAt if later)
+    // Determine start cursor: confirmed anchor time > lastDoneAt > idealSpawnTime
     for (const routine of activeRoutines) {
-      let cursor = lastDoneAt !== undefined && lastDoneAt > routine.idealSpawnTime
+      // Find if any confirmed anchor matches the blocks' anchor
+      let routineStart = routine.idealSpawnTime
+
+      for (const blockId of routine.blockIds) {
+        const block = context.blocks.find((b) => b.id === blockId)
+        if (!block) continue
+        const conf = dayConfirmations.find((c) => c.anchorId === block.anchorId)
+        if (conf && conf.actualTime > routineStart) {
+          routineStart = conf.actualTime
+        }
+      }
+
+      // lastDoneAt takes priority if later
+      let cursor = lastDoneAt !== undefined && lastDoneAt > routineStart
         ? lastDoneAt
-        : routine.idealSpawnTime
+        : routineStart
 
       for (const blockId of routine.blockIds) {
         const block = context.blocks.find((b) => b.id === blockId)
@@ -175,13 +190,15 @@ function resolveDay(
             const anchorId = block.anchorId
             const slotCurve = taskConfig.slotWeights[anchorId]
             if (slotCurve && slotCurve.length > 0) {
-              const offsetInSlot = Math.max(0, cursor - routine.idealSpawnTime)
+              const offsetInSlot = Math.max(0, cursor - routineStart)
               weight = getSlotWeight(slotCurve, offsetInSlot)
             }
           }
 
-          // Use idealTime from taskConfig if set
-          const idealStart = taskConfig?.idealTime ?? cursor
+          // Use idealTime from taskConfig if set, but not earlier than cursor
+          const idealStart = taskConfig?.idealTime
+            ? Math.max(taskConfig.idealTime, cursor)
+            : cursor
 
           if (weight <= 0) continue
 
@@ -196,7 +213,6 @@ function resolveDay(
               weight,
               day: dayIndex,
             })
-            // Background doesn't advance cursor
           } else {
             items.push({
               taskId: task.id,
@@ -439,6 +455,40 @@ export const useSchedulerStore = create<SchedulerStore>()(
           doneTasks: state.doneTasks.filter((id) => id !== taskId),
           postponedTasks: state.postponedTasks.filter((id) => id !== taskId),
         })),
+
+      insertTask: (taskId, startTime, day) =>
+        set((state) => ({
+          adhocTasks: [...state.adhocTasks, {
+            id: `insert-${taskId}-${Date.now()}`,
+            title: taskId, // will be resolved to actual title by dashboard display
+            durationMinutes: 0, // placeholder — scheduler uses actual task duration
+            startTime,
+            day,
+            weight: 500, // high weight to force placement
+          }],
+        })),
+
+      undo: () =>
+        set((state) => {
+          // Undo last action by popping from the most recently modified list
+          // Priority: adhocTasks > doneTasks > postponedTasks > skippedTaskIds > confirmedAnchors
+          if (state.adhocTasks.length > 0) {
+            return { adhocTasks: state.adhocTasks.slice(0, -1) }
+          }
+          if (state.doneTasks.length > 0) {
+            return { doneTasks: state.doneTasks.slice(0, -1) }
+          }
+          if (state.postponedTasks.length > 0) {
+            return { postponedTasks: state.postponedTasks.slice(0, -1) }
+          }
+          if (state.skippedTaskIds.length > 0) {
+            return { skippedTaskIds: state.skippedTaskIds.slice(0, -1) }
+          }
+          if (state.confirmedAnchors.length > 0) {
+            return { confirmedAnchors: state.confirmedAnchors.slice(0, -1) }
+          }
+          return {}
+        }),
 
       clearSchedule: () =>
         set({ schedule: null, confirmedAnchors: [], adhocTasks: [], skippedTaskIds: [], doneTasks: [], postponedTasks: [], lastDoneAt: {} }),

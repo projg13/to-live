@@ -24,6 +24,7 @@ function Dashboard() {
 
   const [selectedDay, setSelectedDay] = useState(0)
   const [showAdhocForm, setShowAdhocForm] = useState(false)
+  const [showInsertForm, setShowInsertForm] = useState(false)
   const [virtualTime, setVirtualTime] = useState(360)
   const [showPrepone, setShowPrepone] = useState<string | null>(null)
   const [preponeTime, setPreponeTime] = useState('')
@@ -86,6 +87,7 @@ function Dashboard() {
             onChange={(e) => setVirtualTime(Number(e.target.value))}
             style={{ flex: 1, minWidth: 150 }}
           />
+          <button onClick={() => scheduler.undo()}>Undo</button>
           <button onClick={() => scheduler.clearSchedule()}>Reset</button>
         </div>
       </div>
@@ -116,6 +118,7 @@ function Dashboard() {
               <span style={{ fontSize: 12, marginLeft: 8 }}>{daySchedule.date}</span>
             </div>
             <button onClick={() => setShowAdhocForm(!showAdhocForm)}>+ Ad-hoc</button>
+            <button onClick={() => setShowInsertForm(!showInsertForm)}>+ Insert Task</button>
           </div>
 
           {showAdhocForm && (
@@ -123,6 +126,15 @@ function Dashboard() {
               day={selectedDay}
               onAdd={(task) => { scheduler.addAdhocTask(task); setShowAdhocForm(false) }}
               onCancel={() => setShowAdhocForm(false)}
+            />
+          )}
+
+          {showInsertForm && (
+            <InsertTaskForm
+              tasks={tasks}
+              day={selectedDay}
+              onInsert={(taskId, startTime) => { scheduler.insertTask(taskId, startTime, selectedDay); setShowInsertForm(false) }}
+              onCancel={() => setShowInsertForm(false)}
             />
           )}
 
@@ -319,6 +331,69 @@ function AdhocTaskForm({
         }}>Add</button>
         <button onClick={onCancel}>Cancel</button>
       </div>
+    </div>
+  )
+}
+
+function InsertTaskForm({
+  tasks,
+  day,
+  onInsert,
+  onCancel,
+}: {
+  tasks: { id: string; title: string; durationMinutes: number }[]
+  day: number
+  onInsert: (taskId: string, startTime: number) => void
+  onCancel: () => void
+}) {
+  const [search, setSearch] = useState('')
+  const [selectedTaskId, setSelectedTaskId] = useState('')
+  const [startTime, setStartTime] = useState('')
+
+  const filtered = tasks.filter((t) =>
+    t.title.toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <div style={{ border: '1px solid #999', padding: 8, marginBottom: 8 }}>
+      <div style={{ marginBottom: 4 }}>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search tasks..."
+          style={{ width: '100%' }}
+        />
+      </div>
+      {search && filtered.length > 0 && !selectedTaskId && (
+        <div style={{ maxHeight: 120, overflow: 'auto', border: '1px solid #ccc', padding: 4, marginBottom: 4 }}>
+          {filtered.slice(0, 10).map((t) => (
+            <div
+              key={t.id}
+              onClick={() => { setSelectedTaskId(t.id); setSearch(t.title) }}
+              style={{ padding: '2px 4px', cursor: 'pointer', fontSize: 12 }}
+            >
+              {t.title} ({t.durationMinutes}min)
+            </div>
+          ))}
+        </div>
+      )}
+      {selectedTaskId && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: 12 }}>Start at:</span>
+          <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+          <button onClick={() => {
+            if (startTime) {
+              const [h, m] = startTime.split(':').map(Number)
+              onInsert(selectedTaskId, (h || 0) * 60 + (m || 0))
+            }
+          }}>Insert</button>
+          <button onClick={onCancel}>Cancel</button>
+        </div>
+      )}
+      {!selectedTaskId && (
+        <button onClick={onCancel} style={{ marginTop: 4 }}>Cancel</button>
+      )}
     </div>
   )
 }
