@@ -490,9 +490,33 @@ export const useSchedulerStore = create<SchedulerStore>()(
           const newDoneItems = item
             ? [...state.doneItems.filter((i) => i.taskId !== taskId), item]
             : state.doneItems
+
+          // Trigger linked tasks — inject as adhoc after this task's end time
+          const allTasks = JSON.parse(localStorage.getItem('to-live-tasks') ?? '{}')?.state?.tasks ?? []
+          const task = allTasks.find((t: any) => t.id === taskId)
+          const newAdhocs = [...state.adhocTasks]
+          if (task?.links) {
+            const endTime = item?.endMinutes ?? 0
+            const day = item?.day ?? 0
+            for (const link of task.links) {
+              const linked = allTasks.find((t: any) => t.id === link.linkedTaskId)
+              if (linked) {
+                newAdhocs.push({
+                  id: `link-${taskId}-${linked.id}-${Date.now()}`,
+                  title: linked.title,
+                  durationMinutes: linked.durationMinutes,
+                  startTime: endTime,
+                  day,
+                  weight: linked.weight,
+                })
+              }
+            }
+          }
+
           return {
             doneTasks: [...state.doneTasks.filter((id) => id !== taskId), taskId],
             doneItems: newDoneItems,
+            adhocTasks: newAdhocs,
           }
         }),
 
@@ -518,8 +542,29 @@ export const useSchedulerStore = create<SchedulerStore>()(
             }
           }
 
+          // Trigger linked tasks from the completed task
+          const allTasks = JSON.parse(localStorage.getItem('to-live-tasks') ?? '{}')?.state?.tasks ?? []
+          const task = allTasks.find((t: any) => t.id === taskId)
+          const newAdhocs = [...state.adhocTasks]
+          if (task?.links) {
+            for (const link of task.links) {
+              const linked = allTasks.find((t: any) => t.id === link.linkedTaskId)
+              if (linked) {
+                newAdhocs.push({
+                  id: `link-${taskId}-${linked.id}-${Date.now()}`,
+                  title: linked.title,
+                  durationMinutes: linked.durationMinutes,
+                  startTime: doneAtMinutes,
+                  day,
+                  weight: linked.weight,
+                })
+              }
+            }
+          }
+
           return {
             doneTasks: allDoneIds,
+            adhocTasks: newAdhocs,
             doneItems: newDoneItems,
             lastDoneAt: { ...state.lastDoneAt, [day]: doneAtMinutes },
           }
