@@ -25,6 +25,7 @@ export const useAnchorStore = create<AnchorStore>()(
         { id: 'anchor-wake', name: 'Wake' },
         { id: 'anchor-work-start', name: 'Work Start' },
         { id: 'anchor-work-end', name: 'Work End' },
+        { id: 'anchor-evening', name: 'Evening' },
         { id: 'anchor-game-start', name: 'Game Start' },
         { id: 'anchor-game-end', name: 'Game End' },
         { id: 'anchor-sleep', name: 'Sleep' },
@@ -67,6 +68,7 @@ export const useAnchorStore = create<AnchorStore>()(
           entries: [
             { anchorId: 'anchor-sleep', spikeTime: toMinutes(21, 0), slotId: 'slot-sleep' },
             { anchorId: 'anchor-wake', spikeTime: toMinutes(6, 0), slotId: 'slot-morning' },
+            { anchorId: 'anchor-evening', spikeTime: toMinutes(18, 0), slotId: 'slot-evening' },
           ],
         },
       ],

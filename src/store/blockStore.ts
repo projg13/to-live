@@ -152,7 +152,7 @@ export const useBlockStore = create<BlockStore>()(
         {
           id: 'block-evening',
           name: 'Evening Routine',
-          anchorId: 'anchor-work-end',
+          anchorId: 'anchor-evening',
           entries: [
             e('t-come-home', 0),
             e('t-protein-pm', 1),

@@ -35,7 +35,10 @@ export const useRoutineStore = create<RoutineStore>()(
           name: 'Evening (Mon/Wed)',
           blockIds: ['block-evening'],
           recurrence: { pattern: 'weekly', daysOfWeek: [1, 3] },
-          idealSpawnTime: 1080, // Work End @ 6 PM
+          idealSpawnTime: 1080, // Evening @ 6 PM
+          taskConfigs: [
+            { taskId: 't-dinner-prep', expiresAfterMinutes: 135 }, // must start before 8:15 PM
+          ],
           enabled: true,
         },
         // Tue/Thu morning
@@ -59,7 +62,10 @@ export const useRoutineStore = create<RoutineStore>()(
           name: 'Evening (Tue/Thu)',
           blockIds: ['block-evening'],
           recurrence: { pattern: 'weekly', daysOfWeek: [2, 4] },
-          idealSpawnTime: 1080, // Work End @ 6 PM
+          idealSpawnTime: 1080,
+          taskConfigs: [
+            { taskId: 't-dinner-prep', expiresAfterMinutes: 135 },
+          ],
           enabled: true,
         },
         // Friday morning
@@ -101,7 +107,10 @@ export const useRoutineStore = create<RoutineStore>()(
           name: 'Friday Evening',
           blockIds: ['block-evening'],
           recurrence: { pattern: 'weekly', daysOfWeek: [5] },
-          idealSpawnTime: 1080, // Work End @ 6 PM
+          idealSpawnTime: 1080,
+          taskConfigs: [
+            { taskId: 't-dinner-prep', expiresAfterMinutes: 135 },
+          ],
           enabled: true,
         },
         // Saturday morning
@@ -125,7 +134,10 @@ export const useRoutineStore = create<RoutineStore>()(
           name: 'Saturday Evening',
           blockIds: ['block-evening'],
           recurrence: { pattern: 'weekly', daysOfWeek: [6] },
-          idealSpawnTime: 1080, // 6 PM
+          idealSpawnTime: 1080,
+          taskConfigs: [
+            { taskId: 't-dinner-prep', expiresAfterMinutes: 135 },
+          ],
           enabled: true,
         },
         // Sunday morning
@@ -158,7 +170,10 @@ export const useRoutineStore = create<RoutineStore>()(
           name: 'Sunday Evening',
           blockIds: ['block-evening'],
           recurrence: { pattern: 'weekly', daysOfWeek: [0] },
-          idealSpawnTime: 1080, // 6 PM
+          idealSpawnTime: 1080,
+          taskConfigs: [
+            { taskId: 't-dinner-prep', expiresAfterMinutes: 135 },
+          ],
           enabled: true,
         },
       ],
