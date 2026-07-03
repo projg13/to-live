@@ -80,6 +80,7 @@ export const useRoutineStore = create<RoutineStore>()(
             { taskId: 't-sandhi-am', expiresAfterMinutes: 120 },
             { taskId: 't-protein-am', expiresAfterMinutes: 180 },
             { taskId: 't-eat-am', expiresAfterMinutes: 240 },
+            { taskId: 't-walk-office', expiresAfterMinutes: 240 }, // dead after 10 AM
           ],
           enabled: true,
         },
