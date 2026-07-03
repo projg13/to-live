@@ -204,9 +204,9 @@ function resolveDay(
           let weight = task.weight
           const taskConfig = routine.taskConfigs?.find((tc) => tc.taskId === task.id)
 
-          // Check expiry: if task would start after its expiry time, skip it
+          // Check expiry: relative to routine's IDEAL spawn time (absolute clock time)
           if (taskConfig?.expiresAfterMinutes !== undefined) {
-            const expiryTime = routineStart + taskConfig.expiresAfterMinutes
+            const expiryTime = routine.idealSpawnTime + taskConfig.expiresAfterMinutes
             if (cursor >= expiryTime) continue
           }
 
@@ -226,7 +226,7 @@ function resolveDay(
 
           // Double-check expiry against actual placement time
           if (taskConfig?.expiresAfterMinutes !== undefined) {
-            const expiryTime = routineStart + taskConfig.expiresAfterMinutes
+            const expiryTime = routine.idealSpawnTime + taskConfig.expiresAfterMinutes
             if (idealStart >= expiryTime) continue
           }
 
