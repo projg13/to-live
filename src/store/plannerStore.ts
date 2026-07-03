@@ -35,7 +35,7 @@ export const usePlannerStore = create<PlannerStore>()(
         {
           id: 'dp-friday',
           name: 'Friday',
-          anchorIds: ['anchor-wake', 'anchor-work-start', 'anchor-work-end', 'anchor-sleep'],
+          anchorIds: ['anchor-wake', 'anchor-work-start', 'anchor-game-start', 'anchor-game-end', 'anchor-work-end', 'anchor-sleep'],
           routineIds: ['routine-friday'],
         },
         {

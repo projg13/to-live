@@ -83,20 +83,31 @@ export const useBlockStore = create<BlockStore>()(
           overflowBehavior: 'drop',
           blockStickiness: 60,
         },
-        // === Friday game block (attached to Game anchor) ===
+        // === Friday game block (attached to Game Start anchor) ===
         {
           id: 'block-fri-game',
           name: 'Friday Game',
-          anchorId: 'anchor-game',
+          anchorId: 'anchor-game-start',
           entries: [
             e('t-football', 0),
-            e('t-bath-fri', 1),
-            e('t-eat-fri', 2),
-            e('t-work-fri-eve', 3),
           ],
-          expectedDurationMinutes: 270,
+          expectedDurationMinutes: 180,
           overflowBehavior: 'push',
-          blockStickiness: 80,
+          blockStickiness: 90,
+        },
+        // === Friday post-game block (attached to Game End → Work 2 slot) ===
+        {
+          id: 'block-fri-post-game',
+          name: 'Friday Post-Game',
+          anchorId: 'anchor-game-end',
+          entries: [
+            e('t-bath-fri', 0),
+            e('t-eat-fri', 1),
+            e('t-work-fri-eve', 2),
+          ],
+          expectedDurationMinutes: 90,
+          overflowBehavior: 'push',
+          blockStickiness: 70,
         },
         // === Morning block (Saturday - Read + Oil bath + Groceries) ===
         {
