@@ -18,8 +18,8 @@ export const useTaskStore = create<TaskStore>()(
     (set, get) => ({
       tasks: [
         // === Morning routine tasks ===
-        { id: 't-brush', title: 'Brush', weight: 80, durationMinutes: 10, knobs: { ...k, hasStickiness: true }, stickiness: 200 },
-        { id: 't-protein-am', title: 'Protein', weight: 70, durationMinutes: 10, knobs: k },
+        { id: 't-brush', title: 'Brush', weight: 150, durationMinutes: 10, knobs: { ...k, hasStickiness: true }, stickiness: 200 },
+        { id: 't-protein-am', title: 'Protein', weight: 120, durationMinutes: 10, knobs: k },
         { id: 't-gym', title: 'Gym', weight: 90, durationMinutes: 130, knobs: k },
         { id: 't-study', title: 'Study', weight: 85, durationMinutes: 130, knobs: k },
         { id: 't-heater-relax', title: 'Turn on heater & relax', weight: 50, durationMinutes: 20, knobs: k },
