@@ -20,6 +20,7 @@ interface SchedulerStore {
   adhocTasks: AdhocTask[]
   skippedTaskIds: string[]
   doneTasks: string[]
+  doneItems: ScheduledItem[]          // stored positions of done tasks for display
   postponedTasks: string[]
   lastDoneAt: Record<number, number>  // day → minutes from midnight (latest done-at time)
 
@@ -367,6 +368,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
       adhocTasks: [],
       skippedTaskIds: [],
       doneTasks: [],
+      doneItems: [],
       postponedTasks: [],
       lastDoneAt: {},
 
@@ -422,25 +424,43 @@ export const useSchedulerStore = create<SchedulerStore>()(
         })),
 
       markDone: (taskId) =>
-        set((state) => ({
-          doneTasks: [...state.doneTasks.filter((id) => id !== taskId), taskId],
-        })),
+        set((state) => {
+          const schedule = state.schedule
+          const item = schedule?.days.flatMap((d) => d.items).find((i) => i.taskId === taskId)
+          const newDoneItems = item
+            ? [...state.doneItems.filter((i) => i.taskId !== taskId), item]
+            : state.doneItems
+          return {
+            doneTasks: [...state.doneTasks.filter((id) => id !== taskId), taskId],
+            doneItems: newDoneItems,
+          }
+        }),
 
       // Mark done at specific time — all tasks scheduled before this time
       // are also marked done, and remaining tasks recalibrate from here
       markDoneAt: (taskId, doneAtMinutes, day) =>
         set((state) => {
-          // Find all tasks that were scheduled before doneAtMinutes and mark them done too
           const schedule = state.schedule
           const dayItems = schedule?.days[day]?.items ?? []
+
+          // All tasks ending before done-at time + this task
           const tasksBefore = dayItems
             .filter((item) => item.endMinutes <= doneAtMinutes && !item.isBackground)
             .map((item) => item.taskId)
 
-          const allDone = [...new Set([...state.doneTasks, ...tasksBefore, taskId])]
+          const allDoneIds = [...new Set([...state.doneTasks, ...tasksBefore, taskId])]
+
+          // Save their positions for display
+          const newDoneItems = [...state.doneItems]
+          for (const item of dayItems) {
+            if (allDoneIds.includes(item.taskId) && !newDoneItems.find((d) => d.taskId === item.taskId)) {
+              newDoneItems.push(item)
+            }
+          }
 
           return {
-            doneTasks: allDone,
+            doneTasks: allDoneIds,
+            doneItems: newDoneItems,
             lastDoneAt: { ...state.lastDoneAt, [day]: doneAtMinutes },
           }
         }),
@@ -473,6 +493,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
       unmarkTask: (taskId) =>
         set((state) => ({
           doneTasks: state.doneTasks.filter((id) => id !== taskId),
+          doneItems: state.doneItems.filter((i) => i.taskId !== taskId),
           postponedTasks: state.postponedTasks.filter((id) => id !== taskId),
         })),
 
@@ -518,7 +539,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
         }),
 
       clearSchedule: () =>
-        set({ schedule: null, confirmedAnchors: [], adhocTasks: [], skippedTaskIds: [], doneTasks: [], postponedTasks: [], lastDoneAt: {} }),
+        set({ schedule: null, confirmedAnchors: [], adhocTasks: [], skippedTaskIds: [], doneTasks: [], doneItems: [], postponedTasks: [], lastDoneAt: {} }),
     }),
     { name: 'to-live-scheduler' }
   )

@@ -55,7 +55,7 @@ function Dashboard() {
     ? Math.max(...daySchedule.items.map((i) => i.weight), 1)
     : 1
 
-  // Build timeline: interleave anchors + tasks
+  // Build timeline: interleave anchors + tasks + done items
   const slots = findSlots(anchors)
   const timelineItems: { type: 'anchor' | 'task'; time: number; data: any }[] = []
 
@@ -64,10 +64,18 @@ function Dashboard() {
     timelineItems.push({ type: 'anchor', time: slot.startTime, data: slot })
   }
 
-  // Add tasks
+  // Add done items (greyed out, from stored positions)
+  const dayDoneItems = scheduler.doneItems.filter((i) => i.day === selectedDay)
+  for (const item of dayDoneItems) {
+    timelineItems.push({ type: 'task', time: item.startMinutes, data: item })
+  }
+
+  // Add active scheduled tasks (exclude done ones to avoid duplicates)
   if (daySchedule) {
     for (const item of daySchedule.items) {
-      timelineItems.push({ type: 'task', time: item.startMinutes, data: item })
+      if (!scheduler.doneTasks.includes(item.taskId)) {
+        timelineItems.push({ type: 'task', time: item.startMinutes, data: item })
+      }
     }
   }
 
@@ -225,7 +233,7 @@ function Dashboard() {
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       {!isDone && !isPostponed && !isSkipped && (
                         <>
-                          <button onClick={() => setShowDoneAt(showDoneAt === item.taskId ? null : item.taskId)} style={{ fontSize: 11 }}>done</button>
+                          <button onClick={() => { setShowDoneAt(showDoneAt === item.taskId ? null : item.taskId); setDoneAtTime(toTimeStr(virtualTime)) }} style={{ fontSize: 11 }}>done</button>
                           <button onClick={() => scheduler.postpone(item.taskId)} style={{ fontSize: 11 }}>postpone</button>
                           <button onClick={() => setShowPrepone(showPrepone === item.taskId ? null : item.taskId)} style={{ fontSize: 11 }}>prepone</button>
                           <button onClick={() => scheduler.skipTask(item.taskId)} style={{ fontSize: 11 }}>skip</button>
