@@ -93,6 +93,9 @@ export const useRoutineStore = create<RoutineStore>()(
           blockIds: ['block-fri-game'],
           recurrence: { pattern: 'weekly', daysOfWeek: [5] },
           idealSpawnTime: 810, // Game Start @ 1:30 PM
+          taskConfigs: [
+            { taskId: 't-football', expiresAfterMinutes: 60 }, // dead after 2:30 PM (810+60=870)
+          ],
           enabled: true,
         },
         // Friday post-game
