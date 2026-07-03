@@ -20,12 +20,12 @@ export const useRoutineStore = create<RoutineStore>()(
           name: 'Gym Morning (Mon/Wed)',
           blockIds: ['block-morning-gym'],
           recurrence: { pattern: 'weekly', daysOfWeek: [1, 3] },
-          idealSpawnTime: 360, // Wake @ 6 AM
+          idealSpawnTime: 360,
           taskConfigs: [
-            { taskId: 't-cook', expiresAfterMinutes: 120 },       // dead after 8 AM
-            { taskId: 't-sandhi-am', expiresAfterMinutes: 120 },  // dead after 8 AM
-            { taskId: 't-protein-am', expiresAfterMinutes: 180 }, // dead after 9 AM
-            { taskId: 't-eat-am', expiresAfterMinutes: 240 },     // dead after 10 AM
+            { taskId: 't-cook', expiresAfterMinutes: 240 },       // dead after 10 AM
+            { taskId: 't-sandhi-am', expiresAfterMinutes: 120 },
+            { taskId: 't-protein-am', expiresAfterMinutes: 180 },
+            { taskId: 't-eat-am', expiresAfterMinutes: 240 },
           ],
           enabled: true,
         },
@@ -44,9 +44,9 @@ export const useRoutineStore = create<RoutineStore>()(
           name: 'Study Morning (Tue/Thu)',
           blockIds: ['block-morning-study'],
           recurrence: { pattern: 'weekly', daysOfWeek: [2, 4] },
-          idealSpawnTime: 360, // Wake @ 6 AM
+          idealSpawnTime: 360,
           taskConfigs: [
-            { taskId: 't-cook', expiresAfterMinutes: 120 },
+            { taskId: 't-cook', expiresAfterMinutes: 240 },       // dead after 10 AM
             { taskId: 't-sandhi-am', expiresAfterMinutes: 120 },
             { taskId: 't-protein-am', expiresAfterMinutes: 180 },
             { taskId: 't-eat-am', expiresAfterMinutes: 240 },
@@ -112,7 +112,7 @@ export const useRoutineStore = create<RoutineStore>()(
           recurrence: { pattern: 'weekly', daysOfWeek: [6] },
           idealSpawnTime: 360,
           taskConfigs: [
-            { taskId: 't-cook', expiresAfterMinutes: 120 },
+            { taskId: 't-cook', expiresAfterMinutes: 240 },
             { taskId: 't-sandhi-am', expiresAfterMinutes: 120 },
             { taskId: 't-protein-am', expiresAfterMinutes: 180 },
             { taskId: 't-eat-am', expiresAfterMinutes: 240 },
@@ -136,7 +136,7 @@ export const useRoutineStore = create<RoutineStore>()(
           recurrence: { pattern: 'weekly', daysOfWeek: [0] },
           idealSpawnTime: 360,
           taskConfigs: [
-            { taskId: 't-cook', expiresAfterMinutes: 120 },
+            { taskId: 't-cook', expiresAfterMinutes: 240 },
             { taskId: 't-sandhi-am', expiresAfterMinutes: 120 },
             { taskId: 't-protein-am', expiresAfterMinutes: 180 },
             { taskId: 't-eat-am', expiresAfterMinutes: 240 },
