@@ -18,7 +18,7 @@ export const useTaskStore = create<TaskStore>()(
     (set, get) => ({
       tasks: [
         // === Morning routine tasks ===
-        { id: 't-brush', title: 'Brush', weight: 80, durationMinutes: 10, knobs: k },
+        { id: 't-brush', title: 'Brush', weight: 80, durationMinutes: 10, knobs: { ...k, hasStickiness: true }, stickiness: 200 },
         { id: 't-protein-am', title: 'Protein', weight: 70, durationMinutes: 10, knobs: k },
         { id: 't-gym', title: 'Gym', weight: 90, durationMinutes: 130, knobs: k },
         { id: 't-study', title: 'Study', weight: 85, durationMinutes: 130, knobs: k },
@@ -28,7 +28,7 @@ export const useTaskStore = create<TaskStore>()(
         { id: 't-bath-groom', title: 'Bath + Grooming', weight: 75, durationMinutes: 60, knobs: k },
         { id: 't-sandhi-am', title: 'Sandhi (AM)', weight: 70, durationMinutes: 15, knobs: k },
         { id: 't-cook', title: 'Cook', weight: 80, durationMinutes: 60, knobs: k },
-        { id: 't-eat-am', title: 'Eat (morning)', weight: 70, durationMinutes: 15, knobs: k },
+        { id: 't-eat-am', title: 'Eat (morning)', weight: 70, durationMinutes: 15, knobs: { ...k, hasExpiry: true }, expiresAt: '2026-07-03T10:00:00' },
         { id: 't-change', title: 'Change', weight: 60, durationMinutes: 10, knobs: k },
         { id: 't-walk-office', title: 'Walk to office', weight: 90, durationMinutes: 10, knobs: k },
 
