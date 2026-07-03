@@ -32,7 +32,7 @@ export function findSlots(anchors: Anchor[]): Slot[] {
       endAnchorId: next.id,
       startAnchorName: current.name,
       endAnchorName: next.name,
-      name: `${current.name} → ${next.name}`,
+      name: current.slotName || `${current.name} → ${next.name}`,
     })
   }
 

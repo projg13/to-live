@@ -1,8 +1,16 @@
 export interface Anchor {
   id: string
-  name: string
-  spikeTime: number  // minutes from midnight — when this anchor activates
-  weight: number     // dominance value at spike
+  name: string           // anchor name (e.g., "Wake", "Work Start")
+  slotName?: string      // name for the slot that starts here (e.g., "Morning Routine", "Work Hours")
+  spikeTime: number      // minutes from midnight — when this anchor activates
+  weight: number         // dominance value at spike
+}
+
+// A template: named set of anchors for a day type
+export interface AnchorTemplate {
+  id: string
+  name: string           // e.g., "Bangalore Workday", "Weekend", "Travel Day"
+  anchorIds: string[]    // which anchors belong to this template
 }
 
 // Helper: convert hours + minutes to minutes-from-midnight
