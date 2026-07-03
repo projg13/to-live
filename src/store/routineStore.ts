@@ -50,7 +50,8 @@ export const useRoutineStore = create<RoutineStore>()(
           recurrence: { pattern: 'weekly', daysOfWeek: [2, 4] },
           idealSpawnTime: 360,
           taskConfigs: [
-            { taskId: 't-cook', expiresAfterMinutes: 240 },       // dead after 10 AM
+            { taskId: 't-study', expiresAfterMinutes: 120 },      // dead after 8 AM
+            { taskId: 't-cook', expiresAfterMinutes: 240 },
             { taskId: 't-sandhi-am', expiresAfterMinutes: 120 },
             { taskId: 't-protein-am', expiresAfterMinutes: 180 },
             { taskId: 't-eat-am', expiresAfterMinutes: 240 },
