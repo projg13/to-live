@@ -152,17 +152,20 @@ function resolveDay(
     )
 
     // Collect tasks from routines → blocks
-    // Determine start cursor: confirmed anchor time > lastDoneAt > idealSpawnTime
+    // Determine start cursor: confirmed anchor > lastDoneAt > idealSpawnTime
     for (const routine of activeRoutines) {
-      // Find if any confirmed anchor matches the blocks' anchor
       let routineStart = routine.idealSpawnTime
 
-      for (const blockId of routine.blockIds) {
-        const block = context.blocks.find((b) => b.id === blockId)
-        if (!block) continue
-        const conf = dayConfirmations.find((c) => c.anchorId === block.anchorId)
-        if (conf && conf.actualTime > routineStart) {
-          routineStart = conf.actualTime
+      // Any confirmed anchor on this day overrides the routine start
+      // The user edits anchor time to say "my actual day started here"
+      if (dayConfirmations.length > 0) {
+        // Use the earliest confirmation that's after midnight as the routine start
+        const relevantConfs = dayConfirmations
+          .map((c) => c.actualTime)
+          .filter((t) => t > 0)
+          .sort((a, b) => a - b)
+        if (relevantConfs.length > 0) {
+          routineStart = relevantConfs[0]
         }
       }
 
