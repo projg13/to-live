@@ -38,8 +38,8 @@ export const useTaskStore = create<TaskStore>()(
         { id: 't-work-fri-eve', title: 'Work (Fri post-game)', weight: 90, durationMinutes: 60, knobs: k },
 
         // === Friday extras ===
-        { id: 't-football', title: 'Football', weight: 95, durationMinutes: 180, knobs: k },
-        { id: 't-bath-fri', title: 'Bath (post-football)', weight: 75, durationMinutes: 20, knobs: k },
+        { id: 't-football', title: 'Football', weight: 95, durationMinutes: 180, knobs: { ...k, isMother: true }, links: [{ linkedTaskId: 't-bath-fri', linkType: 'active' }] },
+        { id: 't-bath-fri', title: 'Bath (post-football)', weight: 75, durationMinutes: 20, knobs: k, parentId: 't-football' },
         { id: 't-eat-fri', title: 'Eat (post-football)', weight: 70, durationMinutes: 10, knobs: k },
 
         // === Evening routine tasks ===
