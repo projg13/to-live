@@ -7,7 +7,8 @@ import { useRoutineStore } from '../store/routineStore'
 import { useObligationStore } from '../store/obligationStore'
 import { useRecoveryStore } from '../store/recoveryStore'
 import { usePlannerStore } from '../store/plannerStore'
-import { formatTime } from '../types/anchor'
+import { formatTime, getWeight } from '../types/anchor'
+import { findSlots } from './DayPlanner'
 import type { AdhocTask, AnchorConfirmation } from '../types/scheduler'
 import type { ResolveContext } from '../store/schedulerStore'
 
@@ -120,6 +121,31 @@ function Dashboard() {
               onCancel={() => setShowAdhocForm(false)}
             />
           )}
+
+          {/* Anchor slots / time blocks */}
+          <div style={{ marginBottom: 12 }}>
+            {(() => {
+              const slots = findSlots(anchors)
+              return slots.map((slot, i) => {
+                const isActive = virtualTime >= slot.startTime && virtualTime < slot.endTime
+                return (
+                  <div key={i} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '4px 0',
+                    borderLeft: isActive ? '3px solid #333' : '3px solid transparent',
+                    paddingLeft: 8,
+                  }}>
+                    <span style={{ fontFamily: 'monospace', fontSize: 12, width: 120 }}>
+                      {formatTime(slot.startTime)} – {formatTime(slot.endTime)}
+                    </span>
+                    <strong style={{ fontSize: 13 }}>{slot.anchorName}</strong>
+                  </div>
+                )
+              })
+            })()}
+          </div>
 
           {/* Timeline */}
           <div>

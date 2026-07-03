@@ -147,12 +147,17 @@ function resolveDay(
     )
 
     // Collect tasks from routines → blocks
+    // Place them sequentially from routine's idealSpawnTime, respecting block order
     for (const routine of activeRoutines) {
+      let cursor = routine.idealSpawnTime
+
       for (const blockId of routine.blockIds) {
         const block = context.blocks.find((b) => b.id === blockId)
         if (!block) continue
 
-        for (const entry of block.entries) {
+        const sortedEntries = [...block.entries].sort((a, b) => a.order - b.order)
+
+        for (const entry of sortedEntries) {
           if (skippedTaskIds.includes(entry.taskId)) continue
           const task = context.tasks.find((t) => t.id === entry.taskId)
           if (!task) continue
@@ -161,30 +166,45 @@ function resolveDay(
           let weight = task.weight
           const taskConfig = routine.taskConfigs?.find((tc) => tc.taskId === task.id)
 
-          // Find which slot this task ideally belongs to
           if (taskConfig?.slotWeights) {
-            const slot = slots.find((s) => s.anchorName === dayAnchors.find((a) => a.id === block.anchorId)?.name)
-            if (slot) {
-              const anchorId = block.anchorId
-              const slotCurve = taskConfig.slotWeights[anchorId]
-              if (slotCurve && slotCurve.length > 0) {
-                weight = getSlotWeight(slotCurve, 0) // at slot start for now
-              }
+            const anchorId = block.anchorId
+            const slotCurve = taskConfig.slotWeights[anchorId]
+            if (slotCurve && slotCurve.length > 0) {
+              const offsetInSlot = Math.max(0, cursor - routine.idealSpawnTime)
+              weight = getSlotWeight(slotCurve, offsetInSlot)
             }
           }
 
+          // Use idealTime from taskConfig if set
+          const idealStart = taskConfig?.idealTime ?? cursor
+
           if (weight <= 0) continue
 
-          items.push({
-            taskId: task.id,
-            title: task.title,
-            startMinutes: 0,
-            endMinutes: task.durationMinutes,
-            isBackground: entry.isBackground,
-            source: 'routine',
-            weight,
-            day: dayIndex,
-          })
+          if (entry.isBackground) {
+            items.push({
+              taskId: task.id,
+              title: task.title,
+              startMinutes: idealStart,
+              endMinutes: idealStart + task.durationMinutes,
+              isBackground: true,
+              source: 'routine',
+              weight,
+              day: dayIndex,
+            })
+            // Background doesn't advance cursor
+          } else {
+            items.push({
+              taskId: task.id,
+              title: task.title,
+              startMinutes: idealStart,
+              endMinutes: idealStart + task.durationMinutes,
+              isBackground: false,
+              source: 'routine',
+              weight,
+              day: dayIndex,
+            })
+            cursor = idealStart + task.durationMinutes
+          }
         }
       }
     }
@@ -259,62 +279,49 @@ function resolveDay(
   }
 }
 
-// Simple greedy placement: sort by weight, place into first available slot
+// Place items: routine items keep their pre-computed positions,
+// obligations/recovery get placed in first available gaps
 function placeItems(
   items: ScheduledItem[],
   slots: { startTime: number; endTime: number; anchorName: string }[],
-  anchors: Anchor[],
-  confirmations: AnchorConfirmation[]
+  _anchors: Anchor[],
+  _confirmations: AnchorConfirmation[]
 ): ScheduledItem[] {
-  // Items with user-specified start times (adhoc) keep their position
-  const fixed = items.filter((i) => i.source === 'adhoc')
-  const floating = items.filter((i) => i.source !== 'adhoc')
+  // Pre-placed items: adhoc + routine (they have valid startMinutes)
+  const prePlaced = items.filter((i) => i.source === 'adhoc' || i.source === 'routine' || i.source === 'event')
+  const floating = items.filter((i) => i.source === 'obligation' || i.source === 'recovery')
 
   // Sort floating by weight descending
   floating.sort((a, b) => b.weight - a.weight)
 
-  // Track occupied time ranges
-  const occupied: { start: number; end: number }[] = fixed.map((f) => ({
-    start: f.startMinutes,
-    end: f.endMinutes,
-  }))
+  // Track occupied time ranges (only non-background items occupy time)
+  const occupied: { start: number; end: number }[] = prePlaced
+    .filter((i) => !i.isBackground)
+    .map((f) => ({ start: f.startMinutes, end: f.endMinutes }))
 
-  const placed: ScheduledItem[] = [...fixed]
+  const placed: ScheduledItem[] = [...prePlaced]
 
+  // Place floating items in gaps
   for (const item of floating) {
     if (item.isBackground) {
-      // Background items don't consume time, just mark them at current position
-      item.startMinutes = 0
-      item.endMinutes = item.endMinutes // duration stays
       placed.push(item)
       continue
     }
 
-    // Find first gap that fits this task
-    const duration = item.endMinutes // endMinutes was set to durationMinutes
+    const duration = item.endMinutes - item.startMinutes || item.endMinutes // duration
     let bestStart = -1
 
-    // Try placing in slots
-    for (const slot of slots) {
-      let cursor = slot.startTime
-      // Adjust for confirmed anchor times
-      const conf = confirmations.find((c) => {
-        const anchor = anchors.find((a) => a.id === c.anchorId)
-        return anchor?.name === slot.anchorName
-      })
-      if (conf) cursor = conf.actualTime
-
-      while (cursor + duration <= slot.endTime) {
-        const conflicts = occupied.some(
-          (o) => cursor < o.end && cursor + duration > o.start
-        )
-        if (!conflicts) {
-          bestStart = cursor
-          break
-        }
-        cursor += 5 // try next 5-min slot
+    // Scan from 6 AM to midnight for first gap
+    let cursor = 360 // start searching from 6 AM
+    while (cursor + duration <= 1440) {
+      const conflicts = occupied.some(
+        (o) => cursor < o.end && cursor + duration > o.start
+      )
+      if (!conflicts) {
+        bestStart = cursor
+        break
       }
-      if (bestStart >= 0) break
+      cursor += 5
     }
 
     if (bestStart >= 0) {
@@ -323,7 +330,6 @@ function placeItems(
       occupied.push({ start: item.startMinutes, end: item.endMinutes })
       placed.push(item)
     }
-    // If no space found, item gets dropped (not placed)
   }
 
   return placed.sort((a, b) => a.startMinutes - b.startMinutes)
