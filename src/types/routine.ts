@@ -1,0 +1,59 @@
+export type RecurrencePattern = 'daily' | 'weekly' | 'monthly' | 'one-time' | 'repeat-until'
+
+export interface RecurrenceConfig {
+  pattern: RecurrencePattern
+  daysOfWeek?: number[]        // 0-6 (Sun-Sat), for weekly
+  dayOfMonth?: number          // for monthly
+  repeatUntil?: string         // ISO date, for repeat-until
+  interval?: number            // every N days/weeks/months
+}
+
+// A weight point relative to the slot's ideal start time (anchor dominance start)
+export interface SlotWeightPoint {
+  offsetMinutes: number   // minutes from slot's ideal start time
+  value: number           // weight at this point (linearly interpolated between)
+}
+
+// Per-task behavior within a routine
+export interface RoutineTaskConfig {
+  taskId: string
+  slotWeights?: Record<string, SlotWeightPoint[]>  // anchorId → piecewise weight curve relative to slot start
+  expiresAfterMinutes?: number                     // task dies after this many minutes from routine spawn
+  idealTime?: number                               // minutes from midnight — ideal time for this task
+}
+
+// Interpolate slot weight at a given offset from slot start
+export function getSlotWeight(points: SlotWeightPoint[], offsetMinutes: number): number {
+  if (points.length === 0) return 0
+  if (points.length === 1) return points[0].value
+  if (offsetMinutes <= points[0].offsetMinutes) return points[0].value
+  if (offsetMinutes >= points[points.length - 1].offsetMinutes) return points[points.length - 1].value
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i]
+    const b = points[i + 1]
+    if (offsetMinutes >= a.offsetMinutes && offsetMinutes <= b.offsetMinutes) {
+      const t = (offsetMinutes - a.offsetMinutes) / (b.offsetMinutes - a.offsetMinutes)
+      return a.value + t * (b.value - a.value)
+    }
+  }
+  return 0
+}
+
+export interface Routine {
+  id: string
+  name: string
+  blockIds: string[]                     // which blocks this routine manages
+
+  // Recurrence
+  recurrence: RecurrenceConfig
+
+  // Ideal spawn time (minutes from midnight)
+  idealSpawnTime: number
+
+  // Per-task overrides
+  taskConfigs?: RoutineTaskConfig[]
+
+  // Active/enabled
+  enabled: boolean
+}
