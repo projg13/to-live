@@ -581,22 +581,7 @@ function placeItems(
       cursor += 5
     }
 
-    // If no space after ideal, try before (wrap search from day start)
-    if (!found) {
-      cursor = 0
-      while (cursor + duration <= start) {
-        if (!hasConflict(cursor, duration, occupied)) {
-          item.startMinutes = cursor
-          item.endMinutes = cursor + duration
-          occupied.push({ start: cursor, end: cursor + duration })
-          placed.push(item)
-          found = true
-          break
-        }
-        cursor += 5
-      }
-    }
-    // If still not found, task is dropped (no space in the day)
+    // If no space after ideal time, task is dropped — never wrap to midnight
   }
 
   return placed.sort((a, b) => a.startMinutes - b.startMinutes)
