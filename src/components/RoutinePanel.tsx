@@ -161,7 +161,7 @@ function RoutineEditor({
 }) {
   const { blocks } = useBlockStore()
   const { tasks } = useTaskStore()
-  const { slots, anchors } = useAnchorStore()
+  const { slots, anchors, templates } = useAnchorStore()
 
   const [name, setName] = useState(initial?.name ?? '')
   const [blockConfigs, setBlockConfigs] = useState<RoutineBlockConfig[]>(initial?.blockConfigs ?? [])
@@ -345,9 +345,58 @@ function RoutineEditor({
       {/* Per-task configs */}
       {uniqueTaskIds.length > 0 && (
         <div className="space-y-3 pl-4 border-l-2 border-cyan-555 bg-slate-900/10 p-3 rounded-2xl">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-            Task Weight & Constraint Overrides
-          </span>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Task Weight & Constraint Overrides
+            </span>
+            <div className="flex gap-1.5">
+              {/* Populate Ideal Times from a template */}
+              <select
+                value=""
+                onChange={(e) => {
+                  if (!e.target.value) return
+                  const template = templates.find((t) => t.id === e.target.value)
+                  if (!template) return
+
+                  // For each block config, find its anchor's spikeTime in the template
+                  const newConfigs = [...taskConfigs]
+                  for (const bc of blockConfigs) {
+                    const templateEntry = template.entries.find((te) => te.anchorId === bc.anchorId)
+                    if (!templateEntry) continue
+                    const block = blocks.find((b) => b.id === bc.blockId)
+                    if (!block) continue
+
+                    for (const entry of block.entries) {
+                      const existing = newConfigs.find((tc) => tc.taskId === entry.taskId)
+                      if (existing) {
+                        existing.idealTime = templateEntry.spikeTime
+                      } else {
+                        newConfigs.push({ taskId: entry.taskId, idealTime: templateEntry.spikeTime })
+                      }
+                    }
+                  }
+                  setTaskConfigs(newConfigs)
+                }}
+                className="text-[10px] px-2 py-1 rounded-lg border border-cyan-800/30 bg-cyan-950/20 text-cyan-400 focus:outline-none cursor-pointer font-bold"
+              >
+                <option value="">⏰ Populate ideal times…</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  setTaskConfigs(taskConfigs.map((tc) => {
+                    const { idealTime, ...rest } = tc
+                    return rest
+                  }))
+                }}
+                className="text-[10px] px-2 py-1 rounded-lg border border-slate-800 bg-slate-950/60 text-slate-500 hover:text-rose-400 hover:border-rose-800/30 transition-all cursor-pointer font-bold"
+              >
+                ✕ Clear ideals
+              </button>
+            </div>
+          </div>
 
           {/* Dropdown to add a task config */}
           <select
