@@ -271,11 +271,15 @@ function resolveDay(
           let weight = task.weight
           const taskConfig = routine.taskConfigs?.find((tc) => tc.taskId === task.id)
 
-          // Check expiry: relative to the ANCHOR start time
+          // Check expiry: anchor time + offset = deadline
+          // If current time already past the deadline, skip during collection
           if (taskConfig?.expiresAfterMinutes !== undefined) {
-            const expiryTime = anchorTime + taskConfig.expiresAfterMinutes
-            if (anchorTime >= expiryTime) {
-              if (debug) console.log(`      ⏰ ${task.title}: EXPIRED (anchor@${anchorTime} >= expiry@${expiryTime})`)
+            const taskIdeal = taskConfig.idealTime ?? anchorTime
+            const expiryTime = taskIdeal + taskConfig.expiresAfterMinutes
+            const now = new Date()
+            const nowMins = now.getHours() * 60 + now.getMinutes()
+            if (dayIndex === 0 && nowMins >= expiryTime) {
+              if (debug) console.log(`      ⏰ ${task.title}: EXPIRED at collection (now=${nowMins} >= expiry@${expiryTime})`)
               continue
             }
           }
@@ -352,10 +356,12 @@ function resolveDay(
 
         // Double-check expiry against actual placement time
         // expiryTime uses ORIGINAL anchor — if pushed anchor makes idealStart exceed it, task is dropped
+        // Expiry: idealTime (or anchor) + offset = deadline
+        // If placement would start at or past expiry, drop it
         if (taskConfig?.expiresAfterMinutes !== undefined) {
-          const expiryTime = cand.anchorTime + taskConfig.expiresAfterMinutes
+          const expiryTime = taskIdealTime + taskConfig.expiresAfterMinutes
           if (idealStart >= expiryTime) {
-            if (debug) console.log(`      ⏰ EXPIRED: ${cand.task.title} — idealStart=${idealStart} >= expiryTime=${expiryTime} (anchor=${cand.anchorTime} + ${taskConfig.expiresAfterMinutes}min)`)
+            if (debug) console.log(`      ⏰ EXPIRED: ${cand.task.title} — idealStart=${idealStart} >= expiryTime=${expiryTime} (ideal=${taskIdealTime} + ${taskConfig.expiresAfterMinutes}min)`)
             continue
           }
         }
