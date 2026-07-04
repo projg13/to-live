@@ -2,7 +2,6 @@ export interface BlockEntry {
   taskId: string
   order: number                    // sequence within block (0-indexed)
   isBackground: boolean            // true = runs concurrently with following active entries
-  mandatory: boolean               // if true, survives drops
 }
 
 // Block: a reusable, named group of tasks in a specific order.

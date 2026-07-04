@@ -157,7 +157,7 @@ function BlockEditor({
   }
 
   const addEntry = () => {
-    setEntries([...entries, { taskId: '', order: entries.length, isBackground: false, mandatory: false }])
+    setEntries([...entries, { taskId: '', order: entries.length, isBackground: false }])
   }
 
   const addLinkedChain = () => {
@@ -166,7 +166,7 @@ function BlockEditor({
     if (!task) { addEntry(); return }
 
     const chain: BlockEntry[] = [
-      { taskId: task.id, order: entries.length, isBackground: false, mandatory: true },
+      { taskId: task.id, order: entries.length, isBackground: false },
     ]
 
     let current = task
@@ -179,7 +179,6 @@ function BlockEditor({
           taskId: linked.id,
           order: entries.length + idx,
           isBackground: link.linkType === 'passive',
-          mandatory: true,
         })
         idx++
         current = linked
@@ -285,15 +284,6 @@ function BlockEditor({
                       background
                     </label>
 
-                    <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-350 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={entry.mandatory}
-                        onChange={(e) => updateEntry(i, { mandatory: e.target.checked })}
-                        className="rounded border-slate-700 bg-slate-900 text-cyan-505 focus:ring-cyan-500 h-4 w-4 cursor-pointer"
-                      />
-                      mandatory
-                    </label>
                   </div>
 
                   {/* Ordering arrows */}

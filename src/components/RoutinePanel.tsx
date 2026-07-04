@@ -3,7 +3,7 @@ import { useRoutineStore } from '../store/routineStore'
 import { useBlockStore } from '../store/blockStore'
 import { useTaskStore } from '../store/taskStore'
 import { useAnchorStore } from '../store/anchorStore'
-import type { Routine, RecurrenceConfig, RecurrencePattern, RoutineTaskConfig, RoutineBlockConfig } from '../types/routine'
+import type { Routine, RoutineTaskConfig, RoutineBlockConfig } from '../types/routine'
 import { formatTime } from '../types/anchor'
 
 // Icons
@@ -101,10 +101,7 @@ function RoutinePanel() {
                 </span>
 
                 <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
-                  <span className="bg-slate-950/65 border border-slate-850 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-mono">
-                    {routine.recurrence.pattern}
-                  </span>
-                  <span>• spawn @ {formatTime(routine.idealSpawnTime)}</span>
+                  <span>spawn @ {formatTime(routine.idealSpawnTime)}</span>
                   <span>• {routine.blockConfigs.length} block(s)</span>
                   <span>• {routine.taskConfigs?.length ?? 0} task config(s)</span>
                 </div>
@@ -169,9 +166,6 @@ function RoutineEditor({
 
   const [name, setName] = useState(initial?.name ?? '')
   const [blockConfigs, setBlockConfigs] = useState<RoutineBlockConfig[]>(initial?.blockConfigs ?? [])
-  const [recurrence, setRecurrence] = useState<RecurrenceConfig>(
-    initial?.recurrence ?? { pattern: 'daily' }
-  )
   const [idealSpawnTime, setIdealSpawnTime] = useState(initial?.idealSpawnTime ?? 360)
   const [taskConfigs, setTaskConfigs] = useState<RoutineTaskConfig[]>(initial?.taskConfigs ?? [])
   const [enabled, setEnabled] = useState(initial?.enabled ?? true)
@@ -188,7 +182,7 @@ function RoutineEditor({
       id: initial?.id ?? crypto.randomUUID(),
       name: name.trim(),
       blockConfigs,
-      recurrence,
+
       idealSpawnTime,
       taskConfigs: taskConfigs.length > 0 ? taskConfigs : undefined,
       enabled,
@@ -281,12 +275,6 @@ function RoutineEditor({
               return sum + (t?.durationMinutes ?? 0)
             }, 0)
             : 0
-          const mandatoryDuration = b
-            ? b.entries.filter((e) => e.mandatory).reduce((sum, e) => {
-              const t = tasks.find((tt) => tt.id === e.taskId)
-              return sum + (t?.durationMinutes ?? 0)
-            }, 0)
-            : 0
 
           return (
             <div key={bc.blockId} className="bg-slate-955 border border-slate-850 p-3 rounded-xl space-y-2">
@@ -294,7 +282,7 @@ function RoutineEditor({
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-cyan-400">{b?.name ?? bc.blockId}</span>
                   <span className="text-[9px] font-mono text-slate-500">
-                    {blockDuration}m total · {mandatoryDuration}m mandatory
+                    {blockDuration}m · {b?.entries.length ?? 0} tasks
                   </span>
                 </div>
                 <button
@@ -329,17 +317,14 @@ function RoutineEditor({
         {/* Live duration summary */}
         {blockConfigs.length > 0 && (() => {
           let totalDuration = 0
-          let mandatoryTotal = 0
-          let optionalTotal = 0
+          let taskCount = 0
           for (const bc of blockConfigs) {
             const b = blocks.find((bl) => bl.id === bc.blockId)
             if (!b) continue
             for (const entry of b.entries) {
               const t = tasks.find((tt) => tt.id === entry.taskId)
-              const dur = t?.durationMinutes ?? 0
-              totalDuration += dur
-              if (entry.mandatory) mandatoryTotal += dur
-              else optionalTotal += dur
+              totalDuration += t?.durationMinutes ?? 0
+              taskCount++
             }
           }
           const hrs = Math.floor(totalDuration / 60)
@@ -349,8 +334,7 @@ function RoutineEditor({
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Routine Total</span>
               <div className="flex items-center gap-3 text-[10px] font-mono">
                 <span className="text-slate-200 font-bold">{hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`}</span>
-                <span className="text-cyan-500">{mandatoryTotal}m must</span>
-                <span className="text-slate-500">{optionalTotal}m optional</span>
+                <span className="text-slate-500">{taskCount} tasks</span>
               </div>
             </div>
           )
@@ -370,95 +354,7 @@ function RoutineEditor({
         />
       </div>
 
-      {/* Recurrence config */}
-      <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-          Recurrence Rules
-        </span>
 
-        <div className="flex flex-wrap items-center gap-3 bg-slate-950/60 p-3 border border-slate-850 rounded-xl">
-          <select
-            value={recurrence.pattern}
-            onChange={(e) => setRecurrence({ ...recurrence, pattern: e.target.value as RecurrencePattern })}
-            className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-350 focus:outline-none cursor-pointer"
-          >
-            <option className="bg-slate-950 text-slate-200" value="daily">daily</option>
-            <option className="bg-slate-950 text-slate-200" value="weekly">weekly</option>
-            <option className="bg-slate-950 text-slate-200" value="monthly">monthly</option>
-            <option className="bg-slate-950 text-slate-200" value="one-time">one-time</option>
-            <option className="bg-slate-950 text-slate-200" value="repeat-until">repeat-until</option>
-          </select>
-
-          {recurrence.pattern !== 'daily' && recurrence.pattern !== 'one-time' && (
-            <div className="flex items-center gap-1.5 text-xs text-slate-400">
-              <span>every</span>
-              <input
-                type="number"
-                value={recurrence.interval ?? 1}
-                onChange={(e) => setRecurrence({ ...recurrence, interval: Number(e.target.value) || 1 })}
-                className="w-12 px-1.5 py-1 text-center bg-slate-900 border border-slate-800 rounded text-slate-205 font-semibold focus:outline-none"
-              />
-            </div>
-          )}
-        </div>
-
-        {recurrence.pattern === 'weekly' && (
-          <div className="flex flex-wrap gap-2 bg-slate-950/40 p-3 border border-slate-850 rounded-xl">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, i) => {
-              const isActive = recurrence.daysOfWeek?.includes(i) ?? false
-              return (
-                <label
-                  key={i}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${isActive
-                      ? 'bg-cyan-955/35 text-cyan-400 border-cyan-905/30'
-                      : 'bg-slate-950 border-slate-900 text-slate-500 hover:bg-slate-900'
-                    }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isActive}
-                    onChange={(e) => {
-                      const days = recurrence.daysOfWeek ?? []
-                      setRecurrence({
-                        ...recurrence,
-                        daysOfWeek: e.target.checked ? [...days, i] : days.filter((d) => d !== i),
-                      })
-                    }}
-                    className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-500 h-3 w-3 cursor-pointer"
-                  />
-                  {day}
-                </label>
-              )
-            })}
-          </div>
-        )}
-
-        {recurrence.pattern === 'monthly' && (
-          <div className="flex items-center gap-2 bg-slate-950/40 p-3 border border-slate-850 rounded-xl text-xs text-slate-350">
-            <span>Day of month:</span>
-            <input
-              type="number"
-              value={recurrence.dayOfMonth ?? 1}
-              onChange={(e) => setRecurrence({ ...recurrence, dayOfMonth: Number(e.target.value) || 1 })}
-              min={1}
-              max={31}
-              className="w-14 px-2 py-1 bg-slate-900 border border-slate-800 rounded text-center text-slate-205 font-bold focus:outline-none"
-            />
-          </div>
-        )}
-
-        {recurrence.pattern === 'repeat-until' && (
-          <div className="flex items-center gap-2 bg-slate-950/40 p-3 border border-slate-850 rounded-xl text-xs text-slate-350">
-            <span>Until:</span>
-            <input
-              type="date"
-              value={recurrence.repeatUntil ?? ''}
-              onChange={(e) => setRecurrence({ ...recurrence, repeatUntil: e.target.value })}
-              className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-slate-205 focus:outline-none cursor-pointer"
-            />
-          </div>
-        )}
-      </div>
 
       {/* Per-task configs */}
       {uniqueTaskIds.length > 0 && (
