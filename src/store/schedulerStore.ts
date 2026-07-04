@@ -270,10 +270,14 @@ function resolveDay(
       let currentAnchorId = candidates[0]?.anchorId ?? ''
 
       for (const cand of candidates) {
-        // When we move to a different anchor, reset cursor to that anchor's time
+        // When we move to a different anchor, jump cursor forward to that anchor's actual time
+        // (which may have been pushed by overflow from the previous anchor group)
         if (cand.anchorId !== currentAnchorId) {
           currentAnchorId = cand.anchorId
-          cursor = Math.max(cursor, cand.anchorTime)
+          // Re-read the anchor's actual time (may have been pushed by earlier overflow)
+          const freshAnchor = resolvedAnchors.find((a) => a.anchorId === cand.anchorId)
+          const freshTime = freshAnchor?.actualTime ?? cand.anchorTime
+          cursor = Math.max(cursor, freshTime)
         }
 
         const taskConfig = routine.taskConfigs?.find((tc) => tc.taskId === cand.task.id)
@@ -318,16 +322,15 @@ function resolveDay(
             resetAnchorId: cand.anchorId,
           })
           cursor = idealStart + cand.task.durationMinutes
-        }
-      }
 
-      // After placing all routine tasks, check if cursor overflowed past next anchors
-      for (const bc of routine.blockConfigs) {
-        const blockAnchorIdx = resolvedAnchors.findIndex((a) => a.anchorId === bc.anchorId)
-        if (blockAnchorIdx >= 0) {
-          for (let ai = blockAnchorIdx + 1; ai < resolvedAnchors.length; ai++) {
-            if (cursor > resolvedAnchors[ai].actualTime) {
-              resolvedAnchors[ai].actualTime = cursor
+          // Inline anchor push: if cursor overflowed past any subsequent anchors, push them now
+          // so the next routine/candidate sees the updated times
+          const thisAnchorIdx = resolvedAnchors.findIndex((a) => a.anchorId === cand.anchorId)
+          if (thisAnchorIdx >= 0) {
+            for (let ai = thisAnchorIdx + 1; ai < resolvedAnchors.length; ai++) {
+              if (cursor > resolvedAnchors[ai].actualTime) {
+                resolvedAnchors[ai].actualTime = cursor
+              }
             }
           }
         }
