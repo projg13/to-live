@@ -36,6 +36,7 @@ interface SchedulerStore {
   preponeTask: (taskId: string, targetTime: number, day: number) => void
   unmarkTask: (taskId: string) => void
   insertTask: (taskId: string, startTime: number, day: number) => void
+  recalibrateFrom: (minutes: number, day: number) => void
   undo: () => void
   clearSchedule: () => void
 }
@@ -52,10 +53,11 @@ export interface ResolveContext {
   dayPlans: DayPlan[]
   weekPlan: Record<number, string>
   calendarEvents: CalendarEvent[]
+  baseDate?: string  // ISO date override (debug) — if absent, uses today
 }
 
-function getDateStr(offsetDays: number): string {
-  const d = new Date()
+function getDateStr(offsetDays: number, base?: string): string {
+  const d = base ? new Date(base + 'T00:00:00') : new Date()
   d.setDate(d.getDate() + offsetDays)
   return d.toISOString().split('T')[0]
 }
@@ -88,8 +90,11 @@ function resolveDay(
   let dayPlanId = ''
   let dayPlanName = 'Unplanned'
   const suspendRegular = event?.suspendRegular ?? false
+  const eventWeightOffset = event?.weightOffset ?? 0
 
-  if (event?.dayPlanOverride) {
+  if (event?.dayPlanOverrides?.[dateStr]) {
+    dayPlanId = event.dayPlanOverrides[dateStr]
+  } else if (event?.dayPlanOverride) {
     dayPlanId = event.dayPlanOverride
   } else {
     dayPlanId = context.weekPlan[dayOfWeek] ?? ''
@@ -168,8 +173,9 @@ function resolveDay(
     }
   }
 
-  // Skip routine/block tasks if event suspends regular
-  if (!suspendRegular && dayPlan) {
+  // Skip routine/block tasks if event suspends regular AND no weightOffset lets them through
+  const allowRoutines = !suspendRegular || eventWeightOffset > 0
+  if (allowRoutines && dayPlan) {
     // Get active routines for this day plan
     const activeRoutines = context.routines.filter(
       (r) => r.enabled && dayPlan.routineIds.includes(r.id)
@@ -253,6 +259,11 @@ function resolveDay(
             if (idealStart >= expiryTime) continue
           }
 
+          // Apply event weight offset (high offset = only important tasks survive)
+          if (eventWeightOffset > 0) {
+            weight = weight - eventWeightOffset
+          }
+
           if (weight <= 0) continue
 
           if (entry.isBackground) {
@@ -301,7 +312,21 @@ function resolveDay(
   }
 
 
-  // Obligations (always run, even during event suspension)
+  // Wake anchor — used as the pivot for obligations and recovery plans
+  const wakeAnchor = resolvedAnchors.find((a) => a.anchorName === 'Wake')
+  const wakeTime = wakeAnchor?.actualTime ?? 360
+
+  // Obligation/recovery start: use lastDoneAt if later than wake
+  const obStart = lastDoneAt !== undefined && lastDoneAt > wakeTime
+    ? lastDoneAt
+    : wakeTime
+
+  // Obligations and recovery: only on today (day 0).
+  // When tomorrow becomes day 0, undone obligations naturally reappear.
+  // Obligations follow the same suspend/weightOffset rules as routines.
+  if (dayIndex === 0 && allowRoutines) {
+
+  // Obligations
   for (const ob of context.obligations) {
     if (!ob.enabled) continue
     const resolvedDeadline = resolveObligationDeadline(ob, dateStr)
@@ -318,15 +343,18 @@ function resolveDay(
       const task = context.tasks.find((t) => t.id === obTask.taskId)
       if (!task) continue
 
-      // Sample weight at midday for scheduling priority
-      const weight = getObligationWeight(bracket.timeCurve, 720)
+      // Apply event weight offset to obligation weight
+      let weight = getObligationWeight(bracket.timeCurve, 720)
+      if (eventWeightOffset > 0) {
+        weight = weight - eventWeightOffset
+      }
       if (weight <= 0) continue
 
       items.push({
         taskId: task.id,
         title: task.title,
-        startMinutes: 0,
-        endMinutes: task.durationMinutes,
+        startMinutes: obStart,
+        endMinutes: obStart + task.durationMinutes,
         isBackground: false,
         source: 'obligation',
         weight,
@@ -339,15 +367,12 @@ function resolveDay(
 
   // Recovery plans (triggered only)
   // Recovery tasks start from Wake anchor and have high priority
-  const wakeAnchor = resolvedAnchors.find((a) => a.anchorName === 'Wake')
-  const recoveryStart = wakeAnchor?.actualTime ?? 360
-
   for (const plan of context.recoveryPlans) {
     if (!plan.triggered) continue
     const weight = getRecoveryWeight(plan, 720, dateStr)
     if (weight <= 0) continue
 
-    let recoveryCursor = recoveryStart
+    let recoveryCursor = obStart
     for (const tid of plan.taskIds) {
       if (skippedTaskIds.includes(tid)) continue
       if (doneTasks.includes(tid) || doneTasks.includes(`${tid}:${periodKey}`)) continue
@@ -369,6 +394,8 @@ function resolveDay(
       recoveryCursor += task.durationMinutes
     }
   }
+
+  } // end dayIndex === 0 guard for obligations + recovery
 
   // Sort by weight descending, then place sequentially into available time
   const placed = placeItems(items, [], [], dayConfirmations)
@@ -471,7 +498,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
         const days: DaySchedule[] = []
 
         for (let i = 0; i < 7; i++) {
-          const dateStr = getDateStr(i)
+          const dateStr = getDateStr(i, context.baseDate)
           days.push(resolveDay(
             i,
             dateStr,
@@ -564,8 +591,9 @@ export const useSchedulerStore = create<SchedulerStore>()(
           }
         }),
 
-      // Mark done at specific time — all tasks scheduled before this time
-      // are also marked done, and remaining tasks recalibrate from here
+      // Mark done at specific time — marks ONLY this task as done
+      // and sets lastDoneAt so the scheduler recalibrates remaining
+      // tasks from this point onwards on next resolve.
       markDoneAt: (taskId, doneAtMinutes, day) =>
         set((state) => {
           const schedule = state.schedule
@@ -585,20 +613,14 @@ export const useSchedulerStore = create<SchedulerStore>()(
             return tid
           }
 
-          const tasksBefore = dayItems
-            .filter((item) => item.endMinutes <= doneAtMinutes && !item.isBackground)
-            .map((item) => resolveKey(item.taskId))
-
           const currentTaskIdKey = resolveKey(taskId)
-          const allDoneIds = [...new Set([...state.doneTasks, ...tasksBefore, currentTaskIdKey])]
+          const allDoneIds = [...new Set([...state.doneTasks, currentTaskIdKey])]
 
-          // Save their positions for display
+          // Save position of the done task for display
           const newDoneItems = [...state.doneItems]
-          for (const item of dayItems) {
-            const mappedKey = resolveKey(item.taskId)
-            if (allDoneIds.includes(mappedKey) && !newDoneItems.find((d) => d.taskId === item.taskId)) {
-              newDoneItems.push(item)
-            }
+          const doneItem = dayItems.find((i) => i.taskId === taskId)
+          if (doneItem && !newDoneItems.find((d) => d.taskId === taskId)) {
+            newDoneItems.push(doneItem)
           }
 
           return {
@@ -658,6 +680,11 @@ export const useSchedulerStore = create<SchedulerStore>()(
           }],
         }))
       },
+
+      recalibrateFrom: (minutes, day) =>
+        set((state) => ({
+          lastDoneAt: { ...state.lastDoneAt, [day]: minutes },
+        })),
 
       undo: () =>
         set((state) => {
