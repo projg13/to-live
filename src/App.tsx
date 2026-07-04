@@ -10,6 +10,7 @@ import EventPanel from './components/EventPanel'
 import RecoveryPanel from './components/RecoveryPanel'
 import RotPanel from './components/RotPanel'
 import SettingsPanel from './components/SettingsPanel'
+import { resetAllStores } from './stateIO'
 
 const managePanels = [
   'Tasks',
@@ -109,8 +110,7 @@ function App() {
         <button
           onClick={() => {
             if (confirm('Clear ALL data and reload? This cannot be undone.')) {
-              localStorage.clear()
-              window.location.reload()
+              resetAllStores()
             }
           }}
           className="px-5 py-2.5 rounded-2xl text-xs font-bold tracking-wider uppercase text-white bg-rose-600 hover:bg-rose-500 active:scale-95 shadow-md shadow-rose-950/30 border border-transparent transition-all cursor-pointer"

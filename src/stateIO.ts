@@ -108,9 +108,10 @@ export function importFullState(snapshot: AppSnapshot) {
   window.location.reload()
 }
 
-/** Clear all stores from localStorage (full reset) and reload. */
+/** Clear data stores from localStorage (full reset) but keep settings, and reload. */
 export function resetAllStores() {
   for (const key of STORE_KEYS) {
+    if (key === 'to-live-settings') continue // Keep PAT and github config
     localStorage.removeItem(key)
   }
   window.location.reload()
