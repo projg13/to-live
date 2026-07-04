@@ -211,7 +211,7 @@ function resolveDay(
 
         for (const entry of sortedEntries) {
           if (skippedTaskIds.includes(entry.taskId)) continue
-          if (doneTasks.includes(entry.taskId) || doneTasks.includes(`${entry.taskId}:${periodKey}`)) continue
+          if (doneTasks.includes(`${entry.taskId}:${dateStr}`) || doneTasks.includes(`${entry.taskId}:${periodKey}`)) continue
           const task = context.tasks.find((t) => t.id === entry.taskId)
           if (!task) continue
 
@@ -339,7 +339,7 @@ function resolveDay(
 
     for (const obTask of ob.tasks) {
       if (skippedTaskIds.includes(obTask.taskId)) continue
-      if (doneTasks.includes(obTask.taskId) || doneTasks.includes(`${obTask.taskId}:${periodKey}`)) continue
+      if (doneTasks.includes(`${obTask.taskId}:${dateStr}`) || doneTasks.includes(`${obTask.taskId}:${periodKey}`)) continue
       const task = context.tasks.find((t) => t.id === obTask.taskId)
       if (!task) continue
 
@@ -375,7 +375,7 @@ function resolveDay(
     let recoveryCursor = obStart
     for (const tid of plan.taskIds) {
       if (skippedTaskIds.includes(tid)) continue
-      if (doneTasks.includes(tid) || doneTasks.includes(`${tid}:${periodKey}`)) continue
+      if (doneTasks.includes(`${tid}:${dateStr}`) || doneTasks.includes(`${tid}:${periodKey}`)) continue
       const task = context.tasks.find((t) => t.id === tid)
       if (!task) continue
 
@@ -570,13 +570,17 @@ export const useSchedulerStore = create<SchedulerStore>()(
         set((state) => {
           const schedule = state.schedule
           const item = schedule?.days.flatMap((d) => d.items).find((i) => i.taskId === taskId)
-          
-          let completionKey = taskId
+          const dayIdx = item?.day ?? 0
+          const dateStr = getDateStr(dayIdx)
+
+          // Default: key by date so task respawns next routine cycle
+          let completionKey = `${taskId}:${dateStr}`
+
+          // Obligations: key by month so they stay done for the period
           if (item && item.source === 'obligation' && item.sourceId) {
             const obligations = useObligationStore.getState().obligations
             const matchingOb = obligations.find((o) => o.id === item.sourceId)
             if (matchingOb && matchingOb.recurrence !== 'one-time') {
-              const dateStr = getDateStr(item.day)
               const periodKey = dateStr.slice(0, 7) // YYYY-MM
               completionKey = `${taskId}:${periodKey}`
             }
@@ -600,17 +604,17 @@ export const useSchedulerStore = create<SchedulerStore>()(
           const dayItems = schedule?.days[day]?.items ?? []
           const obligations = useObligationStore.getState().obligations
 
+          const dateStr = getDateStr(day)
           const resolveKey = (tid: string) => {
             const item = dayItems.find((i) => i.taskId === tid)
             if (item && item.source === 'obligation' && item.sourceId) {
               const matchingOb = obligations.find((o) => o.id === item.sourceId)
               if (matchingOb && matchingOb.recurrence !== 'one-time') {
-                const dateStr = getDateStr(day)
                 const periodKey = dateStr.slice(0, 7)
                 return `${tid}:${periodKey}`
               }
             }
-            return tid
+            return `${tid}:${dateStr}`
           }
 
           const currentTaskIdKey = resolveKey(taskId)
