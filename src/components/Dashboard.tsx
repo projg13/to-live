@@ -8,6 +8,7 @@ import { useObligationStore } from '../store/obligationStore'
 import { useRecoveryStore } from '../store/recoveryStore'
 import { usePlannerStore } from '../store/plannerStore'
 import { formatTime } from '../types/anchor'
+import { exportFullState, importFullState, downloadJSON, loadJSONFile, resetAllStores } from '../stateIO'
 import type { AdhocTask, ScheduledItem } from '../types/scheduler'
 import type { ResolveContext } from '../store/schedulerStore'
 
@@ -89,6 +90,11 @@ const InfoIcon = () => (
   </svg>
 )
 
+function getCurrentMinutes() {
+  const now = new Date()
+  return now.getHours() * 60 + now.getMinutes()
+}
+
 function Dashboard() {
   const scheduler = useSchedulerStore()
   const { tasks } = useTaskStore()
@@ -103,13 +109,27 @@ function Dashboard() {
   const [showAdhocForm, setShowAdhocForm] = useState(false)
   const [showInsertForm, setShowInsertForm] = useState(false)
   const [showRecovery, setShowRecovery] = useState(false)
-  const [virtualTime, setVirtualTime] = useState(360)
   const [showPrepone, setShowPrepone] = useState<string | null>(null)
   const [preponeTime, setPreponeTime] = useState('')
   const [showDoneAt, setShowDoneAt] = useState<string | null>(null)
   const [doneAtTime, setDoneAtTime] = useState('')
   const [showInsertAt, setShowInsertAt] = useState<{ taskId: string; position: 'above' | 'below' } | null>(null)
   const [showInfo, setShowInfo] = useState<string | null>(null)
+
+  // Debug mode state
+  const [showDebug, setShowDebug] = useState(false)
+  const [debugTimeOverride, setDebugTimeOverride] = useState<number | null>(null)
+  const [debugDateOverride, setDebugDateOverride] = useState<string | null>(null)
+
+  // Live clock — auto-updates every 30 seconds
+  const [currentTime, setCurrentTime] = useState(getCurrentMinutes)
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(getCurrentMinutes()), 30000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // Virtual time: debug override or real clock
+  const virtualTime = debugTimeOverride ?? currentTime
 
   const buildContext = (): ResolveContext => ({
     tasks: JSON.parse(JSON.stringify(tasks)),
@@ -122,6 +142,7 @@ function Dashboard() {
     dayPlans,
     weekPlan: weekPlan.days,
     calendarEvents,
+    baseDate: debugDateOverride ?? undefined,
   })
 
   useEffect(() => {
@@ -142,6 +163,7 @@ function Dashboard() {
     scheduler.doneTasks,
     scheduler.postponedTasks,
     scheduler.lastDoneAt,
+    debugDateOverride,
   ])
 
   const schedule = scheduler.schedule
@@ -173,8 +195,12 @@ function Dashboard() {
 
   // Add active scheduled tasks (exclude done ones)
   if (daySchedule) {
+    const dayDate = daySchedule.date ?? ''
+    const pKey = dayDate.slice(0, 7) // YYYY-MM
     for (const item of daySchedule.items) {
-      if (!scheduler.doneTasks.includes(item.taskId)) {
+      const isDoneRaw = scheduler.doneTasks.includes(item.taskId)
+      const isDonePeriod = pKey && scheduler.doneTasks.includes(`${item.taskId}:${pKey}`)
+      if (!isDoneRaw && !isDonePeriod) {
         timelineItems.push({ type: 'task', time: item.startMinutes, data: item })
       }
     }
@@ -185,7 +211,7 @@ function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Virtual time + controls */}
+      {/* Clock + Recalculate + Controls */}
       <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 shadow-lg shadow-indigo-950/10">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -193,32 +219,33 @@ function Dashboard() {
               <ClockIcon className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Virtual Time</div>
-              <div className="font-mono text-2xl font-bold tracking-tight text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.25)]">
+              <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+                {debugTimeOverride !== null ? 'Debug Time' : 'Current Time'}
+              </div>
+              <div className={`font-mono text-2xl font-bold tracking-tight drop-shadow-[0_0_8px_rgba(34,211,238,0.25)] ${
+                debugTimeOverride !== null ? 'text-amber-400' : 'text-cyan-400'
+              }`}>
                 {formatTime(virtualTime)}
               </div>
+              {debugDateOverride && (
+                <div className="text-[10px] text-amber-400/70 font-mono font-bold mt-0.5">
+                  Date override: {debugDateOverride}
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="flex-1 max-w-md mx-2">
-            <input
-              type="range"
-              min={0}
-              max={1439}
-              value={virtualTime}
-              onChange={(e) => setVirtualTime(Number(e.target.value))}
-              className="w-full h-2 bg-slate-950 border border-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-            />
-            <div className="flex justify-between text-[10px] text-slate-500 font-mono mt-1 px-1">
-              <span>00:00</span>
-              <span>06:00</span>
-              <span>12:00</span>
-              <span>18:00</span>
-              <span>23:59</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => {
+                const now = getCurrentMinutes()
+                scheduler.recalibrateFrom(now, selectedDay)
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-950 shadow-md shadow-cyan-950/30 transition-all active:scale-95 cursor-pointer"
+            >
+              <ResetIcon />
+              Recalculate
+            </button>
             <button
               onClick={() => scheduler.undo()}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-slate-950/65 hover:bg-slate-900 text-slate-300 transition-all border border-slate-850 active:scale-95 cursor-pointer"
@@ -230,10 +257,131 @@ function Dashboard() {
               onClick={() => scheduler.clearSchedule()}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-slate-950/65 hover:bg-slate-900 text-rose-400 transition-all border border-slate-850 active:scale-95 cursor-pointer"
             >
-              <ResetIcon />
+              <TrashIcon />
               Reset
             </button>
+            <button
+              onClick={() => setShowDebug(!showDebug)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border cursor-pointer active:scale-95 ${
+                showDebug
+                  ? 'bg-amber-500/20 text-amber-400 border-amber-700/40 shadow-md shadow-amber-950/20'
+                  : 'bg-slate-950/65 text-slate-500 border-slate-850 hover:text-slate-300'
+              }`}
+            >
+              ⚙ Debug
+            </button>
           </div>
+        </div>
+
+        {/* Collapsible Debug Panel */}
+        {showDebug && (
+          <div className="mt-4 pt-4 border-t border-amber-900/30 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-bold text-amber-400/70 uppercase tracking-widest">Debug Controls</span>
+              {(debugTimeOverride !== null || debugDateOverride !== null) && (
+                <button
+                  onClick={() => {
+                    setDebugTimeOverride(null)
+                    setDebugDateOverride(null)
+                  }}
+                  className="text-[10px] font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer ml-2"
+                >
+                  Reset to live
+                </button>
+              )}
+            </div>
+
+            {/* Virtual Time Slider */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-400 flex items-center justify-between">
+                <span>Virtual Time Override</span>
+                <span className="font-mono text-amber-400/80 text-[11px]">
+                  {debugTimeOverride !== null ? formatTime(debugTimeOverride) : 'Off (using live clock)'}
+                </span>
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={1439}
+                value={debugTimeOverride ?? currentTime}
+                onChange={(e) => setDebugTimeOverride(Number(e.target.value))}
+                className="w-full h-2 bg-slate-950 border border-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+              />
+              <div className="flex justify-between text-[10px] text-slate-500 font-mono px-1">
+                <span>00:00</span>
+                <span>06:00</span>
+                <span>12:00</span>
+                <span>18:00</span>
+                <span>23:59</span>
+              </div>
+            </div>
+
+            {/* Date Override */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-400">Date Override</label>
+              <input
+                type="date"
+                value={debugDateOverride ?? ''}
+                onChange={(e) => setDebugDateOverride(e.target.value || null)}
+                className="text-xs px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 focus:ring-2 focus:ring-amber-500/20 focus:outline-none cursor-pointer w-full max-w-xs"
+              />
+              <p className="text-[10px] text-slate-500">
+                Override the base date used for schedule resolution. Affects which day plans, obligations, and recurrence rules activate.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* State Management */}
+      <div className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mr-2">State</span>
+          <button
+            onClick={() => {
+              const snapshot = exportFullState()
+              const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+              downloadJSON(snapshot, `to-live-state-${ts}.json`)
+            }}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-slate-950/65 hover:bg-slate-900 text-emerald-400 border border-slate-850 transition-all active:scale-95 cursor-pointer"
+          >
+            ↓ Export State
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                const data = await loadJSONFile()
+                if (confirm('This will replace ALL app state and reload. Continue?')) {
+                  importFullState(data)
+                }
+              } catch (e: any) {
+                if (e?.message !== 'No file selected') alert(e?.message ?? 'Import failed')
+              }
+            }}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-slate-950/65 hover:bg-slate-900 text-cyan-400 border border-slate-850 transition-all active:scale-95 cursor-pointer"
+          >
+            ↑ Import State
+          </button>
+          <button
+            onClick={() => {
+              const snapshot = exportFullState()
+              snapshot._meta.type = 'defaults'
+              downloadJSON(snapshot, 'to-live-defaults.json')
+            }}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-slate-950/65 hover:bg-slate-900 text-indigo-400 border border-slate-850 transition-all active:scale-95 cursor-pointer"
+          >
+            ⬡ Save as Defaults
+          </button>
+          <button
+            onClick={() => {
+              if (confirm('Reset ALL stores to factory defaults? This cannot be undone.')) {
+                resetAllStores()
+              }
+            }}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-slate-950/65 hover:bg-slate-900 text-rose-400 border border-slate-850 transition-all active:scale-95 cursor-pointer"
+          >
+            ✕ Reset Defaults
+          </button>
         </div>
       </div>
 
@@ -393,8 +541,9 @@ function Dashboard() {
                       <div className="flex items-center gap-2">
                         <input
                           type="time"
-                          value={toTimeStr(displayTime)}
-                          onChange={(e) => {
+                          defaultValue={toTimeStr(displayTime)}
+                          key={`anchor-input-${displayTime}`}
+                          onBlur={(e) => {
                             if (e.target.value) {
                               const [h, m] = e.target.value.split(':').map(Number)
                               scheduler.confirmAnchor({
@@ -599,7 +748,7 @@ function Dashboard() {
                         <span className="text-xs font-bold text-slate-400">Done at:</span>
                         <input
                           type="time"
-                          value={doneAtTime}
+                          defaultValue={doneAtTime}
                           onChange={(e) => setDoneAtTime(e.target.value)}
                           className="text-xs px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:ring-1 focus:ring-emerald-500 focus:outline-none cursor-pointer"
                         />
@@ -646,7 +795,7 @@ function Dashboard() {
                         <span className="text-xs font-bold text-slate-400">Move to:</span>
                         <input
                           type="time"
-                          value={preponeTime}
+                          defaultValue={preponeTime}
                           onChange={(e) => setPreponeTime(e.target.value)}
                           className="text-xs px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:ring-1 focus:ring-indigo-500 focus:outline-none cursor-pointer"
                         />
@@ -770,7 +919,7 @@ function AdhocTaskForm({
           <span className="text-slate-450 font-semibold">Starts:</span>
           <input
             type="time"
-            value={startTime}
+            defaultValue={startTime}
             onChange={(e) => setStartTime(e.target.value)}
             className="w-full bg-transparent border-none text-slate-200 focus:outline-none p-1 cursor-pointer"
           />
@@ -943,7 +1092,7 @@ function InsertTaskForm({
               <span className="text-slate-450 font-semibold mr-1.5">Start at:</span>
               <input
                 type="time"
-                value={startTime}
+                defaultValue={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
                 className="bg-transparent border-none text-slate-200 focus:outline-none py-1.5 cursor-pointer"
               />

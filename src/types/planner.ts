@@ -12,6 +12,16 @@ export interface WeekPlan {
   days: Record<number, string>     // weekday → dayPlanId
 }
 
+// Reusable event template — stores the config, not the dates
+export interface EventTemplate {
+  id: string
+  name: string                     // e.g., "Weekend Getaway", "Conference Trip"
+  suspendRegular: boolean
+  weightOffset?: number
+  taskIds: string[]
+  dayPlanOverride?: string         // single plan for all days (if set)
+}
+
 // Calendar event: date-specific override
 export interface CalendarEvent {
   id: string
@@ -19,6 +29,9 @@ export interface CalendarEvent {
   date: string                     // ISO date
   endDate?: string                 // ISO date (multi-day events)
   taskIds: string[]                // specific tasks for this event
-  suspendRegular: boolean          // if true, regular tasks are suspended (obligations exempt)
-  dayPlanOverride?: string         // optionally override the day plan for this date
+  suspendRegular: boolean          // if true, ALL tasks (routine + obligations) get weight-gated
+  weightOffset?: number            // subtract from all task weights; only weight > 0 survives
+  dayPlanOverride?: string         // single plan for ALL days of the event
+  dayPlanOverrides?: Record<string, string>  // date → dayPlanId (piecewise per-day override)
+  templateId?: string              // which template this was created from (for reference)
 }
