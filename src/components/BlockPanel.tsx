@@ -142,7 +142,7 @@ function BlockEditor({
   onCancel: () => void
   onDelete?: () => void
 }) {
-  const { tasks } = useTaskStore()
+  const { tasks, updateTask } = useTaskStore()
 
   const [name, setName] = useState(initial?.name ?? '')
   const [entries, setEntries] = useState<BlockEntry[]>(initial?.entries ?? [])
@@ -180,6 +180,10 @@ function BlockEditor({
           order: entries.length + idx,
           isBackground: link.linkType === 'passive',
         })
+        // Set parentId so scheduler ancestor-skip works: skip mother → skip entire chain
+        if (linked.parentId !== current.id) {
+          updateTask(linked.id, { parentId: current.id })
+        }
         idx++
         current = linked
         break
