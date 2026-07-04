@@ -205,7 +205,9 @@ function resolveDay(
 
         for (const entry of sortedEntries) {
           if (skippedTaskIds.includes(entry.taskId)) continue
-          if (doneTasks.includes(`${entry.taskId}:${dateStr}`) || doneTasks.includes(`${entry.taskId}:${periodKey}`)) continue
+          // Anchor-scoped done check: task resets per anchor cycle
+          const anchorDoneKey = `${entry.taskId}:${bc.anchorId}:${dateStr}`
+          if (doneTasks.includes(anchorDoneKey) || doneTasks.includes(`${entry.taskId}:${periodKey}`)) continue
           const task = context.tasks.find((t) => t.id === entry.taskId)
           if (!task) continue
 
@@ -278,6 +280,7 @@ function resolveDay(
               day: dayIndex,
               sourceId: routine.id,
               sourceName: routine.name,
+              resetAnchorId: bc.anchorId,
             })
           } else {
             items.push({
@@ -291,6 +294,7 @@ function resolveDay(
               day: dayIndex,
               sourceId: routine.id,
               sourceName: routine.name,
+              resetAnchorId: bc.anchorId,
             })
             cursor = idealStart + task.durationMinutes
           }
@@ -589,6 +593,11 @@ export const useSchedulerStore = create<SchedulerStore>()(
           // Default: key by date so task respawns next routine cycle
           let completionKey = `${taskId}:${dateStr}`
 
+          // Routine tasks: anchor-scoped key so same task at different anchors tracks independently
+          if (item && item.source === 'routine' && item.resetAnchorId) {
+            completionKey = `${taskId}:${item.resetAnchorId}:${dateStr}`
+          }
+
           // Obligations: key by month so they stay done for the period
           if (item && item.source === 'obligation' && item.sourceId) {
             const obligations = useObligationStore.getState().obligations
@@ -620,6 +629,11 @@ export const useSchedulerStore = create<SchedulerStore>()(
           const dateStr = getDateStr(day)
           const resolveKey = (tid: string) => {
             const item = dayItems.find((i) => i.taskId === tid)
+            // Routine tasks: anchor-scoped
+            if (item && item.source === 'routine' && item.resetAnchorId) {
+              return `${tid}:${item.resetAnchorId}:${dateStr}`
+            }
+            // Obligations: period-scoped
             if (item && item.source === 'obligation' && item.sourceId) {
               const matchingOb = obligations.find((o) => o.id === item.sourceId)
               if (matchingOb && matchingOb.recurrence !== 'one-time') {

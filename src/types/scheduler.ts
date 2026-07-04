@@ -10,6 +10,7 @@ export interface ScheduledItem {
   day: number                // 0 = today, 1 = tomorrow, etc.
   sourceId?: string          // e.g. ID of the routine, obligation, recovery, or event
   sourceName?: string        // e.g. Name of the routine, obligation, recovery, or event
+  resetAnchorId?: string     // if set, done-key is scoped to this anchor (resets per anchor cycle)
 }
 
 // An anchor confirmation (user-reported actual transition)
