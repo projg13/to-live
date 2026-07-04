@@ -3,7 +3,7 @@ import { useRoutineStore } from '../store/routineStore'
 import { useBlockStore } from '../store/blockStore'
 import { useTaskStore } from '../store/taskStore'
 import { useAnchorStore } from '../store/anchorStore'
-import type { Routine, RecurrenceConfig, RecurrencePattern, RoutineTaskConfig, RoutineBlockConfig, OverflowBehavior } from '../types/routine'
+import type { Routine, RecurrenceConfig, RecurrencePattern, RoutineTaskConfig, RoutineBlockConfig } from '../types/routine'
 import { formatTime } from '../types/anchor'
 
 // Icons
@@ -236,7 +236,7 @@ function RoutineEditor({
       {/* Block configs */}
       <div className="space-y-3">
         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-          Blocks + Scheduling
+          Blocks → Anchor Mapping
         </span>
 
         {/* Add block dropdown */}
@@ -247,8 +247,6 @@ function RoutineEditor({
               setBlockConfigs([...blockConfigs, {
                 blockId: e.target.value,
                 anchorId: '',
-                expectedDurationMinutes: 120,
-                overflowBehavior: 'drop',
               }])
             }
           }}
@@ -263,10 +261,28 @@ function RoutineEditor({
         {/* Per-block config cards */}
         {blockConfigs.map((bc, idx) => {
           const b = blocks.find((bl) => bl.id === bc.blockId)
+          const blockDuration = b
+            ? b.entries.reduce((sum, e) => {
+                const t = tasks.find((tt) => tt.id === e.taskId)
+                return sum + (t?.durationMinutes ?? 0)
+              }, 0)
+            : 0
+          const mandatoryDuration = b
+            ? b.entries.filter((e) => e.mandatory).reduce((sum, e) => {
+                const t = tasks.find((tt) => tt.id === e.taskId)
+                return sum + (t?.durationMinutes ?? 0)
+              }, 0)
+            : 0
+
           return (
             <div key={bc.blockId} className="bg-slate-955 border border-slate-850 p-3 rounded-xl space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-cyan-400">{b?.name ?? bc.blockId}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-cyan-400">{b?.name ?? bc.blockId}</span>
+                  <span className="text-[9px] font-mono text-slate-500">
+                    {blockDuration}m total · {mandatoryDuration}m mandatory
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setBlockConfigs(blockConfigs.filter((_, i) => i !== idx))}
@@ -275,56 +291,56 @@ function RoutineEditor({
                   <XIcon />
                 </button>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="text-[9px] font-bold text-slate-500 uppercase block mb-0.5">Anchor</label>
-                  <select
-                    value={bc.anchorId}
-                    onChange={(e) => {
-                      const updated = [...blockConfigs]
-                      updated[idx] = { ...updated[idx], anchorId: e.target.value }
-                      setBlockConfigs(updated)
-                    }}
-                    className="text-[10px] px-2 py-1 w-full bg-slate-950 border border-slate-850 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
-                  >
-                    <option value="">-- anchor --</option>
-                    {anchors.map((a) => (
-                      <option key={a.id} value={a.id}>{a.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[9px] font-bold text-slate-500 uppercase block mb-0.5">Duration (min)</label>
-                  <input
-                    type="number"
-                    value={bc.expectedDurationMinutes}
-                    onChange={(e) => {
-                      const updated = [...blockConfigs]
-                      updated[idx] = { ...updated[idx], expectedDurationMinutes: Number(e.target.value) || 0 }
-                      setBlockConfigs(updated)
-                    }}
-                    className="text-[10px] px-2 py-1 w-full bg-slate-950 border border-slate-850 rounded-lg text-slate-300 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] font-bold text-slate-500 uppercase block mb-0.5">Overflow</label>
-                  <select
-                    value={bc.overflowBehavior}
-                    onChange={(e) => {
-                      const updated = [...blockConfigs]
-                      updated[idx] = { ...updated[idx], overflowBehavior: e.target.value as OverflowBehavior }
-                      setBlockConfigs(updated)
-                    }}
-                    className="text-[10px] px-2 py-1 w-full bg-slate-950 border border-slate-850 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
-                  >
-                    <option value="drop">drop</option>
-                    <option value="push">push</option>
-                  </select>
-                </div>
+              <div>
+                <label className="text-[9px] font-bold text-slate-500 uppercase block mb-0.5">At Anchor</label>
+                <select
+                  value={bc.anchorId}
+                  onChange={(e) => {
+                    const updated = [...blockConfigs]
+                    updated[idx] = { ...updated[idx], anchorId: e.target.value }
+                    setBlockConfigs(updated)
+                  }}
+                  className="text-[10px] px-2 py-1 w-full bg-slate-950 border border-slate-850 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- anchor --</option>
+                  {anchors.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
           )
         })}
+
+        {/* Live duration summary */}
+        {blockConfigs.length > 0 && (() => {
+          let totalDuration = 0
+          let mandatoryTotal = 0
+          let optionalTotal = 0
+          for (const bc of blockConfigs) {
+            const b = blocks.find((bl) => bl.id === bc.blockId)
+            if (!b) continue
+            for (const entry of b.entries) {
+              const t = tasks.find((tt) => tt.id === entry.taskId)
+              const dur = t?.durationMinutes ?? 0
+              totalDuration += dur
+              if (entry.mandatory) mandatoryTotal += dur
+              else optionalTotal += dur
+            }
+          }
+          const hrs = Math.floor(totalDuration / 60)
+          const mins = totalDuration % 60
+          return (
+            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Routine Total</span>
+              <div className="flex items-center gap-3 text-[10px] font-mono">
+                <span className="text-slate-200 font-bold">{hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`}</span>
+                <span className="text-cyan-500">{mandatoryTotal}m must</span>
+                <span className="text-slate-500">{optionalTotal}m optional</span>
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Spawn time */}

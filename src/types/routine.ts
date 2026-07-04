@@ -1,5 +1,4 @@
 export type RecurrencePattern = 'daily' | 'weekly' | 'monthly' | 'one-time' | 'repeat-until'
-export type OverflowBehavior = 'drop' | 'push'
 
 export interface RecurrenceConfig {
   pattern: RecurrencePattern
@@ -24,13 +23,10 @@ export interface RoutineTaskConfig {
   idealTime?: number                                 // minutes from midnight — ideal time for this task
 }
 
-// Per-block scheduling behavior within a routine
+// Per-block scheduling within a routine — just maps a block to an anchor
 export interface RoutineBlockConfig {
   blockId: string
   anchorId: string                 // which anchor this block runs at
-  expectedDurationMinutes: number  // time budget for this block
-  overflowBehavior: OverflowBehavior  // drop excess tasks or push next slot
-  expiresAfterMinutes?: number     // block-level expiry from routine spawn
 }
 
 // Interpolate slot weight at a given offset from slot start
