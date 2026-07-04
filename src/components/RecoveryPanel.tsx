@@ -176,8 +176,19 @@ function RecoveryEditor({
   const { blocks } = useBlockStore()
 
   const [name, setName] = useState(initial?.name ?? '')
-  const [taskIds, setTaskIds] = useState<string[]>(initial?.taskIds ?? [])
-  const [blockIds, setBlockIds] = useState<string[]>(initial?.blockIds ?? [])
+  // Unified ordered task list — the single source of truth
+  const [orderedTaskIds, setOrderedTaskIds] = useState<string[]>(() => {
+    // Initialize from existing taskIds + blockIds (flatten blocks into tasks)
+    const ids: string[] = [...(initial?.taskIds ?? [])]
+    for (const blockId of initial?.blockIds ?? []) {
+      const block = blocks.find((b) => b.id === blockId)
+      if (!block) continue
+      for (const entry of [...block.entries].sort((a, b) => a.order - b.order)) {
+        if (!ids.includes(entry.taskId)) ids.push(entry.taskId)
+      }
+    }
+    return ids
+  })
   const [triggerType, setTriggerType] = useState<TriggerType>(initial?.triggerType ?? 'manual')
   const [autoCondition, setAutoCondition] = useState<AutoTriggerCondition>(
     initial?.autoCondition ?? { taskId: '', consecutiveMisses: 3 }
@@ -186,13 +197,17 @@ function RecoveryEditor({
   const [growthRate, setGrowthRate] = useState(initial?.growthRate ?? 0.5)
   const [saturationLimit, setSaturationLimit] = useState(initial?.saturationLimit ?? 300)
 
+  // Drag state
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+
   const handleSave = () => {
     if (!name.trim()) return
     onSave({
       id: initial?.id ?? crypto.randomUUID(),
       name: name.trim(),
-      taskIds,
-      blockIds,
+      taskIds: orderedTaskIds.filter(Boolean),
+      blockIds: [], // blocks are flattened into taskIds now
       triggerType,
       autoCondition: triggerType === 'auto' ? autoCondition : undefined,
       baseTimeCurve,
@@ -212,6 +227,52 @@ function RecoveryEditor({
   const fromTimeStr = (str: string) => {
     const [h, m] = str.split(':').map(Number)
     return (h || 0) * 60 + (m || 0)
+  }
+
+  const addTask = () => setOrderedTaskIds([...orderedTaskIds, ''])
+
+  const importBlock = (blockId: string) => {
+    const block = blocks.find((b) => b.id === blockId)
+    if (!block) return
+    const newIds = [...block.entries]
+      .sort((a, b) => a.order - b.order)
+      .map((e) => e.taskId)
+      .filter((tid) => !orderedTaskIds.includes(tid))
+    setOrderedTaskIds([...orderedTaskIds, ...newIds])
+  }
+
+  const removeTask = (index: number) => {
+    setOrderedTaskIds(orderedTaskIds.filter((_, i) => i !== index))
+  }
+
+  const updateTaskAt = (index: number, taskId: string) => {
+    const updated = [...orderedTaskIds]
+    updated[index] = taskId
+    setOrderedTaskIds(updated)
+  }
+
+  // Drag handlers
+  const handleDragStart = (idx: number) => setDragIdx(idx)
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault()
+    setDragOverIdx(idx)
+  }
+  const handleDrop = (idx: number) => {
+    if (dragIdx === null || dragIdx === idx) {
+      setDragIdx(null)
+      setDragOverIdx(null)
+      return
+    }
+    const reordered = [...orderedTaskIds]
+    const [moved] = reordered.splice(dragIdx, 1)
+    reordered.splice(idx, 0, moved)
+    setOrderedTaskIds(reordered)
+    setDragIdx(null)
+    setDragOverIdx(null)
+  }
+  const handleDragEnd = () => {
+    setDragIdx(null)
+    setDragOverIdx(null)
   }
 
   return (
@@ -312,96 +373,99 @@ function RecoveryEditor({
         </div>
       </div>
 
-      {/* Tasks attached */}
+      {/* Unified ordered task list */}
       <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-          Recovery Tasks
-        </span>
-        
-        <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-          {taskIds.map((tid, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-2 bg-slate-950/60 border border-slate-850 p-2 rounded-xl"
-            >
-              <select
-                value={tid}
-                onChange={(e) => {
-                  const u = [...taskIds]
-                  u[i] = e.target.value
-                  setTaskIds(u)
-                }}
-                className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-205 focus:outline-none cursor-pointer flex-1 min-w-[150px]"
-              >
-                <option value="">-- select task --</option>
-                {tasks.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => setTaskIds(taskIds.filter((_, j) => j !== i))}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-955/20 hover:text-rose-455 transition-all cursor-pointer"
-              >
-                <XIcon />
-              </button>
-            </div>
-          ))}
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Recovery Tasks (drag to reorder)
+          </span>
+          <span className="text-[10px] text-slate-500 font-mono">
+            {orderedTaskIds.filter(Boolean).length} tasks
+          </span>
         </div>
         
-        <button
-          onClick={() => setTaskIds([...taskIds, ''])}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-955 hover:bg-slate-900 text-slate-350 border border-slate-855 transition-all cursor-pointer"
-        >
-          <PlusIcon /> Add Task
-        </button>
-      </div>
+        <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+          {orderedTaskIds.map((tid, i) => {
+            const t = tasks.find((task) => task.id === tid)
+            return (
+              <div
+                key={`${tid}-${i}`}
+                draggable
+                onDragStart={() => handleDragStart(i)}
+                onDragOver={(e) => handleDragOver(e, i)}
+                onDrop={() => handleDrop(i)}
+                onDragEnd={handleDragEnd}
+                className={`flex items-center gap-2 bg-slate-950/60 border p-2.5 rounded-xl transition-all cursor-grab active:cursor-grabbing ${
+                  dragOverIdx === i ? 'border-cyan-500/50 bg-cyan-950/10' : 'border-slate-850'
+                } ${dragIdx === i ? 'opacity-40' : ''}`}
+              >
+                {/* Drag handle + order number */}
+                <span className="font-mono text-[10px] font-bold text-slate-500 w-6 text-center select-none">
+                  {i + 1}
+                </span>
 
-      {/* Blocks attached */}
-      <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-          Recovery Blocks
-        </span>
-        
-        <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-          {blockIds.map((bid, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-2 bg-slate-950/60 border border-slate-850 p-2 rounded-xl"
-            >
-              <select
-                value={bid}
-                onChange={(e) => {
-                  const u = [...blockIds]
-                  u[i] = e.target.value
-                  setBlockIds(u)
-                }}
-                className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-205 focus:outline-none cursor-pointer flex-1 min-w-[150px]"
-              >
-                <option value="">-- select block --</option>
-                {blocks.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => setBlockIds(blockIds.filter((_, j) => j !== i))}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-955/25 hover:text-rose-455 transition-all cursor-pointer"
-              >
-                <XIcon />
-              </button>
-            </div>
-          ))}
+                {/* Grip icon */}
+                <svg className="w-3 h-3 text-slate-600 flex-none" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="9" cy="5" r="1.5" /><circle cx="15" cy="5" r="1.5" />
+                  <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
+                  <circle cx="9" cy="19" r="1.5" /><circle cx="15" cy="19" r="1.5" />
+                </svg>
+
+                <select
+                  value={tid}
+                  onChange={(e) => updateTaskAt(i, e.target.value)}
+                  className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-205 focus:outline-none cursor-pointer flex-1 min-w-0"
+                >
+                  <option value="">-- select task --</option>
+                  {tasks.map((task) => (
+                    <option key={task.id} value={task.id}>
+                      {task.title}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Duration badge */}
+                {t && (
+                  <span className="text-[10px] font-mono text-slate-500 flex-none">
+                    {t.durationMinutes}m
+                  </span>
+                )}
+
+                <button
+                  onClick={() => removeTask(i)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-955/20 hover:text-rose-455 transition-all cursor-pointer flex-none"
+                >
+                  <XIcon />
+                </button>
+              </div>
+            )
+          })}
         </div>
         
-        <button
-          onClick={() => setBlockIds([...blockIds, ''])}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-955 hover:bg-slate-900 text-slate-355 border border-slate-855 transition-all cursor-pointer"
-        >
-          <PlusIcon /> Add Block
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={addTask}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-950 hover:bg-slate-900 text-slate-300 border border-slate-850 transition-all cursor-pointer"
+          >
+            <PlusIcon /> Add Task
+          </button>
+
+          {/* Import from block dropdown */}
+          <select
+            value=""
+            onChange={(e) => {
+              if (e.target.value) importBlock(e.target.value)
+            }}
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-950 text-slate-350 focus:outline-none cursor-pointer"
+          >
+            <option value="">⬇ Import from block...</option>
+            {blocks.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name} ({b.entries.length} tasks)
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Base time weights */}
