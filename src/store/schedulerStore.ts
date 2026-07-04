@@ -8,9 +8,10 @@ import type { Routine } from '../types/routine'
 import type { Obligation } from '../types/obligation'
 import type { RecoveryPlan } from '../types/recovery'
 import type { DayPlan, CalendarEvent } from '../types/planner'
-import { getActiveBracket, getObligationWeight } from '../types/obligation'
+import { getActiveBracket, getObligationWeight, resolveObligationDeadline } from '../types/obligation'
 import { getRecoveryWeight } from '../types/recovery'
 import { getSlotWeight } from '../types/routine'
+import { useObligationStore } from './obligationStore'
 
 interface SchedulerStore {
   schedule: WeekSchedule | null
@@ -71,9 +72,11 @@ function resolveDay(
   confirmedAnchors: AnchorConfirmation[],
   adhocTasks: AdhocTask[],
   skippedTaskIds: string[],
+  doneTasks: string[],
   lastDoneAt?: number
 ): DaySchedule {
   const dayOfWeek = getDayOfWeek(dateStr)
+  const periodKey = dateStr.slice(0, 7) // YYYY-MM
 
   // Find day plan (event override → week plan)
   const event = context.calendarEvents.find((e) => {
@@ -202,6 +205,7 @@ function resolveDay(
 
         for (const entry of sortedEntries) {
           if (skippedTaskIds.includes(entry.taskId)) continue
+          if (doneTasks.includes(entry.taskId) || doneTasks.includes(`${entry.taskId}:${periodKey}`)) continue
           const task = context.tasks.find((t) => t.id === entry.taskId)
           if (!task) continue
 
@@ -296,11 +300,13 @@ function resolveDay(
     }
   }
 
+
   // Obligations (always run, even during event suspension)
   for (const ob of context.obligations) {
     if (!ob.enabled) continue
-    const daysRemaining = ob.deadline
-      ? Math.max(0, Math.ceil((new Date(ob.deadline).getTime() - new Date(dateStr).getTime()) / 86400000))
+    const resolvedDeadline = resolveObligationDeadline(ob, dateStr)
+    const daysRemaining = resolvedDeadline
+      ? Math.max(0, Math.ceil((new Date(resolvedDeadline).getTime() - new Date(dateStr).getTime()) / 86400000))
       : 999
 
     const bracket = getActiveBracket(ob.weightBrackets, daysRemaining)
@@ -308,6 +314,7 @@ function resolveDay(
 
     for (const obTask of ob.tasks) {
       if (skippedTaskIds.includes(obTask.taskId)) continue
+      if (doneTasks.includes(obTask.taskId) || doneTasks.includes(`${obTask.taskId}:${periodKey}`)) continue
       const task = context.tasks.find((t) => t.id === obTask.taskId)
       if (!task) continue
 
@@ -343,6 +350,7 @@ function resolveDay(
     let recoveryCursor = recoveryStart
     for (const tid of plan.taskIds) {
       if (skippedTaskIds.includes(tid)) continue
+      if (doneTasks.includes(tid) || doneTasks.includes(`${tid}:${periodKey}`)) continue
       const task = context.tasks.find((t) => t.id === tid)
       if (!task) continue
 
@@ -470,7 +478,8 @@ export const useSchedulerStore = create<SchedulerStore>()(
             context,
             state.confirmedAnchors,
             state.adhocTasks,
-            [...state.skippedTaskIds, ...state.doneTasks, ...state.postponedTasks],
+            [...state.skippedTaskIds, ...state.postponedTasks],
+            state.doneTasks,
             state.lastDoneAt[i]
           ))
         }
@@ -527,11 +536,23 @@ export const useSchedulerStore = create<SchedulerStore>()(
         set((state) => {
           const schedule = state.schedule
           const item = schedule?.days.flatMap((d) => d.items).find((i) => i.taskId === taskId)
+          
+          let completionKey = taskId
+          if (item && item.source === 'obligation' && item.sourceId) {
+            const obligations = useObligationStore.getState().obligations
+            const matchingOb = obligations.find((o) => o.id === item.sourceId)
+            if (matchingOb && matchingOb.recurrence !== 'one-time') {
+              const dateStr = getDateStr(item.day)
+              const periodKey = dateStr.slice(0, 7) // YYYY-MM
+              completionKey = `${taskId}:${periodKey}`
+            }
+          }
+
           const newDoneItems = item
             ? [...state.doneItems.filter((i) => i.taskId !== taskId), item]
             : state.doneItems
           return {
-            doneTasks: [...state.doneTasks.filter((id) => id !== taskId), taskId],
+            doneTasks: [...state.doneTasks.filter((id) => id !== completionKey), completionKey],
             doneItems: newDoneItems,
           }
         }),
@@ -542,18 +563,33 @@ export const useSchedulerStore = create<SchedulerStore>()(
         set((state) => {
           const schedule = state.schedule
           const dayItems = schedule?.days[day]?.items ?? []
+          const obligations = useObligationStore.getState().obligations
 
-          // All tasks ending before done-at time + this task
+          const resolveKey = (tid: string) => {
+            const item = dayItems.find((i) => i.taskId === tid)
+            if (item && item.source === 'obligation' && item.sourceId) {
+              const matchingOb = obligations.find((o) => o.id === item.sourceId)
+              if (matchingOb && matchingOb.recurrence !== 'one-time') {
+                const dateStr = getDateStr(day)
+                const periodKey = dateStr.slice(0, 7)
+                return `${tid}:${periodKey}`
+              }
+            }
+            return tid
+          }
+
           const tasksBefore = dayItems
             .filter((item) => item.endMinutes <= doneAtMinutes && !item.isBackground)
-            .map((item) => item.taskId)
+            .map((item) => resolveKey(item.taskId))
 
-          const allDoneIds = [...new Set([...state.doneTasks, ...tasksBefore, taskId])]
+          const currentTaskIdKey = resolveKey(taskId)
+          const allDoneIds = [...new Set([...state.doneTasks, ...tasksBefore, currentTaskIdKey])]
 
           // Save their positions for display
           const newDoneItems = [...state.doneItems]
           for (const item of dayItems) {
-            if (allDoneIds.includes(item.taskId) && !newDoneItems.find((d) => d.taskId === item.taskId)) {
+            const mappedKey = resolveKey(item.taskId)
+            if (allDoneIds.includes(mappedKey) && !newDoneItems.find((d) => d.taskId === item.taskId)) {
               newDoneItems.push(item)
             }
           }
@@ -592,7 +628,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
 
       unmarkTask: (taskId) =>
         set((state) => ({
-          doneTasks: state.doneTasks.filter((id) => id !== taskId),
+          doneTasks: state.doneTasks.filter((id) => id !== taskId && !id.startsWith(taskId + ':')),
           doneItems: state.doneItems.filter((i) => i.taskId !== taskId),
           postponedTasks: state.postponedTasks.filter((id) => id !== taskId),
         })),

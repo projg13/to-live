@@ -1,4 +1,22 @@
-export type ObligationRecurrence = 'one-time' | 'yearly' | 'quarterly' | 'custom'
+export type ObligationRecurrence =
+  | 'one-time'
+  | 'yearly'
+  | 'quarterly'
+  | 'custom'
+  | 'monthly'
+
+export type MonthlyRecurrenceType = 'specific-day' | 'relative'
+export type WeekOfMonthSelection = 'first' | 'second' | 'third' | 'fourth' | 'last'
+export type DayOfWeekSelection =
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday'
+  | 'weekday'
+  | 'weekend-day'
 
 // Time-of-day weight point (same as anchor — minutes from midnight → weight)
 export interface TimeWeight {
@@ -36,9 +54,83 @@ export interface Obligation {
   // Recurrence
   recurrence: ObligationRecurrence
   recurrenceMonth?: number        // 0-11, for yearly/quarterly start
+  recurrenceDayOfMonth?: number   // 1-31, for monthly start
+  monthlyType?: MonthlyRecurrenceType
+  recurrenceWeekOfMonth?: WeekOfMonthSelection
+  recurrenceDayOfWeek?: DayOfWeekSelection
 
   // Active/enabled
   enabled: boolean
+}
+
+// Dynamically resolve target deadline for recurring obligations for any given date
+export function resolveObligationDeadline(ob: Obligation, dateStr: string): string | undefined {
+  if (ob.recurrence === 'one-time') {
+    return ob.deadline
+  }
+
+  const currentDate = new Date(dateStr)
+  const year = currentDate.getFullYear()
+  const month = currentDate.getMonth() // 0-11
+
+  let targetDay = 1
+
+  if (ob.recurrence === 'monthly') {
+    if (!ob.monthlyType || ob.monthlyType === 'specific-day') {
+      targetDay = ob.recurrenceDayOfMonth ?? 1
+    } else {
+      // relative monthly type
+      const week = ob.recurrenceWeekOfMonth ?? 'first'
+      const daySel = ob.recurrenceDayOfWeek ?? 'monday'
+
+      // Generate all matching days in the month
+      const totalDays = new Date(year, month + 1, 0).getDate()
+      const matches: number[] = []
+
+      for (let d = 1; d <= totalDays; d++) {
+        const testDate = new Date(year, month, d)
+        const dayOfWeek = testDate.getDay() // 0 = Sun, 6 = Sat
+
+        let matchesDay = false
+        if (daySel === 'weekday') {
+          matchesDay = dayOfWeek >= 1 && dayOfWeek <= 5
+        } else if (daySel === 'weekend-day') {
+          matchesDay = dayOfWeek === 0 || dayOfWeek === 6
+        } else {
+          const dayMap: Record<string, number> = {
+            sunday: 0,
+            monday: 1,
+            tuesday: 2,
+            wednesday: 3,
+            thursday: 4,
+            friday: 5,
+            saturday: 6,
+          }
+          matchesDay = dayOfWeek === dayMap[daySel]
+        }
+
+        if (matchesDay) {
+          matches.push(d)
+        }
+      }
+
+      if (matches.length > 0) {
+        if (week === 'first') targetDay = matches[0]
+        else if (week === 'second') targetDay = matches[1] ?? matches[matches.length - 1]
+        else if (week === 'third') targetDay = matches[2] ?? matches[matches.length - 1]
+        else if (week === 'fourth') targetDay = matches[3] ?? matches[matches.length - 1]
+        else if (week === 'last') targetDay = matches[matches.length - 1]
+      } else {
+        targetDay = 1
+      }
+    }
+  } else {
+    // Fallback to absolute deadline if custom/yearly/quarterly
+    return ob.deadline
+  }
+
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return `${year}-${pad(month + 1)}-${pad(targetDay)}`
 }
 
 // Given days remaining to deadline, find the active bracket

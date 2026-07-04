@@ -291,11 +291,11 @@ function RoutineEditor({
             onChange={(e) => setRecurrence({ ...recurrence, pattern: e.target.value as RecurrencePattern })}
             className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-350 focus:outline-none cursor-pointer"
           >
-            <option value="daily">daily</option>
-            <option value="weekly">weekly</option>
-            <option value="monthly">monthly</option>
-            <option value="one-time">one-time</option>
-            <option value="repeat-until">repeat-until</option>
+            <option className="bg-slate-950 text-slate-200" value="daily">daily</option>
+            <option className="bg-slate-950 text-slate-200" value="weekly">weekly</option>
+            <option className="bg-slate-950 text-slate-200" value="monthly">monthly</option>
+            <option className="bg-slate-950 text-slate-200" value="one-time">one-time</option>
+            <option className="bg-slate-950 text-slate-200" value="repeat-until">repeat-until</option>
           </select>
 
           {recurrence.pattern !== 'daily' && recurrence.pattern !== 'one-time' && (

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useObligationStore } from '../store/obligationStore'
 import { useTaskStore } from '../store/taskStore'
-import type { Obligation, ObligationTask, WeightBracket, ObligationRecurrence } from '../types/obligation'
+import type { Obligation, ObligationTask, WeightBracket, ObligationRecurrence, MonthlyRecurrenceType, WeekOfMonthSelection, DayOfWeekSelection } from '../types/obligation'
 import { formatTime } from '../types/anchor'
 
 // Icons
@@ -123,7 +123,11 @@ function ObligationPanel() {
 
                 <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
                   <span className="bg-slate-950/60 border border-slate-850 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-mono">
-                    {ob.recurrence}
+                    {ob.recurrence === 'monthly'
+                      ? ob.monthlyType === 'relative'
+                        ? `monthly (${ob.recurrenceWeekOfMonth} ${ob.recurrenceDayOfWeek})`
+                        : `monthly (day ${ob.recurrenceDayOfMonth})`
+                      : ob.recurrence}
                   </span>
                   <span>• {ob.tasks.length} task(s)</span>
                   <span>• {ob.weightBrackets.length} weight bracket(s)</span>
@@ -174,6 +178,10 @@ function ObligationEditor({
   const [deadline, setDeadline] = useState(initial?.deadline ?? '')
   const [recurrence, setRecurrence] = useState<ObligationRecurrence>(initial?.recurrence ?? 'one-time')
   const [recurrenceMonth, setRecurrenceMonth] = useState(initial?.recurrenceMonth ?? 0)
+  const [recurrenceDayOfMonth, setRecurrenceDayOfMonth] = useState(initial?.recurrenceDayOfMonth ?? 1)
+  const [monthlyType, setMonthlyType] = useState<MonthlyRecurrenceType>(initial?.monthlyType ?? 'specific-day')
+  const [recurrenceWeekOfMonth, setRecurrenceWeekOfMonth] = useState<WeekOfMonthSelection>(initial?.recurrenceWeekOfMonth ?? 'first')
+  const [recurrenceDayOfWeek, setRecurrenceDayOfWeek] = useState<DayOfWeekSelection>(initial?.recurrenceDayOfWeek ?? 'monday')
   const [enabled, setEnabled] = useState(initial?.enabled ?? true)
   const [tasks, setTasks] = useState<ObligationTask[]>(initial?.tasks ?? [])
   const [brackets, setBrackets] = useState<WeightBracket[]>(initial?.weightBrackets ?? [])
@@ -187,7 +195,11 @@ function ObligationEditor({
       deadline: deadline || undefined,
       weightBrackets: brackets,
       recurrence,
-      recurrenceMonth: recurrence !== 'one-time' ? recurrenceMonth : undefined,
+      recurrenceMonth: (recurrence === 'yearly' || recurrence === 'quarterly' || recurrence === 'custom') ? recurrenceMonth : undefined,
+      recurrenceDayOfMonth: recurrence === 'monthly' ? recurrenceDayOfMonth : undefined,
+      monthlyType: recurrence === 'monthly' ? monthlyType : undefined,
+      recurrenceWeekOfMonth: (recurrence === 'monthly' && monthlyType === 'relative') ? recurrenceWeekOfMonth : undefined,
+      recurrenceDayOfWeek: (recurrence === 'monthly' && monthlyType === 'relative') ? recurrenceDayOfWeek : undefined,
       enabled,
     })
   }
@@ -228,16 +240,49 @@ function ObligationEditor({
           <select
             value={recurrence}
             onChange={(e) => setRecurrence(e.target.value as ObligationRecurrence)}
-            className="text-xs px-2.5 py-1.5 w-full bg-slate-955 border border-slate-800 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
+            className="text-xs px-2.5 py-1.5 w-full bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none cursor-pointer"
           >
-            <option value="one-time">one-time</option>
-            <option value="yearly">yearly</option>
-            <option value="quarterly">quarterly</option>
-            <option value="custom">custom</option>
+            <option className="bg-slate-950 text-slate-200" value="one-time">one-time</option>
+            <option className="bg-slate-950 text-slate-200" value="monthly">monthly</option>
+            <option className="bg-slate-950 text-slate-200" value="yearly">yearly</option>
+            <option className="bg-slate-950 text-slate-200" value="quarterly">quarterly</option>
+            <option className="bg-slate-950 text-slate-200" value="custom">custom</option>
           </select>
         </div>
 
-        {recurrence !== 'one-time' ? (
+        {recurrence === 'monthly' && (
+          <div>
+            <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider block mb-1">
+              Monthly Type
+            </label>
+            <select
+              value={monthlyType}
+              onChange={(e) => setMonthlyType(e.target.value as MonthlyRecurrenceType)}
+              className="text-xs px-2.5 py-1.5 w-full bg-slate-955 border border-slate-800 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
+            >
+              <option className="bg-slate-950 text-slate-200" value="specific-day">Specific Day</option>
+              <option className="bg-slate-950 text-slate-200" value="relative">Relative Day</option>
+            </select>
+          </div>
+        )}
+
+        {recurrence === 'monthly' && monthlyType === 'specific-day' && (
+          <div>
+            <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider block mb-1">
+              Day of Month
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={31}
+              value={recurrenceDayOfMonth}
+              onChange={(e) => setRecurrenceDayOfMonth(Number(e.target.value) || 1)}
+              className="text-xs px-2.5 py-1.5 w-full bg-slate-955 border border-slate-800 rounded-lg text-slate-300 focus:outline-none"
+            />
+          </div>
+        )}
+
+        {(recurrence === 'yearly' || recurrence === 'quarterly' || recurrence === 'custom') && (
           <div>
             <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider block mb-1">
               Start Month
@@ -248,25 +293,66 @@ function ObligationEditor({
               className="text-xs px-2.5 py-1.5 w-full bg-slate-955 border border-slate-800 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
             >
               {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
-                <option key={i} value={i}>
+                <option className="bg-slate-950 text-slate-200" key={i} value={i}>
                   {m}
                 </option>
               ))}
             </select>
           </div>
-        ) : (
-          <div className="flex items-center pt-5 pl-2">
-            <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={(e) => setEnabled(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-955 text-cyan-500 focus:ring-cyan-500 h-4 w-4 cursor-pointer"
-              />
-              Active Enabled
-            </label>
+        )}
+
+        {recurrence === 'monthly' && monthlyType === 'relative' && (
+          <div className="grid grid-cols-2 gap-3 col-span-1 sm:col-span-3 mt-1.5 border-t border-slate-800/40 pt-3">
+            <div>
+              <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider block mb-1">
+                Week of Month
+              </label>
+              <select
+                value={recurrenceWeekOfMonth}
+                onChange={(e) => setRecurrenceWeekOfMonth(e.target.value as WeekOfMonthSelection)}
+                className="text-xs px-2.5 py-1.5 w-full bg-slate-955 border border-slate-800 rounded-lg text-slate-305 focus:outline-none cursor-pointer"
+              >
+                <option className="bg-slate-950 text-slate-200" value="first">first</option>
+                <option className="bg-slate-950 text-slate-200" value="second">second</option>
+                <option className="bg-slate-950 text-slate-200" value="third">third</option>
+                <option className="bg-slate-950 text-slate-200" value="fourth">fourth</option>
+                <option className="bg-slate-950 text-slate-200" value="last">last</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider block mb-1">
+                Day of Week
+              </label>
+              <select
+                value={recurrenceDayOfWeek}
+                onChange={(e) => setRecurrenceDayOfWeek(e.target.value as DayOfWeekSelection)}
+                className="text-xs px-2.5 py-1.5 w-full bg-slate-955 border border-slate-800 rounded-lg text-slate-305 focus:outline-none cursor-pointer"
+              >
+                <option className="bg-slate-950 text-slate-200" value="monday">Monday</option>
+                <option className="bg-slate-950 text-slate-200" value="tuesday">Tuesday</option>
+                <option className="bg-slate-950 text-slate-200" value="wednesday">Wednesday</option>
+                <option className="bg-slate-950 text-slate-200" value="thursday">Thursday</option>
+                <option className="bg-slate-950 text-slate-200" value="friday">Friday</option>
+                <option className="bg-slate-950 text-slate-200" value="saturday">Saturday</option>
+                <option className="bg-slate-950 text-slate-200" value="sunday">Sunday</option>
+                <option className="bg-slate-950 text-slate-200" value="weekday">Weekday (Mon-Fri)</option>
+                <option className="bg-slate-950 text-slate-200" value="weekend-day">Weekend day (Sat-Sun)</option>
+              </select>
+            </div>
           </div>
         )}
+      </div>
+
+      <div className="flex items-center gap-1.5 p-2 bg-slate-900/30 border border-slate-800 rounded-xl max-w-xs">
+        <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            className="rounded border-slate-700 bg-slate-955 text-cyan-500 focus:ring-cyan-500 h-4 w-4 cursor-pointer"
+          />
+          Active Enabled Status
+        </label>
       </div>
 
       {/* Tasks in Obligation */}

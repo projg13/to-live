@@ -414,7 +414,9 @@ function Dashboard() {
 
               // Task item
               const item: ScheduledItem = entry.data
-              const isDone = scheduler.doneTasks.includes(item.taskId)
+              const dayDate = scheduler.schedule?.days[selectedDay]?.date ?? ''
+              const periodKey = dayDate.slice(0, 7) // YYYY-MM
+              const isDone = scheduler.doneTasks.includes(item.taskId) || scheduler.doneTasks.includes(`${item.taskId}:${periodKey}`)
               const isPostponed = scheduler.postponedTasks.includes(item.taskId)
               const isSkipped = scheduler.skippedTaskIds.includes(item.taskId)
               const isCurrent = virtualTime >= item.startMinutes && virtualTime < item.endMinutes
