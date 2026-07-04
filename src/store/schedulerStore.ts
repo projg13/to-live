@@ -56,6 +56,7 @@ export interface ResolveContext {
   weekPlan: Record<number, string>
   calendarEvents: CalendarEvent[]
   baseDate?: string  // ISO date override (debug) — if absent, uses today
+  currentTimeMinutes?: number // minutes from midnight override (debug/recalculate)
 }
 
 function getDateStr(offsetDays: number, base?: string): string {
@@ -176,6 +177,12 @@ function resolveDay(
   // Skip routine/block tasks if event suspends regular AND no weightOffset lets them through
   const allowRoutines = !suspendRegular || eventWeightOffset > 0
 
+  // Current time in minutes from midnight (only relevant for today)
+  const now = new Date()
+  const nowMinutes = dayIndex === 0
+    ? (context.currentTimeMinutes !== undefined ? context.currentTimeMinutes : now.getHours() * 60 + now.getMinutes())
+    : 0
+
   // DEBUG: trace resolve chain
   if (debug) {
     console.group(`🔍 [Scheduler] Day ${dayIndex} (${dateStr})`)
@@ -276,8 +283,7 @@ function resolveDay(
           if (taskConfig?.expiresAfterMinutes !== undefined) {
             const taskIdeal = taskConfig.idealTime ?? anchorTime
             const expiryTime = taskIdeal + taskConfig.expiresAfterMinutes
-            const now = new Date()
-            const nowMins = now.getHours() * 60 + now.getMinutes()
+            const nowMins = context.currentTimeMinutes !== undefined ? context.currentTimeMinutes : (new Date().getHours() * 60 + new Date().getMinutes())
             if (dayIndex === 0 && nowMins >= expiryTime) {
               if (debug) console.log(`      ⏰ ${task.title}: EXPIRED at collection (now=${nowMins} >= expiry@${expiryTime})`)
               continue
@@ -327,9 +333,14 @@ function resolveDay(
       })
 
       // Place tasks sequentially, grouped by anchor
-      let cursor = lastDoneAt !== undefined && lastDoneAt > (candidates[0]?.anchorTime ?? 0)
-        ? lastDoneAt
-        : (candidates[0]?.anchorTime ?? 0)
+      // On day 0, cursor starts at max(firstAnchor, lastDoneAt, nowMinutes)
+      // This ensures recalculate moves undone tasks to current time
+      const firstAnchorTime = candidates[0]?.anchorTime ?? 0
+      let cursor = Math.max(
+        firstAnchorTime,
+        lastDoneAt !== undefined ? lastDoneAt : 0,
+        dayIndex === 0 ? nowMinutes : 0
+      )
       let currentAnchorId = candidates[0]?.anchorId ?? ''
 
       for (const cand of candidates) {
@@ -430,9 +441,6 @@ function resolveDay(
   const wakeAnchor = resolvedAnchors.find((a) => a.anchorName === 'Wake')
   const wakeTime = wakeAnchor?.actualTime ?? 360
 
-  // Current time in minutes from midnight (only relevant for today)
-  const now = new Date()
-  const nowMinutes = dayIndex === 0 ? now.getHours() * 60 + now.getMinutes() : wakeTime
 
   // Obligation/recovery start: latest of wake, lastDoneAt, or current time
   // This ensures on recalculate, pending tasks move to NOW

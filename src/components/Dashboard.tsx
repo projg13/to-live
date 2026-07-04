@@ -143,6 +143,7 @@ function Dashboard() {
     weekPlan: weekPlan.days,
     calendarEvents,
     baseDate: debugDateOverride ?? undefined,
+    currentTimeMinutes: virtualTime,
   })
 
   useEffect(() => {
@@ -163,6 +164,7 @@ function Dashboard() {
     scheduler.postponedTasks,
     scheduler.lastDoneAt,
     debugDateOverride,
+    virtualTime,
   ])
 
   const schedule = scheduler.schedule
@@ -237,8 +239,7 @@ function Dashboard() {
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => {
-                const now = getCurrentMinutes()
-                scheduler.recalibrateFrom(now, selectedDay)
+                scheduler.recalibrateFrom(virtualTime, selectedDay)
               }}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-950 shadow-md shadow-cyan-950/30 transition-all active:scale-95 cursor-pointer"
             >
