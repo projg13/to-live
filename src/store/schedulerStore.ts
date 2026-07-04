@@ -62,7 +62,10 @@ export interface ResolveContext {
 function getDateStr(offsetDays: number, base?: string): string {
   const d = base ? new Date(base + 'T00:00:00') : new Date()
   d.setDate(d.getDate() + offsetDays)
-  return d.toISOString().split('T')[0]
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function getDayOfWeek(dateStr: string): number {
