@@ -387,8 +387,9 @@ function RoutineEditor({
               <button
                 onClick={() => {
                   setTaskConfigs(taskConfigs.map((tc) => {
-                    const { idealTime, ...rest } = tc
-                    return rest
+                    const copy = { ...tc }
+                    delete copy.idealTime
+                    return copy
                   }))
                 }}
                 className="text-[10px] px-2 py-1 rounded-lg border border-slate-800 bg-slate-950/60 text-slate-500 hover:text-rose-400 hover:border-rose-800/30 transition-all cursor-pointer font-bold"

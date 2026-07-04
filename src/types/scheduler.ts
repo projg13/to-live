@@ -2,7 +2,7 @@
 export interface ScheduledItem {
   taskId: string
   title: string
-  startMinutes: number       // minutes from midnight
+  startMinutes: number       // minutes from midnight (actual slotted time)
   endMinutes: number         // startMinutes + duration
   isBackground: boolean      // passive/ghost task
   source: 'routine' | 'obligation' | 'recovery' | 'adhoc' | 'event'
@@ -11,6 +11,8 @@ export interface ScheduledItem {
   sourceId?: string          // e.g. ID of the routine, obligation, recovery, or event
   sourceName?: string        // e.g. Name of the routine, obligation, recovery, or event
   resetAnchorId?: string     // if set, done-key is scoped to this anchor (resets per anchor cycle)
+  idealTime?: number         // the ideal start time (from anchor or task config)
+  expiryTime?: number        // idealTime + expiresAfterMinutes (when the task drops)
 }
 
 // An anchor confirmation (user-reported actual transition)

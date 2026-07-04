@@ -366,8 +366,12 @@ function resolveDay(
           }
         }
 
+        const itemExpiryTime = taskConfig?.expiresAfterMinutes !== undefined
+          ? taskIdealTime + taskConfig.expiresAfterMinutes
+          : undefined
+
         if (cand.entry.isBackground) {
-          items.push({
+           items.push({
             taskId: cand.task.id,
             title: cand.task.title,
             startMinutes: idealStart,
@@ -379,6 +383,8 @@ function resolveDay(
             sourceId: routine.id,
             sourceName: routine.name,
             resetAnchorId: cand.anchorId,
+            idealTime: taskIdealTime,
+            expiryTime: itemExpiryTime,
           })
         } else {
           items.push({
@@ -393,6 +399,8 @@ function resolveDay(
             sourceId: routine.id,
             sourceName: routine.name,
             resetAnchorId: cand.anchorId,
+            idealTime: taskIdealTime,
+            expiryTime: itemExpiryTime,
           })
           cursor = idealStart + cand.task.durationMinutes
 
