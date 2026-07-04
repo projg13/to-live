@@ -160,7 +160,6 @@ function Dashboard() {
     scheduler.confirmedAnchors,
     scheduler.adhocTasks,
     scheduler.skippedTaskIds,
-    scheduler.doneTasks,
     scheduler.postponedTasks,
     scheduler.lastDoneAt,
     debugDateOverride,
