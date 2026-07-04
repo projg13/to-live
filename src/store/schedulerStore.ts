@@ -576,7 +576,36 @@ function resolveDay(
   // Blocks provide tasks (duration only), weight comes from plan + order offset
   for (const plan of context.recoveryPlans) {
     if (!plan.triggered) continue
-    const baseWeight = getRecoveryWeight(plan, obStart, dateStr)
+
+    // Find peak weight and weight window start from the base time curve
+    let recPeakWeight = 0
+    let recWindowStart = 0
+    for (const pt of plan.baseTimeCurve) {
+      if (pt.value > recPeakWeight) {
+        recPeakWeight = pt.value
+      }
+    }
+    if (plan.baseTimeCurve.length > 0) {
+      if (plan.baseTimeCurve[0].value > 0) {
+        recWindowStart = plan.baseTimeCurve[0].time
+      } else {
+        for (let i = 0; i < plan.baseTimeCurve.length - 1; i++) {
+          const a = plan.baseTimeCurve[i]
+          const b = plan.baseTimeCurve[i + 1]
+          if (a.value === 0 && b.value > 0) {
+            recWindowStart = a.time + 1
+            break
+          }
+        }
+      }
+    }
+
+    const recPlacement = Math.max(obStart, recWindowStart)
+
+    // Evaluate weight at peak, with growth multiplier applied
+    const baseWeight = recPeakWeight > 0
+      ? getRecoveryWeight({ ...plan, baseTimeCurve: [{ time: 0, value: recPeakWeight }] }, 0, dateStr)
+      : getRecoveryWeight(plan, recPlacement, dateStr)
     if (baseWeight <= 0) continue
 
     // Collect all tasks in order: direct taskIds first, then block entries by order
@@ -600,7 +629,7 @@ function resolveDay(
     })
 
     const totalTasks = validTasks.length
-    let recoveryCursor = obStart
+    let recoveryCursor = recPlacement
 
     for (let idx = 0; idx < validTasks.length; idx++) {
       const tid = validTasks[idx]
