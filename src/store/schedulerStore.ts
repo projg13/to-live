@@ -458,8 +458,9 @@ function resolveDay(
     const bracket = getActiveBracket(ob.weightBrackets, daysRemaining)
     if (!bracket) continue
 
-    // Base weight from bracket's time curve
-    let baseWeight = getObligationWeight(bracket.timeCurve, 720)
+    // Base weight from bracket's time curve evaluated at actual scheduling time
+    // This makes time-of-day curves work: e.g., evening-only weight when 10 days out
+    let baseWeight = getObligationWeight(bracket.timeCurve, obStart)
     if (eventWeightOffset > 0) {
       baseWeight = baseWeight - eventWeightOffset
     }
@@ -514,7 +515,7 @@ function resolveDay(
   // Blocks provide tasks (duration only), weight comes from plan + order offset
   for (const plan of context.recoveryPlans) {
     if (!plan.triggered) continue
-    const baseWeight = getRecoveryWeight(plan, 720, dateStr)
+    const baseWeight = getRecoveryWeight(plan, obStart, dateStr)
     if (baseWeight <= 0) continue
 
     // Collect all tasks in order: direct taskIds first, then block entries by order
