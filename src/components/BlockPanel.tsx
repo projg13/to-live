@@ -160,38 +160,50 @@ function BlockEditor({
     setEntries([...entries, { taskId: '', order: entries.length, isBackground: false }])
   }
 
-  const addLinkedChain = () => {
-    const taskId = window.prompt('Enter mother task ID to explode its chain')
-    const task = tasks.find((t) => t.id === taskId)
-    if (!task) { addEntry(); return }
+  const explodeEntry = (index: number) => {
+    const sorted = [...entries].sort((a, b) => a.order - b.order)
+    const entry = sorted[index]
+    if (!entry) return
+    const motherTask = tasks.find((t) => t.id === entry.taskId)
+    if (!motherTask?.links?.length) return
 
-    const chain: BlockEntry[] = [
-      { taskId: task.id, order: entries.length, isBackground: false },
-    ]
+    const newEntries: BlockEntry[] = []
+    let current = motherTask
+    let insertOrder = entry.order + 1
 
-    let current = task
-    let idx = 1
     while (current.links && current.links.length > 0) {
       for (const link of current.links) {
         const linked = tasks.find((t) => t.id === link.linkedTaskId)
         if (!linked) continue
-        chain.push({
+        // Skip if already in block
+        if (sorted.some((e) => e.taskId === linked.id) || newEntries.some((e) => e.taskId === linked.id)) {
+          current = linked
+          break
+        }
+        newEntries.push({
           taskId: linked.id,
-          order: entries.length + idx,
+          order: insertOrder++,
           isBackground: link.linkType === 'passive',
         })
-        // Set parentId so scheduler ancestor-skip works: skip mother → skip entire chain
+        // Set parentId for ancestor-skip propagation
         if (linked.parentId !== current.id) {
           updateTask(linked.id, { parentId: current.id })
         }
-        idx++
         current = linked
         break
       }
       if (!current.links || current.links.length === 0) break
     }
 
-    setEntries([...entries, ...chain])
+    if (newEntries.length === 0) return
+
+    // Shift existing entries after the insertion point
+    const reordered = sorted.map((e, idx) => {
+      if (idx > index) return { ...e, order: e.order + newEntries.length }
+      return e
+    })
+
+    setEntries([...reordered, ...newEntries])
   }
 
   const removeEntry = (index: number) => {
@@ -215,7 +227,7 @@ function BlockEditor({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Name */}
       <div>
         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
@@ -239,80 +251,100 @@ function BlockEditor({
         <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
           {entries
             .sort((a, b) => a.order - b.order)
-            .map((entry, i) => (
-              <div
-                key={i}
-                className="bg-slate-950/60 border border-slate-850 p-3 rounded-2xl space-y-2.5 transition-all duration-200"
-                style={{
-                  paddingLeft: entry.isBackground ? '24px' : '12px',
-                }}
-              >
-                {/* Top Row: Selector & Delete */}
-                <div className="flex items-center gap-2.5">
-                  <span className="font-mono text-xs font-bold text-slate-500 w-5">
-                    {entry.isBackground ? '~' : `${entry.order + 1}.`}
-                  </span>
+            .map((entry, i) => {
+              const entryTask = tasks.find((t) => t.id === entry.taskId)
+              const isMother = entryTask?.knobs?.isMother && entryTask?.links && entryTask.links.length > 0
+              const alreadyExploded = isMother && entryTask.links!.every((link) =>
+                entries.some((e) => e.taskId === link.linkedTaskId)
+              )
 
-                  <select
-                    value={entry.taskId}
-                    onChange={(e) => updateEntry(i, { taskId: e.target.value })}
-                    className="text-xs px-2.5 py-2 rounded-xl border border-slate-800 bg-slate-900 text-slate-205 focus:outline-none cursor-pointer flex-1 min-w-0"
-                  >
-                    <option value="">-- select task --</option>
-                    {tasks.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.title}
-                      </option>
-                    ))}
-                  </select>
+              return (
+                <div
+                  key={i}
+                  className="bg-slate-950/60 border border-slate-850 p-3 rounded-2xl space-y-2.5 transition-all duration-200"
+                  style={{
+                    paddingLeft: entry.isBackground ? '24px' : '12px',
+                  }}
+                >
+                  {/* Top Row: Selector & Actions */}
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-mono text-xs font-bold text-slate-500 w-5">
+                      {entry.isBackground ? '~' : `${entry.order + 1}.`}
+                    </span>
 
-                  <button
-                    onClick={() => removeEntry(i)}
-                    className="p-2 rounded-xl text-slate-405 hover:bg-rose-955/25 hover:text-rose-400 transition-all cursor-pointer flex-none"
-                    title="Remove task"
-                  >
-                    <XIcon />
-                  </button>
-                </div>
-
-                {/* Bottom Row: Knobs and ordering */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-900/60">
-                  <div className="flex items-center gap-4 flex-wrap">
-                    <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-350 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={entry.isBackground}
-                        onChange={(e) => updateEntry(i, { isBackground: e.target.checked })}
-                        className="rounded border-slate-700 bg-slate-900 text-cyan-505 focus:ring-cyan-500 h-4 w-4 cursor-pointer"
-                      />
-                      background
-                    </label>
-
-                  </div>
-
-                  {/* Ordering arrows */}
-                  <div className="flex items-center gap-1 bg-slate-900 border border-slate-850 p-0.5 rounded-lg flex-none">
-                    <button
-                      onClick={() => moveEntry(i, -1)}
-                      disabled={i === 0}
-                      className="p-1 px-2 rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-20 cursor-pointer"
-                      title="Move up"
+                    <select
+                      value={entry.taskId}
+                      onChange={(e) => updateEntry(i, { taskId: e.target.value })}
+                      className="text-xs px-2.5 py-2 rounded-xl border border-slate-800 bg-slate-900 text-slate-205 focus:outline-none cursor-pointer flex-1 min-w-0"
                     >
-                      <ArrowUpIcon />
-                    </button>
-                    <div className="w-[1px] h-3 bg-slate-800" />
+                      <option value="">-- select task --</option>
+                      {tasks.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.title}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Explode button — only for mother tasks with un-exploded links */}
+                    {isMother && !alreadyExploded && (
+                      <button
+                        onClick={() => explodeEntry(i)}
+                        className="p-2 rounded-xl text-amber-400 hover:bg-amber-950/25 hover:text-amber-300 transition-all cursor-pointer flex-none"
+                        title="Explode linked chain"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </button>
+                    )}
+
                     <button
-                      onClick={() => moveEntry(i, 1)}
-                      disabled={i === entries.length - 1}
-                      className="p-1 px-2 rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-20 cursor-pointer"
-                      title="Move down"
+                      onClick={() => removeEntry(i)}
+                      className="p-2 rounded-xl text-slate-405 hover:bg-rose-955/25 hover:text-rose-400 transition-all cursor-pointer flex-none"
+                      title="Remove task"
                     >
-                      <ArrowDownIcon />
+                      <XIcon />
                     </button>
                   </div>
+
+                  {/* Bottom Row: Knobs and ordering */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-900/60">
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-350 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={entry.isBackground}
+                          onChange={(e) => updateEntry(i, { isBackground: e.target.checked })}
+                          className="rounded border-slate-700 bg-slate-900 text-cyan-505 focus:ring-cyan-500 h-4 w-4 cursor-pointer"
+                        />
+                        background
+                      </label>
+                    </div>
+
+                    {/* Ordering arrows */}
+                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-850 p-0.5 rounded-lg flex-none">
+                      <button
+                        onClick={() => moveEntry(i, -1)}
+                        disabled={i === 0}
+                        className="p-1 px-2 rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-20 cursor-pointer"
+                        title="Move up"
+                      >
+                        <ArrowUpIcon />
+                      </button>
+                      <div className="w-[1px] h-3 bg-slate-800" />
+                      <button
+                        onClick={() => moveEntry(i, 1)}
+                        disabled={i === entries.length - 1}
+                        className="p-1 px-2 rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-20 cursor-pointer"
+                        title="Move down"
+                      >
+                        <ArrowDownIcon />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
         </div>
         
         <div className="flex gap-2">
@@ -321,12 +353,6 @@ function BlockEditor({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-950 hover:bg-slate-900 text-slate-300 border border-slate-850 transition-all cursor-pointer"
           >
             <PlusIcon /> Add task
-          </button>
-          <button
-            onClick={addLinkedChain}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-955 hover:bg-slate-900 text-slate-350 border border-slate-850 transition-all cursor-pointer"
-          >
-            <PlusIcon /> Explode chain
           </button>
         </div>
       </div>
