@@ -3,7 +3,7 @@ import { useRoutineStore } from '../store/routineStore'
 import { useBlockStore } from '../store/blockStore'
 import { useTaskStore } from '../store/taskStore'
 import { useAnchorStore } from '../store/anchorStore'
-import type { Routine, RecurrenceConfig, RecurrencePattern, RoutineTaskConfig } from '../types/routine'
+import type { Routine, RecurrenceConfig, RecurrencePattern, RoutineTaskConfig, RoutineBlockConfig, OverflowBehavior } from '../types/routine'
 import { formatTime } from '../types/anchor'
 
 // Icons
@@ -106,7 +106,7 @@ function RoutinePanel() {
                     {routine.recurrence.pattern}
                   </span>
                   <span>• spawn @ {formatTime(routine.idealSpawnTime)}</span>
-                  <span>• {routine.blockIds.length} block(s)</span>
+                  <span>• {routine.blockConfigs.length} block(s)</span>
                   <span>• {routine.taskConfigs?.length ?? 0} task config(s)</span>
                 </div>
               </div>
@@ -154,7 +154,7 @@ function RoutineEditor({
   const { slots } = useAnchorStore()
 
   const [name, setName] = useState(initial?.name ?? '')
-  const [blockIds, setBlockIds] = useState<string[]>(initial?.blockIds ?? [])
+  const [blockConfigs, setBlockConfigs] = useState<RoutineBlockConfig[]>(initial?.blockConfigs ?? [])
   const [recurrence, setRecurrence] = useState<RecurrenceConfig>(
     initial?.recurrence ?? { pattern: 'daily' }
   )
@@ -164,7 +164,7 @@ function RoutineEditor({
 
   // Get all tasks from selected blocks
   const blockTasks = blocks
-    .filter((b) => blockIds.includes(b.id))
+    .filter((b) => blockConfigs.some((bc) => bc.blockId === b.id))
     .flatMap((b) => b.entries.map((e) => e.taskId))
   const uniqueTaskIds = [...new Set(blockTasks)]
 
@@ -173,7 +173,7 @@ function RoutineEditor({
     onSave({
       id: initial?.id ?? crypto.randomUUID(),
       name: name.trim(),
-      blockIds,
+      blockConfigs,
       recurrence,
       idealSpawnTime,
       taskConfigs: taskConfigs.length > 0 ? taskConfigs : undefined,
@@ -233,42 +233,98 @@ function RoutineEditor({
         </label>
       </div>
 
-      {/* Blocks dropdown */}
-      <div className="space-y-2">
+      {/* Block configs */}
+      <div className="space-y-3">
         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-          Target Blocks
+          Blocks + Scheduling
         </span>
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {blockIds.map((bid) => {
-            const b = blocks.find((bl) => bl.id === bid)
-            return (
-              <span key={bid} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-cyan-955/35 text-cyan-400 border border-cyan-900/30">
-                {b?.name ?? bid}
-                <button
-                  type="button"
-                  onClick={() => setBlockIds(blockIds.filter((id) => id !== bid))}
-                  className="hover:text-rose-400 cursor-pointer"
-                >
-                  <XIcon />
-                </button>
-              </span>
-            )
-          })}
-        </div>
+
+        {/* Add block dropdown */}
         <select
           value=""
           onChange={(e) => {
-            if (e.target.value && !blockIds.includes(e.target.value)) {
-              setBlockIds([...blockIds, e.target.value])
+            if (e.target.value && !blockConfigs.some((bc) => bc.blockId === e.target.value)) {
+              setBlockConfigs([...blockConfigs, {
+                blockId: e.target.value,
+                anchorId: '',
+                expectedDurationMinutes: 120,
+                overflowBehavior: 'drop',
+              }])
             }
           }}
           className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-950 text-slate-350 focus:outline-none cursor-pointer w-full"
         >
           <option value="" className="bg-slate-950 text-slate-500">＋ Add block…</option>
-          {blocks.filter((b) => !blockIds.includes(b.id)).map((b) => (
+          {blocks.filter((b) => !blockConfigs.some((bc) => bc.blockId === b.id)).map((b) => (
             <option key={b.id} value={b.id} className="bg-slate-950 text-slate-200">{b.name}</option>
           ))}
         </select>
+
+        {/* Per-block config cards */}
+        {blockConfigs.map((bc, idx) => {
+          const b = blocks.find((bl) => bl.id === bc.blockId)
+          return (
+            <div key={bc.blockId} className="bg-slate-955 border border-slate-850 p-3 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-cyan-400">{b?.name ?? bc.blockId}</span>
+                <button
+                  type="button"
+                  onClick={() => setBlockConfigs(blockConfigs.filter((_, i) => i !== idx))}
+                  className="p-1 rounded text-slate-500 hover:text-rose-400 cursor-pointer"
+                >
+                  <XIcon />
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[9px] font-bold text-slate-500 uppercase block mb-0.5">Anchor</label>
+                  <select
+                    value={bc.anchorId}
+                    onChange={(e) => {
+                      const updated = [...blockConfigs]
+                      updated[idx] = { ...updated[idx], anchorId: e.target.value }
+                      setBlockConfigs(updated)
+                    }}
+                    className="text-[10px] px-2 py-1 w-full bg-slate-950 border border-slate-850 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
+                  >
+                    <option value="">-- anchor --</option>
+                    {anchors.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-slate-500 uppercase block mb-0.5">Duration (min)</label>
+                  <input
+                    type="number"
+                    value={bc.expectedDurationMinutes}
+                    onChange={(e) => {
+                      const updated = [...blockConfigs]
+                      updated[idx] = { ...updated[idx], expectedDurationMinutes: Number(e.target.value) || 0 }
+                      setBlockConfigs(updated)
+                    }}
+                    className="text-[10px] px-2 py-1 w-full bg-slate-950 border border-slate-850 rounded-lg text-slate-300 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-slate-500 uppercase block mb-0.5">Overflow</label>
+                  <select
+                    value={bc.overflowBehavior}
+                    onChange={(e) => {
+                      const updated = [...blockConfigs]
+                      updated[idx] = { ...updated[idx], overflowBehavior: e.target.value as OverflowBehavior }
+                      setBlockConfigs(updated)
+                    }}
+                    className="text-[10px] px-2 py-1 w-full bg-slate-950 border border-slate-850 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
+                  >
+                    <option value="drop">drop</option>
+                    <option value="push">push</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* Spawn time */}

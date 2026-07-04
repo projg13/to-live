@@ -183,13 +183,10 @@ function resolveDay(
       // Each routine starts at its own idealSpawnTime OR the pushed anchor time (whichever is later)
       let routineStart = routine.idealSpawnTime
 
-      // Check if this routine's block anchor has been pushed (by overflow or confirmation)
-      for (const blockId of routine.blockIds) {
-        const block = context.blocks.find((b) => b.id === blockId)
-        if (!block) continue
-        const matchedAnchor = resolvedAnchors.find((a) => a.anchorId === block.anchorId)
+      // Check if this routine's first block anchor has been pushed (by overflow or confirmation)
+      for (const bc of routine.blockConfigs) {
+        const matchedAnchor = resolvedAnchors.find((a) => a.anchorId === bc.anchorId)
         if (matchedAnchor) {
-          // Use the later of idealSpawnTime or the anchor's actual (pushed) time
           routineStart = Math.max(routineStart, matchedAnchor.actualTime)
           break
         }
@@ -200,8 +197,8 @@ function resolveDay(
         ? lastDoneAt
         : routineStart
 
-      for (const blockId of routine.blockIds) {
-        const block = context.blocks.find((b) => b.id === blockId)
+      for (const bc of routine.blockConfigs) {
+        const block = context.blocks.find((b) => b.id === bc.blockId)
         if (!block) continue
 
         const sortedEntries = [...block.entries].sort((a, b) => a.order - b.order)
@@ -235,25 +232,21 @@ function resolveDay(
           if (taskConfig?.slotWeights && Object.keys(taskConfig.slotWeights).length > 0) {
             // Slot-relative mode: weight depends on which slot we're in
             const fallback = taskConfig.fallbackWeight ?? 0
-            const anchorId = block.anchorId
+            const anchorId = bc.anchorId
             const templateEntry = dayTemplate?.entries.find((e) => e.anchorId === anchorId)
             const slotId = templateEntry?.slotId
             if (slotId) {
               const slotCurve = taskConfig.slotWeights[slotId]
               if (slotCurve && slotCurve.length > 0) {
-                // Slot has a curve — interpolate
                 const offsetInSlot = Math.max(0, cursor - routineStart)
                 weight = getSlotWeight(slotCurve, offsetInSlot)
               } else {
-                // Slot not in map — use fallback weight
                 weight = fallback
               }
             } else {
-              // Can't resolve slot — use fallback
               weight = fallback
             }
           }
-          // else: no slotWeights → absolute mode, use task.weight as-is
 
           // Use idealTime from taskConfig if set, but not earlier than cursor
           const idealStart = taskConfig?.idealTime
@@ -266,7 +259,7 @@ function resolveDay(
             if (idealStart >= expiryTime) continue
           }
 
-          // Apply event weight offset (high offset = only important tasks survive)
+          // Apply event weight offset
           if (eventWeightOffset > 0) {
             weight = weight - eventWeightOffset
           }
@@ -304,10 +297,8 @@ function resolveDay(
         }
 
         // After placing block tasks, if cursor overflowed past next anchor, push it
-        // This always happens — the next slot starts when this one finishes
-        const blockAnchorIdx = resolvedAnchors.findIndex((a) => a.anchorId === block.anchorId)
+        const blockAnchorIdx = resolvedAnchors.findIndex((a) => a.anchorId === bc.anchorId)
         if (blockAnchorIdx >= 0) {
-          // Push ALL subsequent anchors that are now in the past
           for (let ai = blockAnchorIdx + 1; ai < resolvedAnchors.length; ai++) {
             if (cursor > resolvedAnchors[ai].actualTime) {
               resolvedAnchors[ai].actualTime = cursor

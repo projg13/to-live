@@ -10,12 +10,12 @@ interface BlockStore {
   addEntry: (blockId: string, entry: BlockEntry) => void
   removeEntry: (blockId: string, taskId: string) => void
   reorderEntry: (blockId: string, taskId: string, newOrder: number) => void
-  getBlocksForAnchor: (anchorId: string) => Block[]
+
 }
 
 export const useBlockStore = create<BlockStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       blocks: [],
       addBlock: (block) =>
         set((state) => ({ blocks: [...state.blocks, block] })),
@@ -29,7 +29,7 @@ export const useBlockStore = create<BlockStore>()(
         set((state) => ({ blocks: state.blocks.map((b) => b.id === blockId ? { ...b, entries: b.entries.filter((e) => e.taskId !== taskId) } : b) })),
       reorderEntry: (blockId, taskId, newOrder) =>
         set((state) => ({ blocks: state.blocks.map((b) => { if (b.id !== blockId) return b; return { ...b, entries: b.entries.map((e) => e.taskId === taskId ? { ...e, order: newOrder } : e) } }) })),
-      getBlocksForAnchor: (anchorId) => get().blocks.filter((b) => b.anchorId === anchorId),
+
     }),
     { name: 'to-live-blocks', version: 2 }
   )

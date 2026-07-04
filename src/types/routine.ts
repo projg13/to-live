@@ -1,4 +1,5 @@
 export type RecurrencePattern = 'daily' | 'weekly' | 'monthly' | 'one-time' | 'repeat-until'
+export type OverflowBehavior = 'drop' | 'push'
 
 export interface RecurrenceConfig {
   pattern: RecurrencePattern
@@ -23,6 +24,15 @@ export interface RoutineTaskConfig {
   idealTime?: number                                 // minutes from midnight — ideal time for this task
 }
 
+// Per-block scheduling behavior within a routine
+export interface RoutineBlockConfig {
+  blockId: string
+  anchorId: string                 // which anchor this block runs at
+  expectedDurationMinutes: number  // time budget for this block
+  overflowBehavior: OverflowBehavior  // drop excess tasks or push next slot
+  expiresAfterMinutes?: number     // block-level expiry from routine spawn
+}
+
 // Interpolate slot weight at a given offset from slot start
 export function getSlotWeight(points: SlotWeightPoint[], offsetMinutes: number): number {
   if (points.length === 0) return 0
@@ -44,7 +54,7 @@ export function getSlotWeight(points: SlotWeightPoint[], offsetMinutes: number):
 export interface Routine {
   id: string
   name: string
-  blockIds: string[]                     // which blocks this routine manages
+  blockConfigs: RoutineBlockConfig[]   // block + scheduling behavior
 
   // Recurrence
   recurrence: RecurrenceConfig
@@ -58,3 +68,4 @@ export interface Routine {
   // Active/enabled
   enabled: boolean
 }
+

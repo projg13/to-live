@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useBlockStore } from '../store/blockStore'
 import { useTaskStore } from '../store/taskStore'
-import { useAnchorStore } from '../store/anchorStore'
-import type { Block, BlockEntry, OverflowBehavior } from '../types/block'
+import type { Block, BlockEntry } from '../types/block'
 
 // Icons
 const PlusIcon = () => (
@@ -50,8 +49,8 @@ function BlockPanel() {
     <div className="space-y-6">
       <div className="border-b border-slate-800 pb-2 flex justify-between items-center">
         <div>
-          <h3 className="text-lg font-black tracking-wide text-slate-100">Schedule Blocks</h3>
-          <p className="text-xs text-slate-400">Fixed duration windows containing a list of target tasks.</p>
+          <h3 className="text-lg font-black tracking-wide text-slate-100">Task Blocks</h3>
+          <p className="text-xs text-slate-400">Reusable task groups. Scheduling behavior is set in Routines.</p>
         </div>
         {!creating && (
           <button
@@ -96,11 +95,6 @@ function BlockPanel() {
             )
           }
 
-          const activeParams: string[] = []
-          if (block.overflowBehavior === 'push') activeParams.push('overflow: push')
-          if (block.blockStickiness) activeParams.push(`sticky: ${block.blockStickiness}`)
-          if (block.expiresAfterMinutes) activeParams.push(`expires: +${block.expiresAfterMinutes}m`)
-
           return (
             <div
               key={block.id}
@@ -113,22 +107,8 @@ function BlockPanel() {
                     {block.name}
                   </span>
                   <span className="text-[10px] font-mono font-bold bg-slate-950 border border-slate-850 px-2 py-0.5 rounded text-slate-400">
-                    {block.entries.length} tasks | {block.expectedDurationMinutes}m
+                    {block.entries.length} task(s)
                   </span>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 text-xs font-semibold text-slate-400">
-                  {activeParams.map((p) => {
-                    let color = 'bg-slate-950/60 text-slate-400 border-slate-850'
-                    if (p.includes('push')) color = 'bg-teal-955/35 text-teal-400 border-teal-900/30'
-                    if (p.includes('sticky')) color = 'bg-indigo-955/35 text-indigo-400 border-indigo-900/30'
-                    if (p.includes('expires')) color = 'bg-rose-955/35 text-rose-455 border-rose-900/20'
-                    return (
-                      <span key={p} className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider border ${color}`}>
-                        {p}
-                      </span>
-                    )
-                  })}
                 </div>
               </div>
 
@@ -143,7 +123,7 @@ function BlockPanel() {
 
         {blocks.length === 0 && !creating && (
           <p className="text-sm italic text-slate-500 py-4">
-            No schedule blocks created. Build blocks to organize task lists.
+            No task blocks created yet. Build reusable task groups here.
           </p>
         )}
       </div>
@@ -163,29 +143,16 @@ function BlockEditor({
   onDelete?: () => void
 }) {
   const { tasks } = useTaskStore()
-  const { anchors } = useAnchorStore()
 
   const [name, setName] = useState(initial?.name ?? '')
-  const [anchorId, setAnchorId] = useState(initial?.anchorId ?? '')
   const [entries, setEntries] = useState<BlockEntry[]>(initial?.entries ?? [])
-  const [expectedDuration, setExpectedDuration] = useState(initial?.expectedDurationMinutes ?? 0)
-  const [overflowBehavior, setOverflowBehavior] = useState<OverflowBehavior>(
-    initial?.overflowBehavior ?? 'drop'
-  )
-  const [blockStickiness, setBlockStickiness] = useState(initial?.blockStickiness ?? 0)
-  const [expiresAfter, setExpiresAfter] = useState(initial?.expiresAfterMinutes ?? 0)
 
   const handleSave = () => {
-    if (!name.trim() || !anchorId) return
+    if (!name.trim()) return
     onSave({
       id: initial?.id ?? crypto.randomUUID(),
       name: name.trim(),
-      anchorId,
       entries,
-      expectedDurationMinutes: expectedDuration,
-      overflowBehavior,
-      blockStickiness: blockStickiness || undefined,
-      expiresAfterMinutes: expiresAfter || undefined,
     })
   }
 
@@ -249,87 +216,18 @@ function BlockEditor({
       {/* Name */}
       <div>
         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
-          Name
+          Block Name
         </label>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Focus Work Block"
+          placeholder="e.g. Morning Routine, Evening Wrapup"
           className="text-sm px-3.5 py-2 w-full bg-slate-955 border border-slate-800 rounded-xl text-slate-205 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none"
         />
       </div>
 
-      {/* Anchor */}
-      <div>
-        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
-          Attached to Anchor/Slot
-        </label>
-        <select
-          value={anchorId}
-          onChange={(e) => setAnchorId(e.target.value)}
-          className="text-sm px-3 py-2 w-full bg-slate-955 border border-slate-800 rounded-xl text-slate-205 focus:outline-none cursor-pointer"
-        >
-          <option value="">-- select anchor --</option>
-          {anchors.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Config Row params */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-900/30 p-3.5 border border-slate-800 rounded-xl flex-wrap">
-        <div>
-          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">
-            Expected (min)
-          </label>
-          <input
-            type="number"
-            value={expectedDuration}
-            onChange={(e) => setExpectedDuration(Number(e.target.value) || 0)}
-            className="text-xs px-2.5 py-1.5 w-full bg-slate-950 border border-slate-850 rounded-lg text-slate-300 focus:outline-none"
-          />
-        </div>
-        <div>
-          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">
-            Overflow
-          </label>
-          <select
-            value={overflowBehavior}
-            onChange={(e) => setOverflowBehavior(e.target.value as OverflowBehavior)}
-            className="text-xs px-2.5 py-1.5 w-full bg-slate-950 border border-slate-850 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
-          >
-            <option value="drop">drop</option>
-            <option value="push">push</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider block mb-1">
-            Stickiness
-          </label>
-          <input
-            type="number"
-            value={blockStickiness}
-            onChange={(e) => setBlockStickiness(Number(e.target.value) || 0)}
-            className="text-xs px-2.5 py-1.5 w-full bg-slate-950 border border-slate-850 rounded-lg text-slate-300 focus:outline-none"
-          />
-        </div>
-        <div>
-          <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider block mb-1">
-            Expires (min)
-          </label>
-          <input
-            type="number"
-            value={expiresAfter}
-            onChange={(e) => setExpiresAfter(Number(e.target.value) || 0)}
-            className="text-xs px-2.5 py-1.5 w-full bg-slate-950 border border-slate-850 rounded-lg text-slate-300 focus:outline-none"
-          />
-        </div>
-      </div>
-
-      {/* Entries Checklist */}
+      {/* Task entries */}
       <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
           Tasks in Block
@@ -384,7 +282,7 @@ function BlockEditor({
                         onChange={(e) => updateEntry(i, { isBackground: e.target.checked })}
                         className="rounded border-slate-700 bg-slate-900 text-cyan-505 focus:ring-cyan-500 h-4 w-4 cursor-pointer"
                       />
-                      background task
+                      background
                     </label>
 
                     <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-350 cursor-pointer">
@@ -396,17 +294,6 @@ function BlockEditor({
                       />
                       mandatory
                     </label>
-
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-450">
-                      <span>sticky boost:</span>
-                      <input
-                        type="number"
-                        value={entry.stickinessBoost ?? ''}
-                        onChange={(e) => updateEntry(i, { stickinessBoost: Number(e.target.value) || undefined })}
-                        placeholder="0"
-                        className="w-14 px-2 py-1 text-center bg-slate-900 border border-slate-800 rounded-lg text-slate-200 font-bold focus:outline-none"
-                      />
-                    </div>
                   </div>
 
                   {/* Ordering arrows */}
@@ -457,7 +344,7 @@ function BlockEditor({
             onClick={handleSave}
             className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-955 shadow-md shadow-cyan-950/20 transition-all active:scale-95 cursor-pointer"
           >
-            <CheckIcon /> Save Changes
+            <CheckIcon /> Save Block
           </button>
           <button
             onClick={onCancel}
