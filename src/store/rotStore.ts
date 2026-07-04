@@ -28,6 +28,6 @@ export const useRotStore = create<RotStore>()(
         return get().entries.filter((e) => new Date(e.date).getTime() >= cutoff).length
       },
     }),
-    { name: 'to-live-rot' }
+    { name: 'to-live-rot', version: 2 }
   )
 )

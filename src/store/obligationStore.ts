@@ -23,6 +23,6 @@ export const useObligationStore = create<ObligationStore>()(
       toggleEnabled: (id) =>
         set((state) => ({ obligations: state.obligations.map((o) => o.id === id ? { ...o, enabled: !o.enabled } : o) })),
     }),
-    { name: 'to-live-obligations' }
+    { name: 'to-live-obligations', version: 2 }
   )
 )
