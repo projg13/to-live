@@ -530,12 +530,15 @@ export const useSchedulerStore = create<SchedulerStore>()(
           },
         })
 
-        // Auto snapshot (fire-and-forget)
-        import('../backup').then(({ snapshotToGitHub }) => {
-          snapshotToGitHub().catch((err) => {
-            console.error('Auto backup to GitHub failed:', err)
+        // Auto snapshot (debounced — avoids 409 SHA conflicts from rapid resolves)
+        clearTimeout((globalThis as any).__backupTimer)
+        ;(globalThis as any).__backupTimer = setTimeout(() => {
+          import('../backup').then(({ snapshotToGitHub }) => {
+            snapshotToGitHub().catch((err) => {
+              console.error('Auto backup to GitHub failed:', err)
+            })
           })
-        })
+        }, 3000)
       },
 
       confirmAnchor: (conf) =>
