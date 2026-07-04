@@ -151,7 +151,7 @@ function RoutineEditor({
 }) {
   const { blocks } = useBlockStore()
   const { tasks } = useTaskStore()
-  const { slots } = useAnchorStore()
+  const { slots, anchors } = useAnchorStore()
 
   const [name, setName] = useState(initial?.name ?? '')
   const [blockConfigs, setBlockConfigs] = useState<RoutineBlockConfig[]>(initial?.blockConfigs ?? [])
