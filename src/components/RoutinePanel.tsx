@@ -456,10 +456,10 @@ function RoutineEditor({
                     </div>
                   </div>
 
-                  {/* Slot weights points */}
+                  {/* Slot weights */}
                   <div className="space-y-2 mt-2">
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Slot Weight Curves
+                      Active Slots <span className="text-slate-600 font-normal">(unselected slots = weight 0)</span>
                     </span>
 
                     {/* Dropdown to add a slot */}
@@ -468,12 +468,13 @@ function RoutineEditor({
                       onChange={(e) => {
                         if (e.target.value) {
                           const current = config?.slotWeights ?? {}
-                          setTaskConfig(taskId, { slotWeights: { ...current, [e.target.value]: [{ offsetMinutes: 0, value: 100 }] } })
+                          // Default: flat weight = task's absolute weight
+                          setTaskConfig(taskId, { slotWeights: { ...current, [e.target.value]: [{ offsetMinutes: 0, value: task.weight }] } })
                         }
                       }}
                       className="text-[10px] px-2 py-1 rounded-lg border border-slate-800 bg-slate-950 text-slate-350 focus:outline-none cursor-pointer w-full"
                     >
-                      <option value="" className="bg-slate-950 text-slate-500">＋ Add slot curve…</option>
+                      <option value="" className="bg-slate-950 text-slate-500">＋ Enable in slot…</option>
                       {slots
                         .filter((s) => !config?.slotWeights?.[s.id])
                         .map((s) => (
@@ -481,16 +482,27 @@ function RoutineEditor({
                         ))}
                     </select>
 
-                    {/* Only show slots that have curves */}
+                    {/* Active slots */}
                     {Object.entries(config?.slotWeights ?? {}).map(([slotId, points]) => {
                       const slot = slots.find((s) => s.id === slotId)
+                      const isFlat = points.length <= 1
+                      const flatWeight = points[0]?.value ?? 0
+
                       return (
                         <div
                           key={slotId}
-                          className="pl-3 border-l border-slate-850 py-1.5 space-y-2 bg-slate-955/30 p-2.5 rounded-lg border border-slate-850/60"
+                          className="pl-3 border-l-2 border-cyan-800/40 py-1.5 space-y-2 bg-slate-955/30 p-2.5 rounded-lg border border-slate-850/60"
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-slate-400">{slot?.name ?? slotId}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold text-cyan-400">{slot?.name ?? slotId}</span>
+                              {isFlat && (
+                                <span className="text-[9px] text-slate-600">flat</span>
+                              )}
+                              {!isFlat && (
+                                <span className="text-[9px] text-purple-400">{points.length} pts</span>
+                              )}
+                            </div>
                             <button
                               type="button"
                               onClick={() => {
@@ -503,66 +515,97 @@ function RoutineEditor({
                               <XIcon />
                             </button>
                           </div>
-                          
-                          <div className="space-y-1.5">
-                            {points.map((pt, pi) => (
-                              <div key={pi} className="flex items-center gap-1.5 text-xs flex-wrap">
-                                <span className="text-slate-500">+</span>
-                                <input
-                                  type="number"
-                                  value={pt.offsetMinutes}
-                                  onChange={(e) => {
-                                    const updated = [...points]
-                                    updated[pi] = { ...updated[pi], offsetMinutes: Number(e.target.value) || 0 }
-                                    const current = config?.slotWeights ?? {}
-                                    setTaskConfig(taskId, { slotWeights: { ...current, [slotId]: updated } })
-                                  }}
-                                  className="w-14 px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded text-center text-slate-300"
-                                />
-                                <span className="text-slate-500">min =</span>
-                                <input
-                                  type="number"
-                                  value={pt.value}
-                                  onChange={(e) => {
-                                    const updated = [...points]
-                                    updated[pi] = { ...updated[pi], value: Number(e.target.value) || 0 }
-                                    const current = config?.slotWeights ?? {}
-                                    setTaskConfig(taskId, { slotWeights: { ...current, [slotId]: updated } })
-                                  }}
-                                  className="w-14 px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded text-center text-slate-202 font-semibold"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updated = points.filter((_, j) => j !== pi)
-                                    const current = config?.slotWeights ?? {}
-                                    if (updated.length === 0) {
-                                      const { [slotId]: _, ...rest } = current
-                                      setTaskConfig(taskId, { slotWeights: Object.keys(rest).length > 0 ? rest : undefined })
-                                    } else {
-                                      setTaskConfig(taskId, { slotWeights: { ...current, [slotId]: updated } })
-                                    }
-                                  }}
-                                  className="p-1 rounded text-slate-400 hover:bg-rose-955/20 hover:text-rose-455 transition-all cursor-pointer"
-                                >
-                                  <XIcon />
-                                </button>
+
+                          {/* Flat mode: single weight input */}
+                          {isFlat && (
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-slate-500">Weight:</span>
+                              <input
+                                type="number"
+                                value={flatWeight}
+                                onChange={(e) => {
+                                  const current = config?.slotWeights ?? {}
+                                  setTaskConfig(taskId, { slotWeights: { ...current, [slotId]: [{ offsetMinutes: 0, value: Number(e.target.value) || 0 }] } })
+                                }}
+                                className="w-16 px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded text-center text-slate-202 font-semibold"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // Expand to piecewise: add a second point
+                                  const current = config?.slotWeights ?? {}
+                                  setTaskConfig(taskId, { slotWeights: { ...current, [slotId]: [...points, { offsetMinutes: 60, value: 0 }] } })
+                                }}
+                                className="text-[9px] font-bold text-purple-400 hover:underline flex items-center gap-0.5 cursor-pointer ml-auto"
+                              >
+                                <PlusIcon /> Piecewise
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Piecewise mode: multiple offset→value points */}
+                          {!isFlat && (
+                            <>
+                              <div className="space-y-1.5">
+                                {points.map((pt, pi) => (
+                                  <div key={pi} className="flex items-center gap-1.5 text-xs flex-wrap">
+                                    <span className="text-slate-500">+</span>
+                                    <input
+                                      type="number"
+                                      value={pt.offsetMinutes}
+                                      onChange={(e) => {
+                                        const updated = [...points]
+                                        updated[pi] = { ...updated[pi], offsetMinutes: Number(e.target.value) || 0 }
+                                        const current = config?.slotWeights ?? {}
+                                        setTaskConfig(taskId, { slotWeights: { ...current, [slotId]: updated } })
+                                      }}
+                                      className="w-14 px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded text-center text-slate-300"
+                                    />
+                                    <span className="text-slate-500">min →</span>
+                                    <input
+                                      type="number"
+                                      value={pt.value}
+                                      onChange={(e) => {
+                                        const updated = [...points]
+                                        updated[pi] = { ...updated[pi], value: Number(e.target.value) || 0 }
+                                        const current = config?.slotWeights ?? {}
+                                        setTaskConfig(taskId, { slotWeights: { ...current, [slotId]: updated } })
+                                      }}
+                                      className="w-14 px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded text-center text-slate-202 font-semibold"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = points.filter((_, j) => j !== pi)
+                                        const current = config?.slotWeights ?? {}
+                                        if (updated.length === 0) {
+                                          const { [slotId]: _, ...rest } = current
+                                          setTaskConfig(taskId, { slotWeights: Object.keys(rest).length > 0 ? rest : undefined })
+                                        } else {
+                                          setTaskConfig(taskId, { slotWeights: { ...current, [slotId]: updated } })
+                                        }
+                                      }}
+                                      className="p-1 rounded text-slate-400 hover:bg-rose-955/20 hover:text-rose-455 transition-all cursor-pointer"
+                                    >
+                                      <XIcon />
+                                    </button>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                          
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const last = points[points.length - 1]
-                              const newPt = { offsetMinutes: (last?.offsetMinutes ?? 0) + 60, value: 0 }
-                              const current = config?.slotWeights ?? {}
-                              setTaskConfig(taskId, { slotWeights: { ...current, [slotId]: [...points, newPt] } })
-                            }}
-                            className="text-[9px] font-bold text-cyan-400 hover:underline flex items-center gap-0.5 cursor-pointer"
-                          >
-                            <PlusIcon /> Add point
-                          </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const last = points[points.length - 1]
+                                  const newPt = { offsetMinutes: (last?.offsetMinutes ?? 0) + 60, value: 0 }
+                                  const current = config?.slotWeights ?? {}
+                                  setTaskConfig(taskId, { slotWeights: { ...current, [slotId]: [...points, newPt] } })
+                                }}
+                                className="text-[9px] font-bold text-cyan-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                              >
+                                <PlusIcon /> Add point
+                              </button>
+                            </>
+                          )}
                         </div>
                       )
                     })}
