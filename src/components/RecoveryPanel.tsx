@@ -4,6 +4,37 @@ import { useTaskStore } from '../store/taskStore'
 import { useBlockStore } from '../store/blockStore'
 import type { RecoveryPlan, TriggerType, AutoTriggerCondition, TimeWeight } from '../types/recovery'
 
+// Icons
+const PlusIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+  </svg>
+)
+
+const CheckIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+)
+
+const TrashIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+)
+
+const XIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  </svg>
+)
+
+const FlameIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+  </svg>
+)
+
 function RecoveryPanel() {
   const { plans, addPlan, updatePlan, deletePlan, trigger, resolve } = useRecoveryStore()
   const [editing, setEditing] = useState<string | null>(null)
@@ -12,33 +43,52 @@ function RecoveryPanel() {
   const today = new Date().toISOString().split('T')[0]
 
   return (
-    <div>
-      <h3 style={{ marginBottom: 8 }}>Recovery Plans</h3>
-
-      {!creating && (
-        <button onClick={() => setCreating(true)} style={{ marginBottom: 12 }}>
-          + New Recovery Plan
-        </button>
-      )}
+    <div className="space-y-6">
+      <div className="border-b border-slate-800 pb-2 flex justify-between items-center">
+        <div>
+          <h3 className="text-lg font-black tracking-wide text-slate-100">Recovery Plans</h3>
+          <p className="text-xs text-slate-400">Inject high weight blockers dynamically to recover daily momentum.</p>
+        </div>
+        {!creating && (
+          <button
+            onClick={() => setCreating(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-955 shadow-md shadow-cyan-950/20 transition-all active:scale-95 cursor-pointer"
+          >
+            <PlusIcon /> New Plan
+          </button>
+        )}
+      </div>
 
       {creating && (
-        <RecoveryEditor
-          onSave={(p) => { addPlan(p); setCreating(false) }}
-          onCancel={() => setCreating(false)}
-        />
+        <div className="bg-slate-955 border border-slate-800 rounded-2xl p-4">
+          <RecoveryEditor
+            onSave={(p) => {
+              addPlan(p)
+              setCreating(false)
+            }}
+            onCancel={() => setCreating(false)}
+          />
+        </div>
       )}
 
-      <div>
+      <div className="space-y-2.5">
         {plans.map((plan) => {
           if (editing === plan.id) {
             return (
-              <RecoveryEditor
-                key={plan.id}
-                initial={plan}
-                onSave={(updated) => { updatePlan(plan.id, updated); setEditing(null) }}
-                onCancel={() => setEditing(null)}
-                onDelete={() => { deletePlan(plan.id); setEditing(null) }}
-              />
+              <div key={plan.id} className="bg-slate-955 border border-slate-800 rounded-2xl p-4">
+                <RecoveryEditor
+                  initial={plan}
+                  onSave={(updated) => {
+                    updatePlan(plan.id, updated)
+                    setEditing(null)
+                  }}
+                  onCancel={() => setEditing(null)}
+                  onDelete={() => {
+                    deletePlan(plan.id)
+                    setEditing(null)
+                  }}
+                />
+              </div>
             )
           }
 
@@ -49,31 +99,62 @@ function RecoveryPanel() {
           return (
             <div
               key={plan.id}
-              style={{ borderTop: '1px solid #ccc', padding: '8px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              className={`flex justify-between items-center py-3.5 px-4 bg-slate-950/40 hover:bg-slate-900 rounded-2xl border border-slate-800/80 shadow-sm transition-all ${
+                plan.triggered ? 'border-rose-900/50 bg-rose-955/5' : ''
+              }`}
             >
-              <div onClick={() => setEditing(plan.id)} style={{ cursor: 'pointer', flex: 1 }}>
-                <strong>{plan.name}</strong>
-                {plan.triggered && <span style={{ marginLeft: 8 }}>[ACTIVE - {daysPending}d]</span>}
-                <div style={{ fontSize: 12 }}>
-                  {plan.triggerType}
-                  {plan.autoCondition && ` | ${plan.autoCondition.consecutiveMisses} misses`}
-                  {' | '}growth: {plan.growthRate}/day
-                  {' | '}cap: {plan.saturationLimit}
+              <div
+                onClick={() => setEditing(plan.id)}
+                className="cursor-pointer flex-1 space-y-1.5 pr-4"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-slate-205 text-[15px]">
+                    {plan.name}
+                  </span>
+                  {plan.triggered && (
+                    <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-rose-955/35 text-rose-450 border border-rose-900/30 animate-pulse">
+                      <FlameIcon /> Active {daysPending}d
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
+                  <span className="bg-slate-950/60 border border-slate-850 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-mono">
+                    Trigger: {plan.triggerType}
+                  </span>
+                  {plan.autoCondition && (
+                    <span>• Auto: {plan.autoCondition.consecutiveMisses} misses</span>
+                  )}
+                  <span>• growth: +{plan.growthRate}/day</span>
+                  <span>• cap: {plan.saturationLimit}w</span>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {!plan.triggered && (
-                  <button onClick={() => trigger(plan.id)}>Trigger</button>
-                )}
-                {plan.triggered && (
-                  <button onClick={() => resolve(plan.id)}>Resolve</button>
+
+              <div className="flex gap-2">
+                {!plan.triggered ? (
+                  <button
+                    onClick={() => trigger(plan.id)}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-rose-955/30 hover:bg-rose-900/40 text-rose-400 border border-rose-800/30 transition-all active:scale-95 cursor-pointer"
+                  >
+                    Trigger
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => resolve(plan.id)}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-955/30 hover:bg-cyan-900/40 text-cyan-400 border border-cyan-800/30 transition-all active:scale-95 cursor-pointer"
+                  >
+                    Resolve
+                  </button>
                 )}
               </div>
             </div>
           )
         })}
+
         {plans.length === 0 && !creating && (
-          <p style={{ fontSize: 12, fontStyle: 'italic' }}>No recovery plans yet.</p>
+          <p className="text-sm italic text-slate-500 py-4">
+            No recovery plans configured yet.
+          </p>
         )}
       </div>
     </div>
@@ -134,129 +215,267 @@ function RecoveryEditor({
   }
 
   return (
-    <div style={{ border: '2px solid #333', padding: 12, marginBottom: 12 }}>
+    <div className="space-y-4">
       {/* Name */}
-      <div style={{ marginBottom: 8 }}>
-        <label style={{ fontSize: 13 }}>Name</label><br />
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ width: '100%' }} />
+      <div>
+        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
+          Plan Name
+        </label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Routine Recovery, Urgency Push"
+          className="text-sm px-3.5 py-2 w-full bg-slate-955 border border-slate-800 rounded-xl text-slate-205 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none"
+        />
       </div>
 
-      {/* Trigger type */}
-      <div style={{ marginBottom: 8, display: 'flex', gap: 12, alignItems: 'center' }}>
-        <div>
-          <label style={{ fontSize: 13 }}>Trigger</label><br />
-          <select value={triggerType} onChange={(e) => setTriggerType(e.target.value as TriggerType)}>
+      {/* Trigger rule configurations */}
+      <div className="flex flex-col sm:flex-row gap-3 bg-slate-900/30 p-3.5 border border-slate-800 rounded-xl">
+        <div className="min-w-[120px]">
+          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">
+            Trigger Method
+          </label>
+          <select
+            value={triggerType}
+            onChange={(e) => setTriggerType(e.target.value as TriggerType)}
+            className="text-xs px-2.5 py-1.5 w-full bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
+          >
             <option value="manual">manual</option>
             <option value="auto">auto</option>
           </select>
         </div>
+
         {triggerType === 'auto' && (
-          <>
-            <div>
-              <label style={{ fontSize: 13 }}>Task</label><br />
+          <div className="flex flex-1 flex-wrap gap-3">
+            <div className="flex-1 min-w-[140px]">
+              <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">
+                Monitored Task
+              </label>
               <select
                 value={autoCondition.taskId}
                 onChange={(e) => setAutoCondition({ ...autoCondition, taskId: e.target.value })}
+                className="text-xs px-2.5 py-1.5 w-full bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
               >
-                <option value="">-- task --</option>
+                <option value="">-- select task --</option>
                 {tasks.map((t) => (
-                  <option key={t.id} value={t.id}>{t.title}</option>
+                  <option key={t.id} value={t.id}>
+                    {t.title}
+                  </option>
                 ))}
               </select>
             </div>
-            <div>
-              <label style={{ fontSize: 13 }}>Misses</label><br />
+            <div className="w-20">
+              <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider block mb-1">
+                Miss Threshold
+              </label>
               <input
                 type="number"
-                value={autoCondition.consecutiveMisses}
-                onChange={(e) => setAutoCondition({ ...autoCondition, consecutiveMisses: Number(e.target.value) || 1 })}
-                style={{ width: 50 }}
+                value={autoCondition.consecutiveMisses || ''}
+                onChange={(e) =>
+                  setAutoCondition({
+                    ...autoCondition,
+                    consecutiveMisses: Number(e.target.value) || 1,
+                  })
+                }
+                className="text-xs px-2.5 py-1.5 w-full bg-slate-950 border border-slate-800 rounded-lg text-slate-300 text-center"
               />
             </div>
-          </>
+          </div>
         )}
       </div>
 
-      {/* Growth + Saturation */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
+      {/* Weight Dynamics Params */}
+      <div className="grid grid-cols-2 gap-3 bg-slate-900/30 p-3 rounded-xl border border-slate-800">
         <div>
-          <label style={{ fontSize: 13 }}>Growth rate (/day)</label><br />
-          <input type="number" value={growthRate} onChange={(e) => setGrowthRate(Number(e.target.value) || 0)} style={{ width: 60 }} step="0.1" />
+          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">
+            Growth Rate (/day)
+          </label>
+          <input
+            type="number"
+            value={growthRate}
+            onChange={(e) => setGrowthRate(Number(e.target.value) || 0)}
+            step="0.1"
+            className="text-xs px-2.5 py-1.5 w-full bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:outline-none"
+          />
         </div>
         <div>
-          <label style={{ fontSize: 13 }}>Saturation limit</label><br />
-          <input type="number" value={saturationLimit} onChange={(e) => setSaturationLimit(Number(e.target.value) || 0)} style={{ width: 80 }} />
+          <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider block mb-1">
+            Saturation Limit (max weight)
+          </label>
+          <input
+            type="number"
+            value={saturationLimit}
+            onChange={(e) => setSaturationLimit(Number(e.target.value) || 0)}
+            className="text-xs px-2.5 py-1.5 w-full bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:outline-none"
+          />
         </div>
       </div>
 
-      {/* Tasks */}
-      <div style={{ marginBottom: 8, paddingLeft: 12, borderLeft: '2px solid #666' }}>
-        <span style={{ fontSize: 13, fontWeight: 'bold' }}>Tasks</span>
-        {taskIds.map((tid, i) => (
-          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
-            <select value={tid} onChange={(e) => { const u = [...taskIds]; u[i] = e.target.value; setTaskIds(u) }}>
-              <option value="">-- task --</option>
-              {tasks.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
-            </select>
-            <button onClick={() => setTaskIds(taskIds.filter((_, j) => j !== i))}>x</button>
-          </div>
-        ))}
-        <button onClick={() => setTaskIds([...taskIds, ''])} style={{ marginTop: 4 }}>+ Add task</button>
-      </div>
-
-      {/* Blocks */}
-      <div style={{ marginBottom: 8, paddingLeft: 12, borderLeft: '2px solid #666' }}>
-        <span style={{ fontSize: 13, fontWeight: 'bold' }}>Blocks</span>
-        {blockIds.map((bid, i) => (
-          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
-            <select value={bid} onChange={(e) => { const u = [...blockIds]; u[i] = e.target.value; setBlockIds(u) }}>
-              <option value="">-- block --</option>
-              {blocks.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-            <button onClick={() => setBlockIds(blockIds.filter((_, j) => j !== i))}>x</button>
-          </div>
-        ))}
-        <button onClick={() => setBlockIds([...blockIds, ''])} style={{ marginTop: 4 }}>+ Add block</button>
-      </div>
-
-      {/* Base time curve */}
-      <div style={{ marginBottom: 8, paddingLeft: 12, borderLeft: '2px solid #666' }}>
-        <span style={{ fontSize: 13, fontWeight: 'bold' }}>Base time-of-day weight</span>
-        {baseTimeCurve.map((pt, i) => (
-          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
-            <input
-              type="time"
-              value={toTimeStr(pt.time)}
-              onChange={(e) => {
-                const updated = [...baseTimeCurve]
-                updated[i] = { ...updated[i], time: fromTimeStr(e.target.value) }
-                setBaseTimeCurve(updated)
-              }}
-            />
-            <span style={{ fontSize: 13 }}>=</span>
-            <input
-              type="number"
-              value={pt.value}
-              onChange={(e) => {
-                const updated = [...baseTimeCurve]
-                updated[i] = { ...updated[i], value: Number(e.target.value) || 0 }
-                setBaseTimeCurve(updated)
-              }}
-              style={{ width: 60 }}
-            />
-            <button onClick={() => setBaseTimeCurve(baseTimeCurve.filter((_, j) => j !== i))}>x</button>
-          </div>
-        ))}
-        <button onClick={() => setBaseTimeCurve([...baseTimeCurve, { time: 600, value: 50 }])} style={{ marginTop: 4 }}>
-          + Add point
+      {/* Tasks attached */}
+      <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+          Recovery Tasks
+        </span>
+        
+        <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+          {taskIds.map((tid, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-2 bg-slate-950/60 border border-slate-850 p-2 rounded-xl"
+            >
+              <select
+                value={tid}
+                onChange={(e) => {
+                  const u = [...taskIds]
+                  u[i] = e.target.value
+                  setTaskIds(u)
+                }}
+                className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-205 focus:outline-none cursor-pointer flex-1 min-w-[150px]"
+              >
+                <option value="">-- select task --</option>
+                {tasks.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => setTaskIds(taskIds.filter((_, j) => j !== i))}
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-955/20 hover:text-rose-455 transition-all cursor-pointer"
+              >
+                <XIcon />
+              </button>
+            </div>
+          ))}
+        </div>
+        
+        <button
+          onClick={() => setTaskIds([...taskIds, ''])}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-955 hover:bg-slate-900 text-slate-350 border border-slate-855 transition-all cursor-pointer"
+        >
+          <PlusIcon /> Add Task
         </button>
       </div>
 
-      {/* Actions */}
-      <div style={{ borderTop: '1px solid #999', paddingTop: 8 }}>
-        <button onClick={handleSave} style={{ marginRight: 8 }}>Save Changes</button>
-        <button onClick={onCancel} style={{ marginRight: 8 }}>Discard</button>
-        {onDelete && <button onClick={onDelete}>Delete</button>}
+      {/* Blocks attached */}
+      <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+          Recovery Blocks
+        </span>
+        
+        <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+          {blockIds.map((bid, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-2 bg-slate-950/60 border border-slate-850 p-2 rounded-xl"
+            >
+              <select
+                value={bid}
+                onChange={(e) => {
+                  const u = [...blockIds]
+                  u[i] = e.target.value
+                  setBlockIds(u)
+                }}
+                className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-205 focus:outline-none cursor-pointer flex-1 min-w-[150px]"
+              >
+                <option value="">-- select block --</option>
+                {blocks.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => setBlockIds(blockIds.filter((_, j) => j !== i))}
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-955/25 hover:text-rose-455 transition-all cursor-pointer"
+              >
+                <XIcon />
+              </button>
+            </div>
+          ))}
+        </div>
+        
+        <button
+          onClick={() => setBlockIds([...blockIds, ''])}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-955 hover:bg-slate-900 text-slate-355 border border-slate-855 transition-all cursor-pointer"
+        >
+          <PlusIcon /> Add Block
+        </button>
+      </div>
+
+      {/* Base time weights */}
+      <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+          Base Time-Of-Day Weight Curve
+        </span>
+        
+        <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+          {baseTimeCurve.map((pt, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs flex-wrap bg-slate-950/60 border border-slate-850 p-2 rounded-xl">
+              <input
+                type="time"
+                value={toTimeStr(pt.time)}
+                onChange={(e) => {
+                  const updated = [...baseTimeCurve]
+                  updated[i] = { ...updated[i], time: fromTimeStr(e.target.value) }
+                  setBaseTimeCurve(updated)
+                }}
+                className="text-xs px-2.5 py-1 bg-slate-900 border border-slate-800 rounded text-slate-300 cursor-pointer focus:outline-none"
+              />
+              <span className="text-slate-500 font-bold">=</span>
+              <input
+                type="number"
+                value={pt.value}
+                onChange={(e) => {
+                  const updated = [...baseTimeCurve]
+                  updated[i] = { ...updated[i], value: Number(e.target.value) || 0 }
+                  setBaseTimeCurve(updated)
+                }}
+                className="w-16 px-2 py-1 bg-slate-900 border border-slate-800 rounded text-center text-slate-202 font-semibold focus:outline-none"
+              />
+              <button
+                onClick={() => setBaseTimeCurve(baseTimeCurve.filter((_, j) => j !== i))}
+                className="p-1 rounded text-slate-400 hover:bg-rose-955/25 hover:text-rose-455 transition-all cursor-pointer"
+              >
+                <XIcon />
+              </button>
+            </div>
+          ))}
+        </div>
+        
+        <button
+          onClick={() => setBaseTimeCurve([...baseTimeCurve, { time: 600, value: 50 }])}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-950 hover:bg-slate-900 text-slate-300 border border-slate-855 transition-all cursor-pointer"
+        >
+          <PlusIcon /> Add Point
+        </button>
+      </div>
+
+      {/* Save / Discard Actions */}
+      <div className="flex items-center justify-between border-t border-slate-800 pt-4 mt-4">
+        <div className="flex gap-2">
+          <button
+            onClick={handleSave}
+            className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-955 shadow-md shadow-cyan-950/20 transition-all active:scale-95 cursor-pointer"
+          >
+            <CheckIcon /> Save Recovery Plan
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-955 hover:bg-slate-900 text-slate-400 border border-slate-850 transition-all cursor-pointer"
+          >
+            Discard
+          </button>
+        </div>
+        {onDelete && (
+          <button
+            onClick={onDelete}
+            className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-rose-955/35 hover:bg-rose-900/30 text-rose-455 border border-rose-800/30 transition-all cursor-pointer"
+          >
+            <TrashIcon /> Delete
+          </button>
+        )}
       </div>
     </div>
   )

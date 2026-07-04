@@ -8,6 +8,8 @@ export interface ScheduledItem {
   source: 'routine' | 'obligation' | 'recovery' | 'adhoc' | 'event'
   weight: number             // resolved weight at placement time
   day: number                // 0 = today, 1 = tomorrow, etc.
+  sourceId?: string          // e.g. ID of the routine, obligation, recovery, or event
+  sourceName?: string        // e.g. Name of the routine, obligation, recovery, or event
 }
 
 // An anchor confirmation (user-reported actual transition)

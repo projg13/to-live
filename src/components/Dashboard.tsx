@@ -11,10 +11,88 @@ import { formatTime } from '../types/anchor'
 import type { AdhocTask, ScheduledItem } from '../types/scheduler'
 import type { ResolveContext } from '../store/schedulerStore'
 
+// --- Custom SVGs for a polished, cute look ---
+const UndoIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+  </svg>
+)
+
+const ResetIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H17" />
+  </svg>
+)
+
+const ClockIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+)
+
+const CalendarIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+)
+
+const PlusIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+  </svg>
+)
+
+const ActivityIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+  </svg>
+)
+
+const CheckIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+)
+
+const PostponeIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+)
+
+const SkipIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+  </svg>
+)
+
+const ArrowUpIcon = () => (
+  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+  </svg>
+)
+
+const ArrowDownIcon = () => (
+  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+  </svg>
+)
+
+const TrashIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+)
+const InfoIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+)
+
 function Dashboard() {
   const scheduler = useSchedulerStore()
   const { tasks } = useTaskStore()
-  const { anchors } = useAnchorStore()
+  const { anchors, templates } = useAnchorStore()
   const { blocks } = useBlockStore()
   const { routines } = useRoutineStore()
   const { obligations } = useObligationStore()
@@ -31,8 +109,7 @@ function Dashboard() {
   const [showDoneAt, setShowDoneAt] = useState<string | null>(null)
   const [doneAtTime, setDoneAtTime] = useState('')
   const [showInsertAt, setShowInsertAt] = useState<{ taskId: string; position: 'above' | 'below' } | null>(null)
-
-  const { templates } = useAnchorStore()
+  const [showInfo, setShowInfo] = useState<string | null>(null)
 
   const buildContext = (): ResolveContext => ({
     tasks: JSON.parse(JSON.stringify(tasks)),
@@ -49,7 +126,23 @@ function Dashboard() {
 
   useEffect(() => {
     scheduler.resolve(buildContext())
-  }, [tasks, anchors, blocks, routines, obligations, recoveryPlans, dayPlans, weekPlan, calendarEvents, scheduler.confirmedAnchors, scheduler.adhocTasks, scheduler.skippedTaskIds, scheduler.doneTasks, scheduler.postponedTasks, scheduler.lastDoneAt])
+  }, [
+    tasks,
+    anchors,
+    blocks,
+    routines,
+    obligations,
+    recoveryPlans,
+    dayPlans,
+    weekPlan,
+    calendarEvents,
+    scheduler.confirmedAnchors,
+    scheduler.adhocTasks,
+    scheduler.skippedTaskIds,
+    scheduler.doneTasks,
+    scheduler.postponedTasks,
+    scheduler.lastDoneAt,
+  ])
 
   const schedule = scheduler.schedule
   const daySchedule = schedule?.days[selectedDay]
@@ -64,17 +157,21 @@ function Dashboard() {
   // Use resolved anchors from the schedule (they shift with overflow)
   if (daySchedule?.resolvedAnchors) {
     for (const ra of daySchedule.resolvedAnchors) {
-      timelineItems.push({ type: 'anchor', time: ra.actualTime, data: { id: ra.anchorId, name: ra.anchorName, spikeTime: ra.actualTime } })
+      timelineItems.push({
+        type: 'anchor',
+        time: ra.actualTime,
+        data: { id: ra.anchorId, name: ra.anchorName, spikeTime: ra.actualTime },
+      })
     }
   }
 
-  // Add done items (greyed out, from stored positions)
+  // Add done items
   const dayDoneItems = scheduler.doneItems.filter((i) => i.day === selectedDay)
   for (const item of dayDoneItems) {
     timelineItems.push({ type: 'task', time: item.startMinutes, data: item })
   }
 
-  // Add active scheduled tasks (exclude done ones to avoid duplicates)
+  // Add active scheduled tasks (exclude done ones)
   if (daySchedule) {
     for (const item of daySchedule.items) {
       if (!scheduler.doneTasks.includes(item.taskId)) {
@@ -87,78 +184,180 @@ function Dashboard() {
   timelineItems.sort((a, b) => a.time - b.time)
 
   return (
-    <div>
+    <div className="space-y-6">
       {/* Virtual time + controls */}
-      <div style={{ marginBottom: 12, padding: 8, border: '1px solid #999' }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span>Virtual Time: <strong>{formatTime(virtualTime)}</strong></span>
-          <input
-            type="range"
-            min={0}
-            max={1439}
-            value={virtualTime}
-            onChange={(e) => setVirtualTime(Number(e.target.value))}
-            style={{ flex: 1, minWidth: 150 }}
-          />
-          <button onClick={() => scheduler.undo()}>Undo</button>
-          <button onClick={() => scheduler.clearSchedule()}>Reset</button>
+      <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 shadow-lg shadow-indigo-950/10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-950 text-cyan-400 flex items-center justify-center border border-slate-800 shadow-inner">
+              <ClockIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Virtual Time</div>
+              <div className="font-mono text-2xl font-bold tracking-tight text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.25)]">
+                {formatTime(virtualTime)}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 max-w-md mx-2">
+            <input
+              type="range"
+              min={0}
+              max={1439}
+              value={virtualTime}
+              onChange={(e) => setVirtualTime(Number(e.target.value))}
+              className="w-full h-2 bg-slate-950 border border-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+            />
+            <div className="flex justify-between text-[10px] text-slate-500 font-mono mt-1 px-1">
+              <span>00:00</span>
+              <span>06:00</span>
+              <span>12:00</span>
+              <span>18:00</span>
+              <span>23:59</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => scheduler.undo()}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-slate-950/65 hover:bg-slate-900 text-slate-300 transition-all border border-slate-850 active:scale-95 cursor-pointer"
+            >
+              <UndoIcon />
+              Undo
+            </button>
+            <button
+              onClick={() => scheduler.clearSchedule()}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-slate-950/65 hover:bg-slate-900 text-rose-400 transition-all border border-slate-850 active:scale-95 cursor-pointer"
+            >
+              <ResetIcon />
+              Reset
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Week tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
-        {schedule?.days.map((day, i) => (
-          <button
-            key={i}
-            onClick={() => setSelectedDay(i)}
-            style={{
-              padding: '6px 10px',
-              fontWeight: selectedDay === i ? 'bold' : 'normal',
-              borderBottom: selectedDay === i ? '2px solid #333' : 'none',
-            }}
-          >
-            {i === 0 ? 'Today' : new Date(day.date).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}
-          </button>
-        )) ?? <span>Loading...</span>}
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        {schedule?.days.map((day, i) => {
+          const isSelected = selectedDay === i
+          return (
+            <button
+              key={i}
+              onClick={() => setSelectedDay(i)}
+              className={`flex-none px-4 py-2.5 rounded-full text-xs font-bold tracking-wide transition-all active:scale-95 shadow-sm border cursor-pointer ${
+                isSelected
+                  ? 'bg-gradient-to-r from-cyan-500 to-indigo-500 text-white border-transparent shadow-md shadow-indigo-950/30'
+                  : 'bg-slate-950/40 hover:bg-slate-900 text-slate-400 border-slate-900'
+              }`}
+            >
+              {i === 0 ? 'Today' : new Date(day.date).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}
+            </button>
+          )
+        }) ?? <div className="text-sm text-slate-500 animate-pulse py-2">Loading Week Planner...</div>}
       </div>
 
       {daySchedule && (
-        <div>
-          {/* Day header */}
-          <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <div className="space-y-6">
+          {/* Day header & quick controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-900/60 pb-4">
             <div>
-              <strong>{daySchedule.dayPlanName}</strong>
-              <span style={{ fontSize: 12, marginLeft: 8 }}>{daySchedule.date}</span>
+              <h2 className="text-xl font-bold tracking-tight text-slate-100">
+                {daySchedule.dayPlanName}
+              </h2>
+              <div className="text-xs text-slate-450 mt-0.5 flex items-center gap-1.5">
+                <CalendarIcon />
+                {daySchedule.date}
+              </div>
             </div>
-            <button onClick={() => setShowAdhocForm(!showAdhocForm)}>+ Ad-hoc</button>
-            <button onClick={() => setShowInsertForm(!showInsertForm)}>+ Insert</button>
-            <button onClick={() => setShowRecovery(!showRecovery)}>Recovery</button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setShowAdhocForm(!showAdhocForm)
+                  setShowInsertForm(false)
+                  setShowRecovery(false)
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold tracking-wide transition-all border cursor-pointer ${
+                  showAdhocForm
+                    ? 'bg-cyan-500 border-transparent text-slate-950 shadow-md shadow-cyan-950/40'
+                    : 'bg-cyan-950/20 text-cyan-400 hover:bg-cyan-950/40 border-cyan-800/30'
+                }`}
+              >
+                <PlusIcon />
+                Ad-hoc
+              </button>
+              <button
+                onClick={() => {
+                  setShowInsertForm(!showInsertForm)
+                  setShowAdhocForm(false)
+                  setShowRecovery(false)
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold tracking-wide transition-all border cursor-pointer ${
+                  showInsertForm
+                    ? 'bg-cyan-500 border-transparent text-slate-950 shadow-md shadow-cyan-950/40'
+                    : 'bg-cyan-950/20 text-cyan-400 hover:bg-cyan-950/40 border-cyan-800/30'
+                }`}
+              >
+                <PlusIcon />
+                Insert
+              </button>
+              <button
+                onClick={() => {
+                  setShowRecovery(!showRecovery)
+                  setShowAdhocForm(false)
+                  setShowInsertForm(false)
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold tracking-wide transition-all border cursor-pointer ${
+                  showRecovery
+                    ? 'bg-rose-500 border-transparent text-white shadow-md shadow-rose-950/40'
+                    : 'bg-rose-950/20 text-rose-450 hover:bg-rose-950/40 border-rose-800/30'
+                }`}
+              >
+                <ActivityIcon />
+                Recovery
+              </button>
+            </div>
           </div>
 
+          {/* Conditional panels */}
           {showAdhocForm && (
-            <AdhocTaskForm
-              day={selectedDay}
-              onAdd={(task) => { scheduler.addAdhocTask(task); setShowAdhocForm(false) }}
-              onCancel={() => setShowAdhocForm(false)}
-            />
+            <div className="bg-slate-950/30 border border-slate-850 rounded-2xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <AdhocTaskForm
+                day={selectedDay}
+                onAdd={(task) => {
+                  scheduler.addAdhocTask(task)
+                  setShowAdhocForm(false)
+                }}
+                onCancel={() => setShowAdhocForm(false)}
+              />
+            </div>
           )}
 
           {showInsertForm && (
-            <InsertTaskForm
-              tasks={tasks}
-              onInsert={(taskId, startTime) => { scheduler.insertTask(taskId, startTime, selectedDay); setShowInsertForm(false) }}
-              onCancel={() => setShowInsertForm(false)}
-            />
+            <div className="bg-slate-950/30 border border-slate-850 rounded-2xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <InsertTaskForm
+                tasks={tasks}
+                onInsert={(taskId, startTime) => {
+                  scheduler.insertTask(taskId, startTime, selectedDay)
+                  setShowInsertForm(false)
+                }}
+                onCancel={() => setShowInsertForm(false)}
+              />
+            </div>
           )}
 
           {showRecovery && (
-            <RecoveryQuickPanel onClose={() => setShowRecovery(false)} />
+            <div className="bg-slate-950/30 border border-slate-850 rounded-2xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <RecoveryQuickPanel onClose={() => setShowRecovery(false)} />
+            </div>
           )}
 
           {/* Timeline: anchors + tasks interleaved */}
-          <div>
+          <div className="relative pl-6 ml-4 border-l-2 border-dashed border-slate-800 space-y-6">
             {timelineItems.length === 0 && (
-              <p style={{ fontSize: 12, fontStyle: 'italic' }}>No items.</p>
+              <p className="text-sm italic text-slate-500 py-4 pl-2">
+                No items scheduled for today.
+              </p>
             )}
             {timelineItems.map((entry, i) => {
               if (entry.type === 'anchor') {
@@ -167,29 +366,48 @@ function Dashboard() {
                 const displayTime = conf?.actualTime ?? anchor.spikeTime
 
                 return (
-                  <div key={`anchor-${i}`} style={{
-                    padding: '6px 0',
-                    borderTop: '2px solid #333',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}>
-                    <span style={{ fontFamily: 'monospace', fontSize: 13 }}>
-                      {formatTime(displayTime)}
-                    </span>
-                    <strong>{anchor.name}</strong>
-                    <input
-                      type="time"
-                      value={toTimeStr(displayTime)}
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          const [h, m] = e.target.value.split(':').map(Number)
-                          scheduler.confirmAnchor({ anchorId: anchor.id, actualTime: (h || 0) * 60 + (m || 0), day: selectedDay })
-                        }
-                      }}
-                      style={{ fontSize: 11, width: 90 }}
-                    />
-                    {conf && <span style={{ fontSize: 11 }}>(edited)</span>}
+                  <div
+                    key={`anchor-${i}`}
+                    className="relative group transition-all duration-300 hover:translate-x-1"
+                  >
+                    {/* Timeline Node Icon */}
+                    <div className="absolute -left-[35px] top-1.5 w-6 h-6 rounded-full bg-indigo-950 text-indigo-400 flex items-center justify-center border-2 border-[#0b0f19] shadow-sm">
+                      <ClockIcon className="w-3.5 h-3.5" />
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-indigo-950/10 border border-indigo-900/30 rounded-2xl p-4">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-xs font-bold text-indigo-400 bg-indigo-950/40 px-2.5 py-1 rounded-lg border border-indigo-900/40">
+                          {formatTime(displayTime)}
+                        </span>
+                        <div>
+                          <strong className="text-slate-200 font-semibold">{anchor.name}</strong>
+                          {conf && (
+                            <span className="text-[10px] text-indigo-455 font-bold ml-2 uppercase tracking-wider bg-indigo-950/50 px-1.5 py-0.5 rounded border border-indigo-900/20">
+                              Confirmed
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="time"
+                          value={toTimeStr(displayTime)}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              const [h, m] = e.target.value.split(':').map(Number)
+                              scheduler.confirmAnchor({
+                                anchorId: anchor.id,
+                                actualTime: (h || 0) * 60 + (m || 0),
+                                day: selectedDay,
+                              })
+                            }
+                          }}
+                          className="text-xs px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-250 focus:ring-2 focus:ring-indigo-500/25 focus:outline-none w-28 cursor-pointer"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )
               }
@@ -202,122 +420,311 @@ function Dashboard() {
               const isCurrent = virtualTime >= item.startMinutes && virtualTime < item.endMinutes
               const weightPct = Math.round((item.weight / maxWeight) * 100)
 
+              let borderClass = 'border-slate-850 bg-slate-900/30'
+              let glowDot = 'bg-slate-700'
+
+              if (isCurrent) {
+                borderClass = 'border-cyan-500/50 bg-cyan-950/10 shadow-lg shadow-cyan-950/15 ring-2 ring-cyan-500/10'
+                glowDot = 'bg-cyan-400'
+              } else if (isDone) {
+                borderClass = 'border-slate-850/50 bg-slate-950/15 opacity-55'
+                glowDot = 'bg-emerald-450'
+              } else if (isSkipped) {
+                borderClass = 'border-dashed border-slate-800/80 bg-slate-950/10 opacity-45'
+                glowDot = 'bg-slate-600'
+              } else if (isPostponed) {
+                borderClass = 'border-slate-850/60 bg-slate-950/20 opacity-55'
+                glowDot = 'bg-amber-400'
+              }
+
               return (
-                <div key={`task-${item.taskId}-${i}`}>
-                  <div
-                    style={{
-                      borderTop: '1px solid #eee',
-                      padding: '6px 0',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      paddingLeft: item.isBackground ? 20 : 0,
-                      fontStyle: item.isBackground ? 'italic' : 'normal',
-                      opacity: (isSkipped || isDone || isPostponed) ? 0.4 : 1,
-                      fontWeight: isCurrent ? 'bold' : 'normal',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 40, height: 12, border: '1px solid #999', position: 'relative' }}>
-                        <div style={{ width: `${weightPct}%`, height: '100%', background: '#333' }} />
-                      </div>
-                      <span style={{ fontFamily: 'monospace', fontSize: 12 }}>
-                        {formatTime(item.startMinutes)}–{formatTime(item.endMinutes)}
-                      </span>
-                      <span>
-                        {isCurrent && '> '}
-                        {item.isBackground ? '~ ' : ''}
-                        {item.title}
-                        {isDone && ' [done]'}
-                        {isPostponed && ' [postponed]'}
-                      </span>
-                      <span style={{ fontSize: 11 }}>w:{Math.round(item.weight)}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      {!isDone && !isPostponed && !isSkipped && (
-                        <>
-                          <button onClick={() => { setShowDoneAt(showDoneAt === item.taskId ? null : item.taskId); setDoneAtTime(toTimeStr(virtualTime)) }} style={{ fontSize: 11 }}>done</button>
-                          <button onClick={() => scheduler.postpone(item.taskId)} style={{ fontSize: 11 }}>postpone</button>
-                          <button onClick={() => setShowPrepone(showPrepone === item.taskId ? null : item.taskId)} style={{ fontSize: 11 }}>prepone</button>
-                          <button onClick={() => scheduler.skipTask(item.taskId)} style={{ fontSize: 11 }}>skip</button>
-                        </>
-                      )}
-                      {isSkipped && (
-                        <button onClick={() => scheduler.unskipTask(item.taskId)} style={{ fontSize: 11 }}>unskip</button>
-                      )}
-                      {(isDone || isPostponed) && (
-                        <button onClick={() => scheduler.unmarkTask(item.taskId)} style={{ fontSize: 11 }}>undo</button>
-                      )}
-                      {item.source === 'adhoc' && (
-                        <button onClick={() => scheduler.removeAdhocTask(item.taskId)} style={{ fontSize: 11 }}>x</button>
-                      )}
-                      <button onClick={() => setShowInsertAt({ taskId: item.taskId, position: 'above' })} style={{ fontSize: 11 }}>+above</button>
-                      <button onClick={() => setShowInsertAt({ taskId: item.taskId, position: 'below' })} style={{ fontSize: 11 }}>+below</button>
-                    </div>
+                <div
+                  key={`task-${item.taskId}-${i}`}
+                  className="relative group transition-all duration-300 hover:translate-x-1"
+                >
+                  {/* Timeline node marker */}
+                  <div className="absolute -left-[35px] top-4 w-6 h-6 rounded-full bg-slate-950 flex items-center justify-center border-2 border-slate-800 shadow-sm z-10">
+                    <span className={`w-2.5 h-2.5 rounded-full ${glowDot}`} />
+                    {isCurrent && (
+                      <span className="absolute w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping opacity-75" />
+                    )}
                   </div>
 
-                  {/* Done at time picker */}
-                  {showDoneAt === item.taskId && (
-                    <div style={{ padding: '4px 0 8px 48px', display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <span style={{ fontSize: 12 }}>Done at:</span>
-                      <input
-                        type="time"
-                        value={doneAtTime}
-                        onChange={(e) => setDoneAtTime(e.target.value)}
-                      />
-                      <button onClick={() => {
-                        if (doneAtTime) {
-                          const [h, m] = doneAtTime.split(':').map(Number)
-                          scheduler.markDoneAt(item.taskId, (h || 0) * 60 + (m || 0), selectedDay)
-                        } else {
-                          scheduler.markDone(item.taskId)
-                        }
-                        setShowDoneAt(null)
-                        setDoneAtTime('')
-                      }} style={{ fontSize: 11 }}>confirm</button>
-                      <button onClick={() => {
-                        scheduler.markDone(item.taskId)
-                        setShowDoneAt(null)
-                        setDoneAtTime('')
-                      }} style={{ fontSize: 11 }}>now</button>
-                      <button onClick={() => { setShowDoneAt(null); setDoneAtTime('') }} style={{ fontSize: 11 }}>cancel</button>
-                    </div>
-                  )}
+                  <div className={`border rounded-2xl p-4 shadow-sm transition-all duration-300 ${borderClass}`}>
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                      
+                      {/* Left: Weight, Time, and Title info */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        {/* Weight progress bar */}
+                        <div className="w-12 h-2.5 bg-slate-950 border border-slate-850 rounded-full overflow-hidden relative shadow-inner">
+                          <div
+                            className="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 rounded-full shadow-[0_0_6px_rgba(34,211,238,0.45)]"
+                            style={{ width: `${weightPct}%` }}
+                          />
+                        </div>
 
-                  {/* Prepone form */}
-                  {showPrepone === item.taskId && (
-                    <div style={{ padding: '4px 0 8px 48px', display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <span style={{ fontSize: 12 }}>Move to:</span>
-                      <input
-                        type="time"
-                        value={preponeTime}
-                        onChange={(e) => setPreponeTime(e.target.value)}
-                      />
-                      <button onClick={() => {
-                        if (preponeTime) {
-                          const [h, m] = preponeTime.split(':').map(Number)
-                          scheduler.preponeTask(item.taskId, (h || 0) * 60 + (m || 0), selectedDay)
-                          setShowPrepone(null)
-                          setPreponeTime('')
-                        }
-                      }} style={{ fontSize: 11 }}>move</button>
-                      <button onClick={() => { setShowPrepone(null); setPreponeTime('') }} style={{ fontSize: 11 }}>cancel</button>
-                    </div>
-                  )}
+                        {/* Start/End Time block */}
+                        <span className="font-mono text-xs font-bold text-slate-400 bg-slate-950/60 border border-slate-850 px-2.5 py-1 rounded-lg">
+                          {formatTime(item.startMinutes)}–{formatTime(item.endMinutes)}
+                        </span>
 
-                  {/* Insert above/below */}
-                  {showInsertAt?.taskId === item.taskId && (
-                    <InlineInsertForm
-                      tasks={tasks}
-                      targetTime={showInsertAt.position === 'above' ? item.startMinutes : item.endMinutes}
-                      label={showInsertAt.position === 'above' ? `Insert above (@ ${formatTime(item.startMinutes)})` : `Insert below (@ ${formatTime(item.endMinutes)})`}
-                      onInsert={(taskId, startTime) => {
-                        scheduler.insertTask(taskId, startTime, selectedDay)
-                        setShowInsertAt(null)
-                      }}
-                      onCancel={() => setShowInsertAt(null)}
-                    />
-                  )}
+                        {/* Title & Status */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {isCurrent && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider text-cyan-400 bg-cyan-950/40 border border-cyan-850/30 shadow-[0_0_6px_rgba(34,211,238,0.15)] animate-pulse">
+                              Now
+                            </span>
+                          )}
+                          <span className={`font-semibold text-slate-202 ${item.isBackground ? 'italic text-slate-450' : ''} ${isDone ? 'line-through text-slate-500' : ''}`}>
+                            {item.isBackground ? '☁️ ' : ''}
+                            {item.title}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const key = `${item.taskId}-${item.startMinutes}`
+                              setShowInfo(showInfo === key ? null : key)
+                            }}
+                            className="p-1 rounded bg-slate-950/65 hover:bg-slate-900 text-slate-400 hover:text-cyan-400 border border-slate-850 cursor-pointer"
+                            title="Task Info Details"
+                          >
+                            <InfoIcon />
+                          </button>
+                          {isDone && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-950/35 text-emerald-400 border border-emerald-800/30">
+                              Done
+                            </span>
+                          )}
+                          {isPostponed && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-950/35 text-amber-400 border border-amber-800/30">
+                              Postponed
+                            </span>
+                          )}
+                          {isSkipped && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-950/40 text-slate-400 border border-slate-800/30">
+                              Skipped
+                            </span>
+                          )}
+                        </div>
+
+                        <span className="text-[10px] text-slate-500 font-bold tracking-wide">
+                          w:{Math.round(item.weight)}
+                        </span>
+                      </div>
+
+                      {/* Right: Actions */}
+                      <div className="flex items-center gap-1.5 flex-wrap self-end lg:self-auto">
+                        {!isDone && !isPostponed && !isSkipped && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setShowDoneAt(showDoneAt === item.taskId ? null : item.taskId)
+                                setDoneAtTime(toTimeStr(virtualTime))
+                              }}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-emerald-950/30 hover:bg-emerald-900/30 text-emerald-400 border border-emerald-800/30 transition-all active:scale-95 cursor-pointer"
+                            >
+                              <CheckIcon />
+                              Done
+                            </button>
+                            <button
+                              onClick={() => scheduler.postpone(item.taskId)}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-amber-950/30 hover:bg-amber-900/30 text-amber-400 border border-amber-800/30 transition-all active:scale-95 cursor-pointer"
+                            >
+                              <PostponeIcon />
+                              Postpone
+                            </button>
+                            <button
+                              onClick={() => setShowPrepone(showPrepone === item.taskId ? null : item.taskId)}
+                              className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-950/60 hover:bg-slate-900 text-slate-405 border border-slate-850 transition-all active:scale-95 cursor-pointer"
+                            >
+                              Prepone
+                            </button>
+                            <button
+                              onClick={() => scheduler.skipTask(item.taskId)}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-950/60 hover:bg-slate-900 text-slate-400 border border-slate-850 transition-all active:scale-95 cursor-pointer"
+                            >
+                              <SkipIcon />
+                              Skip
+                            </button>
+                          </>
+                        )}
+                        {isSkipped && (
+                          <button
+                            onClick={() => scheduler.unskipTask(item.taskId)}
+                            className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-950/80 hover:bg-slate-900 text-slate-300 transition-all border border-slate-850 active:scale-95 cursor-pointer"
+                          >
+                            Unskip
+                          </button>
+                        )}
+                        {(isDone || isPostponed) && (
+                          <button
+                            onClick={() => scheduler.unmarkTask(item.taskId)}
+                            className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-cyan-950/30 hover:bg-cyan-900/30 text-cyan-400 border border-cyan-800/30 transition-all active:scale-95 cursor-pointer"
+                          >
+                            Undo
+                          </button>
+                        )}
+                        {item.source === 'adhoc' && (
+                          <button
+                            onClick={() => scheduler.removeAdhocTask(item.taskId)}
+                            className="p-1 rounded-xl bg-rose-950/30 hover:bg-rose-900/30 text-rose-450 border border-rose-800/30 transition-all cursor-pointer"
+                          >
+                            <TrashIcon />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setShowInsertAt({ taskId: item.taskId, position: 'above' })}
+                          className="p-1 px-1.5 rounded-xl bg-slate-950/40 hover:bg-slate-900 text-slate-400 transition-all flex items-center gap-0.5 border border-slate-850 cursor-pointer"
+                          title="Insert above"
+                        >
+                          <ArrowUpIcon />
+                          <span className="text-[9px]">above</span>
+                        </button>
+                        <button
+                          onClick={() => setShowInsertAt({ taskId: item.taskId, position: 'below' })}
+                          className="p-1 px-1.5 rounded-xl bg-slate-950/40 hover:bg-slate-900 text-slate-400 transition-all flex items-center gap-0.5 border border-slate-850 cursor-pointer"
+                          title="Insert below"
+                        >
+                          <ArrowDownIcon />
+                          <span className="text-[9px]">below</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Conditional: Done at time picker */}
+                    {showDoneAt === item.taskId && (
+                      <div className="mt-3 ml-2 pl-4 border-l-2 border-emerald-450 flex flex-wrap gap-2 items-center bg-emerald-950/10 border border-emerald-900/20 p-3 rounded-xl">
+                        <span className="text-xs font-bold text-slate-400">Done at:</span>
+                        <input
+                          type="time"
+                          value={doneAtTime}
+                          onChange={(e) => setDoneAtTime(e.target.value)}
+                          className="text-xs px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:ring-1 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                        />
+                        <button
+                          onClick={() => {
+                            if (doneAtTime) {
+                              const [h, m] = doneAtTime.split(':').map(Number)
+                              scheduler.markDoneAt(item.taskId, (h || 0) * 60 + (m || 0), selectedDay)
+                            } else {
+                              scheduler.markDone(item.taskId)
+                            }
+                            setShowDoneAt(null)
+                            setDoneAtTime('')
+                          }}
+                          className="px-2.5 py-1 text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-lg transition-all cursor-pointer"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => {
+                            scheduler.markDone(item.taskId)
+                            setShowDoneAt(null)
+                            setDoneAtTime('')
+                          }}
+                          className="px-2.5 py-1 text-xs font-semibold bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 rounded-lg transition-all cursor-pointer"
+                        >
+                          Now
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowDoneAt(null)
+                            setDoneAtTime('')
+                          }}
+                          className="px-2.5 py-1 text-xs font-semibold text-slate-450 hover:text-slate-200 transition-all cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Conditional: Prepone form */}
+                    {showPrepone === item.taskId && (
+                      <div className="mt-3 ml-2 pl-4 border-l-2 border-indigo-400 flex flex-wrap gap-2 items-center bg-indigo-950/10 border border-indigo-900/20 p-3 rounded-xl">
+                        <span className="text-xs font-bold text-slate-400">Move to:</span>
+                        <input
+                          type="time"
+                          value={preponeTime}
+                          onChange={(e) => setPreponeTime(e.target.value)}
+                          className="text-xs px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:ring-1 focus:ring-indigo-500 focus:outline-none cursor-pointer"
+                        />
+                        <button
+                          onClick={() => {
+                            if (preponeTime) {
+                              const [h, m] = preponeTime.split(':').map(Number)
+                              scheduler.preponeTask(item.taskId, (h || 0) * 60 + (m || 0), selectedDay)
+                              setShowPrepone(null)
+                              setPreponeTime('')
+                            }
+                          }}
+                          className="px-2.5 py-1 text-xs font-bold bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-all cursor-pointer"
+                        >
+                          Move
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowPrepone(null)
+                            setPreponeTime('')
+                          }}
+                          className="px-2.5 py-1 text-xs font-semibold text-slate-450 hover:text-slate-200 transition-all cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Conditional: Info Details */}
+                    {showInfo === `${item.taskId}-${item.startMinutes}` && (
+                      <div className="mt-3 p-3.5 bg-slate-950/80 border border-slate-850 rounded-xl space-y-2 text-xs">
+                        <div className="flex justify-between items-center border-b border-slate-850 pb-1.5 mb-1.5">
+                          <span className="font-bold text-slate-205">Scheduling Metadata</span>
+                          <span className="text-[10px] text-slate-500 font-mono">ID: {item.taskId}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                          <div>
+                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Source type</span>
+                            <span className="text-slate-350 capitalize font-medium">{item.source}</span>
+                          </div>
+                          {item.sourceName && (
+                            <div>
+                              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Origin name</span>
+                              <span className="text-slate-300 font-semibold">{item.sourceName}</span>
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Resolved weight</span>
+                            <span className="text-cyan-405 font-mono font-bold">{Math.round(item.weight)}</span>
+                          </div>
+                          {item.sourceId && (
+                            <div className="col-span-2">
+                              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Origin ID</span>
+                              <span className="text-slate-400 font-mono text-[10px] break-all">{item.sourceId}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Conditional: Insert above/below */}
+                    {showInsertAt?.taskId === item.taskId && (
+                      <div className="mt-3 bg-slate-950 border border-slate-850 rounded-xl p-3">
+                        <InlineInsertForm
+                          tasks={tasks}
+                          targetTime={showInsertAt.position === 'above' ? item.startMinutes : item.endMinutes}
+                          label={
+                            showInsertAt.position === 'above'
+                              ? `Insert above (@ ${formatTime(item.startMinutes)})`
+                              : `Insert below (@ ${formatTime(item.endMinutes)})`
+                          }
+                          onInsert={(taskId, startTime) => {
+                            scheduler.insertTask(taskId, startTime, selectedDay)
+                            setShowInsertAt(null)
+                          }}
+                          onCancel={() => setShowInsertAt(null)}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               )
             })}
@@ -327,6 +734,8 @@ function Dashboard() {
     </div>
   )
 }
+
+// --- Inner Components Styled Beautifully ---
 
 function AdhocTaskForm({
   day,
@@ -343,21 +752,72 @@ function AdhocTaskForm({
   const [weight, setWeight] = useState(100)
 
   return (
-    <div style={{ border: '1px solid #999', padding: 8, marginBottom: 8 }}>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
-        <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-        <input type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value) || 0)} style={{ width: 50 }} />
-        <span style={{ fontSize: 12 }}>min</span>
-        <input type="number" value={weight} onChange={(e) => setWeight(Number(e.target.value) || 0)} style={{ width: 50 }} />
-        <span style={{ fontSize: 12 }}>weight</span>
-        <button onClick={() => {
-          if (title && startTime) {
-            const [h, m] = startTime.split(':').map(Number)
-            onAdd({ id: crypto.randomUUID(), title, durationMinutes: duration, startTime: (h || 0) * 60 + (m || 0), day, weight })
-          }
-        }}>Add</button>
-        <button onClick={onCancel}>Cancel</button>
+    <div className="space-y-4">
+      <h3 className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+        <PlusIcon /> Add Ad-hoc Task
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Task title..."
+          className="text-sm px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none"
+        />
+        <div className="flex items-center gap-1.5 bg-slate-955 border border-slate-800 rounded-xl px-3 text-sm">
+          <span className="text-slate-450 font-semibold">Starts:</span>
+          <input
+            type="time"
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+            className="w-full bg-transparent border-none text-slate-200 focus:outline-none p-1 cursor-pointer"
+          />
+        </div>
+        <div className="flex items-center bg-slate-955 border border-slate-800 rounded-xl px-3.5 text-sm gap-2">
+          <span className="text-slate-455 font-semibold whitespace-nowrap">Duration:</span>
+          <input
+            type="number"
+            value={duration}
+            onChange={(e) => setDuration(Number(e.target.value) || 0)}
+            className="w-full bg-transparent border-none text-slate-200 focus:outline-none p-1"
+          />
+          <span className="text-slate-405 text-xs font-semibold">min</span>
+        </div>
+        <div className="flex items-center bg-slate-955 border border-slate-800 rounded-xl px-3.5 text-sm gap-2">
+          <span className="text-slate-455 font-semibold whitespace-nowrap">Weight:</span>
+          <input
+            type="number"
+            value={weight}
+            onChange={(e) => setWeight(Number(e.target.value) || 0)}
+            className="w-full bg-transparent border-none text-slate-200 focus:outline-none p-1"
+          />
+        </div>
+      </div>
+      <div className="flex items-center justify-end gap-2 pt-2">
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-950 hover:bg-slate-900 text-slate-400 border border-slate-850 transition-all cursor-pointer"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => {
+            if (title && startTime) {
+              const [h, m] = startTime.split(':').map(Number)
+              onAdd({
+                id: crypto.randomUUID(),
+                title,
+                durationMinutes: duration,
+                startTime: (h || 0) * 60 + (m || 0),
+                day,
+                weight,
+              })
+            }
+          }}
+          className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-950 shadow-md shadow-cyan-950/40 transition-all active:scale-95 cursor-pointer"
+        >
+          Add Task
+        </button>
       </div>
     </div>
   )
@@ -366,9 +826,9 @@ function AdhocTaskForm({
 function InlineInsertForm({
   tasks,
   targetTime,
-  label,
   onInsert,
   onCancel,
+  label,
 }: {
   tasks: { id: string; title: string; durationMinutes: number }[]
   targetTime: number
@@ -377,35 +837,40 @@ function InlineInsertForm({
   onCancel: () => void
 }) {
   const [search, setSearch] = useState('')
-  const filtered = tasks.filter((t) =>
-    t.title.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = tasks.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <div style={{ padding: '4px 0 8px 48px' }}>
-      <span style={{ fontSize: 12, fontWeight: 'bold' }}>{label}</span>
-      <div style={{ marginTop: 4 }}>
+    <div className="space-y-3">
+      <span className="text-xs font-bold text-slate-400">{label}</span>
+      <div className="relative">
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search tasks..."
-          style={{ width: '100%' }}
+          placeholder="Search registered tasks to insert..."
+          className="w-full text-xs px-3.5 py-2.5 bg-slate-955 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none placeholder-slate-500"
         />
         {search && filtered.length > 0 && (
-          <div style={{ maxHeight: 100, overflow: 'auto', border: '1px solid #ccc', padding: 4, marginTop: 2 }}>
+          <div className="absolute z-20 w-full mt-1.5 max-h-40 overflow-y-auto bg-slate-900 border border-slate-800 rounded-xl shadow-lg p-1.5 divide-y divide-slate-850">
             {filtered.slice(0, 8).map((t) => (
               <div
                 key={t.id}
                 onClick={() => onInsert(t.id, targetTime)}
-                style={{ padding: '2px 4px', cursor: 'pointer', fontSize: 12 }}
+                className="px-3 py-2 text-xs text-slate-300 hover:text-cyan-400 hover:bg-slate-850/50 cursor-pointer rounded-lg font-bold transition-all"
               >
-                {t.title} ({t.durationMinutes}min)
+                {t.title} <span className="text-slate-500 font-normal text-[10px] ml-1.5">({t.durationMinutes} min)</span>
               </div>
             ))}
           </div>
         )}
-        <button onClick={onCancel} style={{ marginTop: 4, fontSize: 11 }}>cancel</button>
+      </div>
+      <div className="flex justify-end">
+        <button
+          onClick={onCancel}
+          className="px-3.5 py-1.5 text-[11px] font-semibold text-slate-450 hover:text-slate-200 rounded-lg hover:bg-slate-900 transition-all cursor-pointer"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   )
@@ -424,49 +889,86 @@ function InsertTaskForm({
   const [selectedTaskId, setSelectedTaskId] = useState('')
   const [startTime, setStartTime] = useState('')
 
-  const filtered = tasks.filter((t) =>
-    t.title.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = tasks.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <div style={{ border: '1px solid #999', padding: 8, marginBottom: 8 }}>
-      <div style={{ marginBottom: 4 }}>
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search tasks..."
-          style={{ width: '100%' }}
-        />
-      </div>
-      {search && filtered.length > 0 && !selectedTaskId && (
-        <div style={{ maxHeight: 120, overflow: 'auto', border: '1px solid #ccc', padding: 4, marginBottom: 4 }}>
-          {filtered.slice(0, 10).map((t) => (
-            <div
-              key={t.id}
-              onClick={() => { setSelectedTaskId(t.id); setSearch(t.title) }}
-              style={{ padding: '2px 4px', cursor: 'pointer', fontSize: 12 }}
-            >
-              {t.title} ({t.durationMinutes}min)
+    <div className="space-y-4">
+      <h3 className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+        <PlusIcon /> Insert Task
+      </h3>
+      
+      {!selectedTaskId ? (
+        <div className="space-y-3">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search registered tasks..."
+            className="w-full text-sm px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none"
+          />
+          {search && filtered.length > 0 && (
+            <div className="max-h-40 overflow-y-auto bg-slate-950 border border-slate-800 rounded-xl p-1.5 shadow-inner divide-y divide-slate-850">
+              {filtered.slice(0, 10).map((t) => (
+                <div
+                  key={t.id}
+                  onClick={() => {
+                    setSelectedTaskId(t.id)
+                    setSearch(t.title)
+                  }}
+                  className="px-3 py-2 text-xs font-semibold text-slate-350 hover:text-cyan-400 hover:bg-slate-900 cursor-pointer rounded-lg transition-all"
+                >
+                  {t.title} <span className="text-slate-500 font-normal ml-1">({t.durationMinutes}min)</span>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+          <div className="flex justify-end">
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-955 hover:bg-slate-900 text-slate-400 border border-slate-800 transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
-      )}
-      {selectedTaskId && (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: 12 }}>Start at:</span>
-          <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-          <button onClick={() => {
-            if (startTime) {
-              const [h, m] = startTime.split(':').map(Number)
-              onInsert(selectedTaskId, (h || 0) * 60 + (m || 0))
-            }
-          }}>Insert</button>
-          <button onClick={onCancel}>Cancel</button>
+      ) : (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950 p-3.5 border border-slate-850 rounded-xl">
+          <div className="text-sm font-semibold text-slate-300">
+            Selected: <span className="text-cyan-400 font-bold">{search}</span>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl px-3 text-xs">
+              <span className="text-slate-450 font-semibold mr-1.5">Start at:</span>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="bg-transparent border-none text-slate-200 focus:outline-none py-1.5 cursor-pointer"
+              />
+            </div>
+            <button
+              onClick={() => {
+                if (startTime) {
+                  const [h, m] = startTime.split(':').map(Number)
+                  onInsert(selectedTaskId, (h || 0) * 60 + (m || 0))
+                }
+              }}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-950 shadow-md shadow-cyan-950/40 transition-all active:scale-95 cursor-pointer"
+            >
+              Insert
+            </button>
+            <button
+              onClick={() => {
+                setSelectedTaskId('')
+                setSearch('')
+                setStartTime('')
+              }}
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-450 hover:text-slate-250 hover:bg-slate-900 border border-slate-850 transition-all cursor-pointer"
+            >
+              Back
+            </button>
+          </div>
         </div>
-      )}
-      {!selectedTaskId && (
-        <button onClick={onCancel} style={{ marginTop: 4 }}>Cancel</button>
       )}
     </div>
   )
@@ -476,28 +978,59 @@ function RecoveryQuickPanel({ onClose }: { onClose: () => void }) {
   const { plans, trigger, resolve } = useRecoveryStore()
 
   return (
-    <div style={{ border: '1px solid #999', padding: 8, marginBottom: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <strong style={{ fontSize: 13 }}>Recovery Plans</strong>
-        <button onClick={onClose} style={{ fontSize: 11 }}>close</button>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+        <h3 className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+          <ActivityIcon /> Recovery Plans
+        </h3>
+        <button
+          onClick={onClose}
+          className="text-xs font-semibold text-slate-450 hover:text-slate-200 px-2 py-1 rounded hover:bg-slate-900 transition-all cursor-pointer"
+        >
+          Close
+        </button>
       </div>
-      {plans.map((plan) => (
-        <div key={plan.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderTop: '1px solid #eee' }}>
-          <div>
-            <span>{plan.name}</span>
-            {plan.triggered && <span style={{ fontSize: 11, marginLeft: 8 }}>[ACTIVE]</span>}
+
+      <div className="space-y-2">
+        {plans.map((plan) => (
+          <div
+            key={plan.id}
+            className="flex justify-between items-center p-3 rounded-xl border border-slate-850 bg-slate-950/40 shadow-sm"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-350">{plan.name}</span>
+              {plan.triggered && (
+                <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-950/35 text-rose-400 border border-rose-800/30 animate-pulse">
+                  Active
+                </span>
+              )}
+            </div>
+            
+            <div className="flex gap-2">
+              {!plan.triggered ? (
+                <button
+                  onClick={() => trigger(plan.id)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-950/30 hover:bg-rose-900/30 text-rose-400 border border-rose-800/30 transition-all cursor-pointer"
+                >
+                  Trigger
+                </button>
+              ) : (
+                <button
+                  onClick={() => resolve(plan.id)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-950/30 hover:bg-cyan-900/30 text-cyan-400 border border-cyan-800/30 transition-all cursor-pointer"
+                >
+                  Resolve
+                </button>
+              )}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {!plan.triggered && (
-              <button onClick={() => trigger(plan.id)} style={{ fontSize: 11 }}>Trigger</button>
-            )}
-            {plan.triggered && (
-              <button onClick={() => resolve(plan.id)} style={{ fontSize: 11 }}>Resolve</button>
-            )}
-          </div>
-        </div>
-      ))}
-      {plans.length === 0 && <p style={{ fontSize: 12, fontStyle: 'italic' }}>No recovery plans defined.</p>}
+        ))}
+        {plans.length === 0 && (
+          <p className="text-xs italic text-slate-500 py-2">
+            No recovery plans defined. Define one in the Manage tab.
+          </p>
+        )}
+      </div>
     </div>
   )
 }

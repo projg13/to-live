@@ -140,6 +140,8 @@ function resolveDay(
       source: 'adhoc',
       weight: adhoc.weight,
       day: dayIndex,
+      sourceId: adhoc.id,
+      sourceName: 'Adhoc',
     })
   }
 
@@ -157,6 +159,8 @@ function resolveDay(
         source: 'event',
         weight: task.weight * 2, // events get priority boost
         day: dayIndex,
+        sourceId: event.id,
+        sourceName: event.name,
       })
     }
   }
@@ -223,10 +227,14 @@ function resolveDay(
 
           if (taskConfig?.slotWeights) {
             const anchorId = block.anchorId
-            const slotCurve = taskConfig.slotWeights[anchorId]
-            if (slotCurve && slotCurve.length > 0) {
-              const offsetInSlot = Math.max(0, cursor - routineStart)
-              weight = getSlotWeight(slotCurve, offsetInSlot)
+            const templateEntry = dayTemplate?.entries.find((e) => e.anchorId === anchorId)
+            const slotId = templateEntry?.slotId
+            if (slotId) {
+              const slotCurve = taskConfig.slotWeights[slotId]
+              if (slotCurve && slotCurve.length > 0) {
+                const offsetInSlot = Math.max(0, cursor - routineStart)
+                weight = getSlotWeight(slotCurve, offsetInSlot)
+              }
             }
           }
 
@@ -253,6 +261,8 @@ function resolveDay(
               source: 'routine',
               weight,
               day: dayIndex,
+              sourceId: routine.id,
+              sourceName: routine.name,
             })
           } else {
             items.push({
@@ -264,6 +274,8 @@ function resolveDay(
               source: 'routine',
               weight,
               day: dayIndex,
+              sourceId: routine.id,
+              sourceName: routine.name,
             })
             cursor = idealStart + task.durationMinutes
           }
@@ -312,6 +324,8 @@ function resolveDay(
         source: 'obligation',
         weight,
         day: dayIndex,
+        sourceId: ob.id,
+        sourceName: ob.name,
       })
     }
   }
@@ -341,6 +355,8 @@ function resolveDay(
         source: 'recovery',
         weight,
         day: dayIndex,
+        sourceId: plan.id,
+        sourceName: plan.name,
       })
       recoveryCursor += task.durationMinutes
     }

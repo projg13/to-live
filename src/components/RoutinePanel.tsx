@@ -6,63 +6,132 @@ import { useAnchorStore } from '../store/anchorStore'
 import type { Routine, RecurrenceConfig, RecurrencePattern, RoutineTaskConfig } from '../types/routine'
 import { formatTime } from '../types/anchor'
 
+// Icons
+const PlusIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+  </svg>
+)
+
+const CheckIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+)
+
+const TrashIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+)
+
+const XIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  </svg>
+)
+
 function RoutinePanel() {
   const { routines, addRoutine, updateRoutine, deleteRoutine, toggleEnabled } = useRoutineStore()
   const [editing, setEditing] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
 
   return (
-    <div>
-      <h3 style={{ marginBottom: 8 }}>Routines</h3>
-
-      {!creating && (
-        <button onClick={() => setCreating(true)} style={{ marginBottom: 12 }}>
-          + New Routine
-        </button>
-      )}
+    <div className="space-y-6 text-slate-100">
+      <div className="border-b border-slate-800 pb-2 flex justify-between items-center">
+        <div>
+          <h3 className="text-lg font-black tracking-wide text-slate-101 font-sans">Recurring Routines</h3>
+          <p className="text-xs text-slate-400">Regular habits or repeating blocks scheduled dynamically.</p>
+        </div>
+        {!creating && (
+          <button
+            onClick={() => setCreating(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-955 shadow-md shadow-cyan-950/20 transition-all active:scale-95 cursor-pointer"
+          >
+            <PlusIcon /> New Routine
+          </button>
+        )}
+      </div>
 
       {creating && (
-        <RoutineEditor
-          onSave={(r) => { addRoutine(r); setCreating(false) }}
-          onCancel={() => setCreating(false)}
-        />
+        <div className="bg-slate-955 border border-slate-800 rounded-2xl p-4">
+          <RoutineEditor
+            onSave={(r) => {
+              addRoutine(r)
+              setCreating(false)
+            }}
+            onCancel={() => setCreating(false)}
+          />
+        </div>
       )}
 
-      <div>
+      <div className="space-y-2.5">
         {routines.map((routine) => {
           if (editing === routine.id) {
             return (
-              <RoutineEditor
-                key={routine.id}
-                initial={routine}
-                onSave={(updated) => { updateRoutine(routine.id, updated); setEditing(null) }}
-                onCancel={() => setEditing(null)}
-                onDelete={() => { deleteRoutine(routine.id); setEditing(null) }}
-              />
+              <div key={routine.id} className="bg-slate-955 border border-slate-800 rounded-2xl p-4">
+                <RoutineEditor
+                  initial={routine}
+                  onSave={(updated) => {
+                    updateRoutine(routine.id, updated)
+                    setEditing(null)
+                  }}
+                  onCancel={() => setEditing(null)}
+                  onDelete={() => {
+                    deleteRoutine(routine.id)
+                    setEditing(null)
+                  }}
+                />
+              </div>
             )
           }
 
           return (
             <div
               key={routine.id}
-              style={{ borderTop: '1px solid #ccc', padding: '8px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              className={`flex justify-between items-center py-3.5 px-4 bg-slate-950/40 hover:bg-slate-900 rounded-2xl border border-slate-800/80 shadow-sm transition-all ${
+                !routine.enabled ? 'opacity-40' : ''
+              }`}
             >
-              <div onClick={() => setEditing(routine.id)} style={{ cursor: 'pointer', flex: 1 }}>
-                <strong style={{ opacity: routine.enabled ? 1 : 0.5 }}>{routine.name}</strong>
-                <div style={{ fontSize: 11 }}>
-                  {routine.recurrence.pattern} | spawn @ {formatTime(routine.idealSpawnTime)}
-                  | {routine.blockIds.length} block(s)
-                  | {routine.taskConfigs?.length ?? 0} task config(s)
+              <div
+                onClick={() => setEditing(routine.id)}
+                className="cursor-pointer flex-1 space-y-1 pr-4"
+              >
+                <span className="font-bold text-slate-205 text-[15px]">
+                  {routine.name}
+                </span>
+
+                <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
+                  <span className="bg-slate-950/65 border border-slate-850 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-mono">
+                    {routine.recurrence.pattern}
+                  </span>
+                  <span>• spawn @ {formatTime(routine.idealSpawnTime)}</span>
+                  <span>• {routine.blockIds.length} block(s)</span>
+                  <span>• {routine.taskConfigs?.length ?? 0} task config(s)</span>
                 </div>
               </div>
-              <button onClick={() => toggleEnabled(routine.id)} style={{ fontSize: 11 }}>
-                {routine.enabled ? 'ON' : 'OFF'}
+
+              {/* Toggle Enabled Switch */}
+              <button
+                onClick={() => toggleEnabled(routine.id)}
+                className={`w-12 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-200 focus:outline-none ${
+                  routine.enabled ? 'bg-cyan-500' : 'bg-slate-800'
+                }`}
+              >
+                <span
+                  className={`w-5 h-5 rounded-full shadow-md transform transition-transform duration-200 ${
+                    routine.enabled ? 'translate-x-6 bg-slate-950' : 'translate-x-0 bg-slate-400'
+                  }`}
+                />
               </button>
             </div>
           )
         })}
+
         {routines.length === 0 && !creating && (
-          <p style={{ fontSize: 12, fontStyle: 'italic' }}>No routines yet.</p>
+          <p className="text-sm italic text-slate-500 py-4 font-sans">
+            No routines configured yet. Track repeating blocks on specific days.
+          </p>
         )}
       </div>
     </div>
@@ -82,7 +151,7 @@ function RoutineEditor({
 }) {
   const { blocks } = useBlockStore()
   const { tasks } = useTaskStore()
-  const { anchors } = useAnchorStore()
+  const { slots } = useAnchorStore()
 
   const [name, setName] = useState(initial?.name ?? '')
   const [blockIds, setBlockIds] = useState<string[]>(initial?.blockIds ?? [])
@@ -136,55 +205,91 @@ function RoutineEditor({
   }
 
   return (
-    <div style={{ border: '2px solid #333', padding: 12, marginBottom: 12 }}>
+    <div className="space-y-4">
       {/* Name */}
-      <div style={{ marginBottom: 8 }}>
-        <label style={{ fontSize: 12 }}>Name</label><br />
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ width: '100%' }} />
+      <div>
+        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
+          Routine Name
+        </label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Morning Wake Routine, Evening Wrapup"
+          className="text-sm px-3.5 py-2 w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-205 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none"
+        />
       </div>
 
-      {/* Enabled */}
-      <label style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>
-        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-        {' '}Enabled
-      </label>
+      {/* Enabled switch */}
+      <div className="flex items-center gap-1.5 p-2 bg-slate-900/30 border border-slate-800 rounded-xl max-w-xs">
+        <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            className="rounded border-slate-700 bg-slate-955 text-cyan-500 focus:ring-cyan-500 h-4 w-4 cursor-pointer"
+          />
+          Enabled Routine Status
+        </label>
+      </div>
 
-      {/* Blocks */}
-      <div style={{ marginBottom: 8 }}>
-        <label style={{ fontSize: 12 }}>Blocks</label><br />
-        {blocks.map((b) => (
-          <label key={b.id} style={{ fontSize: 11, marginRight: 10 }}>
-            <input
-              type="checkbox"
-              checked={blockIds.includes(b.id)}
-              onChange={(e) => {
-                if (e.target.checked) setBlockIds([...blockIds, b.id])
-                else setBlockIds(blockIds.filter((id) => id !== b.id))
-              }}
-            />
-            {' '}{b.name}
-          </label>
-        ))}
+      {/* Blocks checkboxes list */}
+      <div className="space-y-2">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+          Target Blocks
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {blocks.map((b) => {
+            const isChecked = blockIds.includes(b.id)
+            return (
+              <label
+                key={b.id}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                  isChecked
+                    ? 'bg-cyan-955/35 text-cyan-400 border-cyan-900/30 shadow-sm'
+                    : 'bg-slate-950 border-slate-900 text-slate-500 hover:bg-slate-900'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={(e) => {
+                    if (e.target.checked) setBlockIds([...blockIds, b.id])
+                    else setBlockIds(blockIds.filter((id) => id !== b.id))
+                  }}
+                  className="rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-cyan-500 h-3.5 w-3.5 cursor-pointer"
+                />
+                {b.name}
+              </label>
+            )
+          })}
+        </div>
       </div>
 
       {/* Spawn time */}
-      <div style={{ marginBottom: 8 }}>
-        <label style={{ fontSize: 12 }}>Ideal Spawn Time</label><br />
+      <div>
+        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
+          Ideal Spawn Time
+        </label>
         <input
           type="time"
           value={toTimeStr(idealSpawnTime)}
           onChange={(e) => setIdealSpawnTime(fromTimeStr(e.target.value))}
+          className="text-xs px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
         />
       </div>
 
-      {/* Recurrence */}
-      <div style={{ marginBottom: 8, paddingLeft: 12, borderLeft: '2px solid #666' }}>
-        <span style={{ fontSize: 12, fontWeight: 'bold' }}>Recurrence</span>
-        <div style={{ marginBottom: 4 }}>
+      {/* Recurrence config */}
+      <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+          Recurrence Rules
+        </span>
+
+        <div className="flex flex-wrap items-center gap-3 bg-slate-950/60 p-3 border border-slate-850 rounded-xl">
           <select
             value={recurrence.pattern}
             onChange={(e) => setRecurrence({ ...recurrence, pattern: e.target.value as RecurrencePattern })}
-            style={{ fontSize: 11 }}
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-350 focus:outline-none cursor-pointer"
           >
             <option value="daily">daily</option>
             <option value="weekly">weekly</option>
@@ -192,59 +297,74 @@ function RoutineEditor({
             <option value="one-time">one-time</option>
             <option value="repeat-until">repeat-until</option>
           </select>
+
           {recurrence.pattern !== 'daily' && recurrence.pattern !== 'one-time' && (
-            <span style={{ marginLeft: 8 }}>
-              <label style={{ fontSize: 11 }}>every </label>
+            <div className="flex items-center gap-1.5 text-xs text-slate-400">
+              <span>every</span>
               <input
                 type="number"
                 value={recurrence.interval ?? 1}
                 onChange={(e) => setRecurrence({ ...recurrence, interval: Number(e.target.value) || 1 })}
-                style={{ width: 30, fontSize: 11 }}
+                className="w-12 px-1.5 py-1 text-center bg-slate-900 border border-slate-800 rounded text-slate-205 font-semibold focus:outline-none"
               />
-            </span>
+            </div>
           )}
         </div>
+
         {recurrence.pattern === 'weekly' && (
-          <div style={{ fontSize: 11 }}>
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, i) => (
-              <label key={i} style={{ marginRight: 6 }}>
-                <input
-                  type="checkbox"
-                  checked={recurrence.daysOfWeek?.includes(i) ?? false}
-                  onChange={(e) => {
-                    const days = recurrence.daysOfWeek ?? []
-                    setRecurrence({
-                      ...recurrence,
-                      daysOfWeek: e.target.checked ? [...days, i] : days.filter((d) => d !== i),
-                    })
-                  }}
-                />
-                {day}
-              </label>
-            ))}
+          <div className="flex flex-wrap gap-2 bg-slate-950/40 p-3 border border-slate-850 rounded-xl">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, i) => {
+              const isActive = recurrence.daysOfWeek?.includes(i) ?? false
+              return (
+                <label
+                  key={i}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-cyan-955/35 text-cyan-400 border-cyan-905/30'
+                      : 'bg-slate-950 border-slate-900 text-slate-500 hover:bg-slate-900'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isActive}
+                    onChange={(e) => {
+                      const days = recurrence.daysOfWeek ?? []
+                      setRecurrence({
+                        ...recurrence,
+                        daysOfWeek: e.target.checked ? [...days, i] : days.filter((d) => d !== i),
+                      })
+                    }}
+                    className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-500 h-3 w-3 cursor-pointer"
+                  />
+                  {day}
+                </label>
+              )
+            })}
           </div>
         )}
+
         {recurrence.pattern === 'monthly' && (
-          <div>
-            <label style={{ fontSize: 11 }}>Day of month: </label>
+          <div className="flex items-center gap-2 bg-slate-950/40 p-3 border border-slate-850 rounded-xl text-xs text-slate-350">
+            <span>Day of month:</span>
             <input
               type="number"
               value={recurrence.dayOfMonth ?? 1}
               onChange={(e) => setRecurrence({ ...recurrence, dayOfMonth: Number(e.target.value) || 1 })}
-              style={{ width: 30, fontSize: 11 }}
               min={1}
               max={31}
+              className="w-14 px-2 py-1 bg-slate-900 border border-slate-800 rounded text-center text-slate-205 font-bold focus:outline-none"
             />
           </div>
         )}
+
         {recurrence.pattern === 'repeat-until' && (
-          <div>
-            <label style={{ fontSize: 11 }}>Until: </label>
+          <div className="flex items-center gap-2 bg-slate-950/40 p-3 border border-slate-850 rounded-xl text-xs text-slate-350">
+            <span>Until:</span>
             <input
               type="date"
               value={recurrence.repeatUntil ?? ''}
               onChange={(e) => setRecurrence({ ...recurrence, repeatUntil: e.target.value })}
-              style={{ fontSize: 11 }}
+              className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-slate-205 focus:outline-none cursor-pointer"
             />
           </div>
         )}
@@ -252,108 +372,161 @@ function RoutineEditor({
 
       {/* Per-task configs */}
       {uniqueTaskIds.length > 0 && (
-        <div style={{ marginBottom: 8, paddingLeft: 12, borderLeft: '2px solid #666' }}>
-          <span style={{ fontSize: 12, fontWeight: 'bold' }}>Task Configs</span>
-          {uniqueTaskIds.map((taskId) => {
-            const task = tasks.find((t) => t.id === taskId)
-            if (!task) return null
-            const config = getTaskConfig(taskId)
+        <div className="space-y-3 pl-4 border-l-2 border-cyan-555 bg-slate-900/10 p-3 rounded-2xl">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+            Specific Task Constraints & curves
+          </span>
+          
+          <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
+            {uniqueTaskIds.map((taskId) => {
+              const task = tasks.find((t) => t.id === taskId)
+              if (!task) return null
+              const config = getTaskConfig(taskId)
 
-            return (
-              <div key={taskId} style={{ marginBottom: 8, paddingLeft: 8, borderLeft: '1px solid #999' }}>
-                <span style={{ fontSize: 11, fontWeight: 'bold' }}>{task.title}</span>
+              return (
+                <div
+                  key={taskId}
+                  className="bg-slate-955 border border-slate-850 p-3.5 rounded-xl space-y-3"
+                >
+                  <span className="text-xs font-bold text-slate-202 tracking-wide block border-b border-slate-850 pb-1.5">
+                    {task.title}
+                  </span>
 
-                {/* Ideal time */}
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 2 }}>
-                  <label style={{ fontSize: 11 }}>Ideal:</label>
-                  <input
-                    type="time"
-                    value={config?.idealTime !== undefined ? toTimeStr(config.idealTime) : ''}
-                    onChange={(e) => setTaskConfig(taskId, { idealTime: e.target.value ? fromTimeStr(e.target.value) : undefined })}
-                    style={{ fontSize: 11 }}
-                  />
-                  <label style={{ fontSize: 11 }}>Expires:</label>
-                  <input
-                    type="number"
-                    value={config?.expiresAfterMinutes ?? ''}
-                    onChange={(e) => setTaskConfig(taskId, { expiresAfterMinutes: Number(e.target.value) || undefined })}
-                    placeholder="min"
-                    style={{ width: 50, fontSize: 11 }}
-                  />
-                </div>
+                  {/* Ideal time & expiry offset */}
+                  <div className="grid grid-cols-2 gap-3 flex-wrap">
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">
+                        Ideal Time
+                      </label>
+                      <input
+                        type="time"
+                        value={config?.idealTime !== undefined ? toTimeStr(config.idealTime) : ''}
+                        onChange={(e) => setTaskConfig(taskId, { idealTime: e.target.value ? fromTimeStr(e.target.value) : undefined })}
+                        className="text-xs px-2.5 py-1 bg-slate-950 border border-slate-850 rounded-lg text-slate-300 focus:outline-none cursor-pointer w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">
+                        Expires Offset (min)
+                      </label>
+                      <input
+                        type="number"
+                        value={config?.expiresAfterMinutes ?? ''}
+                        onChange={(e) => setTaskConfig(taskId, { expiresAfterMinutes: Number(e.target.value) || undefined })}
+                        placeholder="expires"
+                        className="text-xs px-2 py-1 bg-slate-950 border border-slate-850 rounded-lg text-slate-300 text-center w-full focus:outline-none"
+                      />
+                    </div>
+                  </div>
 
-                {/* Slot weights (piecewise per anchor) */}
-                <div style={{ marginTop: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 'bold' }}>Slot weights (from slot ideal start):</span>
-                  {anchors.map((a) => {
-                    const points = config?.slotWeights?.[a.id] ?? []
-                    return (
-                      <div key={a.id} style={{ marginLeft: 12, marginTop: 8, paddingLeft: 8, borderLeft: '1px solid #999' }}>
-                        <span style={{ fontSize: 13, fontWeight: 'bold' }}>{a.name}</span>
-                        {points.map((pt, pi) => (
-                          <div key={pi} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
-                            <label style={{ fontSize: 13 }}>+</label>
-                            <input
-                              type="number"
-                              value={pt.offsetMinutes}
-                              onChange={(e) => {
-                                const updated = [...points]
-                                updated[pi] = { ...updated[pi], offsetMinutes: Number(e.target.value) || 0 }
-                                const current = config?.slotWeights ?? {}
-                                setTaskConfig(taskId, { slotWeights: { ...current, [a.id]: updated } })
-                              }}
-                              style={{ width: 60 }}
-                            />
-                            <label style={{ fontSize: 13 }}>min =</label>
-                            <input
-                              type="number"
-                              value={pt.value}
-                              onChange={(e) => {
-                                const updated = [...points]
-                                updated[pi] = { ...updated[pi], value: Number(e.target.value) || 0 }
-                                const current = config?.slotWeights ?? {}
-                                setTaskConfig(taskId, { slotWeights: { ...current, [a.id]: updated } })
-                              }}
-                              style={{ width: 60 }}
-                            />
-                            <button
-                              onClick={() => {
-                                const updated = points.filter((_, j) => j !== pi)
-                                const current = config?.slotWeights ?? {}
-                                if (updated.length === 0) {
-                                  const { [a.id]: _, ...rest } = current
-                                  setTaskConfig(taskId, { slotWeights: Object.keys(rest).length > 0 ? rest : undefined })
-                                } else {
-                                  setTaskConfig(taskId, { slotWeights: { ...current, [a.id]: updated } })
-                                }
-                              }}
-                            >x</button>
+                  {/* Slot weights points */}
+                  <div className="space-y-2 mt-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      Slot Weight Spikes (minutes offset from anchor ideal)
+                    </span>
+                    {slots.map((s) => {
+                      const points = config?.slotWeights?.[s.id] ?? []
+                      return (
+                        <div
+                          key={s.id}
+                          className="pl-3 border-l border-slate-850 py-1.5 space-y-2 bg-slate-955/30 p-2.5 rounded-lg border border-slate-850/60"
+                        >
+                          <span className="text-[10px] font-bold text-slate-400">{s.name}</span>
+                          
+                          <div className="space-y-1.5">
+                            {points.map((pt, pi) => (
+                              <div key={pi} className="flex items-center gap-1.5 text-xs flex-wrap">
+                                <span className="text-slate-500">+</span>
+                                <input
+                                  type="number"
+                                  value={pt.offsetMinutes}
+                                  onChange={(e) => {
+                                    const updated = [...points]
+                                    updated[pi] = { ...updated[pi], offsetMinutes: Number(e.target.value) || 0 }
+                                    const current = config?.slotWeights ?? {}
+                                    setTaskConfig(taskId, { slotWeights: { ...current, [s.id]: updated } })
+                                  }}
+                                  className="w-14 px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded text-center text-slate-300"
+                                />
+                                <span className="text-slate-500">min =</span>
+                                <input
+                                  type="number"
+                                  value={pt.value}
+                                  onChange={(e) => {
+                                    const updated = [...points]
+                                    updated[pi] = { ...updated[pi], value: Number(e.target.value) || 0 }
+                                    const current = config?.slotWeights ?? {}
+                                    setTaskConfig(taskId, { slotWeights: { ...current, [s.id]: updated } })
+                                  }}
+                                  className="w-14 px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded text-center text-slate-202 font-semibold"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = points.filter((_, j) => j !== pi)
+                                    const current = config?.slotWeights ?? {}
+                                    if (updated.length === 0) {
+                                      const { [s.id]: _, ...rest } = current
+                                      setTaskConfig(taskId, { slotWeights: Object.keys(rest).length > 0 ? rest : undefined })
+                                    } else {
+                                      setTaskConfig(taskId, { slotWeights: { ...current, [s.id]: updated } })
+                                    }
+                                  }}
+                                  className="p-1 rounded text-slate-400 hover:bg-rose-955/20 hover:text-rose-455 transition-all cursor-pointer"
+                                >
+                                  <XIcon />
+                                </button>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                        <button
-                          onClick={() => {
-                            const last = points[points.length - 1]
-                            const newPt = { offsetMinutes: (last?.offsetMinutes ?? 0) + 60, value: 0 }
-                            const current = config?.slotWeights ?? {}
-                            setTaskConfig(taskId, { slotWeights: { ...current, [a.id]: [...points, newPt] } })
-                          }}
-                          style={{ marginTop: 4 }}
-                        >+ Add point</button>
-                      </div>
-                    )
-                  })}
+                          
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const last = points[points.length - 1]
+                              const newPt = { offsetMinutes: (last?.offsetMinutes ?? 0) + 60, value: 0 }
+                              const current = config?.slotWeights ?? {}
+                              setTaskConfig(taskId, { slotWeights: { ...current, [s.id]: [...points, newPt] } })
+                            }}
+                            className="text-[9px] font-bold text-cyan-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <PlusIcon /> Add point
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       )}
 
-      {/* Actions */}
-      <div style={{ borderTop: '1px solid #999', paddingTop: 8 }}>
-        <button onClick={handleSave} style={{ marginRight: 8 }}>Save Changes</button>
-        <button onClick={onCancel} style={{ marginRight: 8 }}>Discard</button>
-        {onDelete && <button onClick={onDelete}>Delete</button>}
+      {/* Save / Discard Actions */}
+      <div className="flex items-center justify-between border-t border-slate-800 pt-4 mt-4">
+        <div className="flex gap-2">
+          <button
+            onClick={handleSave}
+            className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-955 shadow-md shadow-cyan-950/20 transition-all active:scale-95 cursor-pointer"
+          >
+            <CheckIcon /> Save Changes
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-955 hover:bg-slate-900 text-slate-400 border border-slate-850 transition-all cursor-pointer"
+          >
+            Discard
+          </button>
+        </div>
+        {onDelete && (
+          <button
+            onClick={onDelete}
+            className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-rose-955/35 hover:bg-rose-900/30 text-rose-400 border border-rose-800/30 transition-all cursor-pointer"
+          >
+            <TrashIcon /> Delete
+          </button>
+        )}
       </div>
     </div>
   )

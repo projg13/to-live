@@ -17,7 +17,7 @@ export interface SlotWeightPoint {
 // Per-task behavior within a routine
 export interface RoutineTaskConfig {
   taskId: string
-  slotWeights?: Record<string, SlotWeightPoint[]>  // anchorId → piecewise weight curve relative to slot start
+  slotWeights?: Record<string, SlotWeightPoint[]>  // slotId → piecewise weight curve relative to slot start
   expiresAfterMinutes?: number                     // task dies after this many minutes from routine spawn
   idealTime?: number                               // minutes from midnight — ideal time for this task
 }

@@ -4,39 +4,83 @@ import { useTaskStore } from '../store/taskStore'
 import type { Obligation, ObligationTask, WeightBracket, ObligationRecurrence } from '../types/obligation'
 import { formatTime } from '../types/anchor'
 
+// Icons
+const PlusIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+  </svg>
+)
+
+const CheckIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+)
+
+const TrashIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+)
+
+const XIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  </svg>
+)
+
 function ObligationPanel() {
   const { obligations, addObligation, updateObligation, deleteObligation, toggleEnabled } = useObligationStore()
   const [editing, setEditing] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
 
   return (
-    <div>
-      <h3 style={{ marginBottom: 8 }}>Obligations</h3>
-
-      {!creating && (
-        <button onClick={() => setCreating(true)} style={{ marginBottom: 12 }}>
-          + New Obligation
-        </button>
-      )}
+    <div className="space-y-6">
+      <div className="border-b border-slate-800 pb-2 flex justify-between items-center">
+        <div>
+          <h3 className="text-lg font-black tracking-wide text-slate-100">Obligations</h3>
+          <p className="text-xs text-slate-400">Tasks with rigid dates and dynamic urgency curves.</p>
+        </div>
+        {!creating && (
+          <button
+            onClick={() => setCreating(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-950 shadow-md shadow-cyan-950/20 transition-all active:scale-95 cursor-pointer"
+          >
+            <PlusIcon /> New Obligation
+          </button>
+        )}
+      </div>
 
       {creating && (
-        <ObligationEditor
-          onSave={(o) => { addObligation(o); setCreating(false) }}
-          onCancel={() => setCreating(false)}
-        />
+        <div className="bg-slate-955 border border-slate-800 rounded-2xl p-4">
+          <ObligationEditor
+            onSave={(o) => {
+              addObligation(o)
+              setCreating(false)
+            }}
+            onCancel={() => setCreating(false)}
+          />
+        </div>
       )}
 
-      <div>
+      <div className="space-y-2">
         {obligations.map((ob) => {
           if (editing === ob.id) {
             return (
-              <ObligationEditor
-                key={ob.id}
-                initial={ob}
-                onSave={(updated) => { updateObligation(ob.id, updated); setEditing(null) }}
-                onCancel={() => setEditing(null)}
-                onDelete={() => { deleteObligation(ob.id); setEditing(null) }}
-              />
+              <div key={ob.id} className="bg-slate-955 border border-slate-800 rounded-2xl p-4">
+                <ObligationEditor
+                  initial={ob}
+                  onSave={(updated) => {
+                    updateObligation(ob.id, updated)
+                    setEditing(null)
+                  }}
+                  onCancel={() => setEditing(null)}
+                  onDelete={() => {
+                    deleteObligation(ob.id)
+                    setEditing(null)
+                  }}
+                />
+              </div>
             )
           }
 
@@ -44,28 +88,69 @@ function ObligationPanel() {
             ? Math.ceil((new Date(ob.deadline).getTime() - Date.now()) / 86400000)
             : null
 
+          let daysBadge = null
+          if (daysLeft !== null) {
+            let badgeColor = 'bg-slate-950/60 text-slate-400 border-slate-850'
+            if (daysLeft <= 3) {
+              badgeColor = 'bg-rose-955/30 text-rose-400 border-rose-900/30 animate-pulse'
+            } else if (daysLeft <= 7) {
+              badgeColor = 'bg-amber-955/35 text-amber-400 border-amber-900/30'
+            }
+            daysBadge = (
+              <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${badgeColor}`}>
+                {daysLeft} days left
+              </span>
+            )
+          }
+
           return (
             <div
               key={ob.id}
-              style={{ borderTop: '1px solid #ccc', padding: '8px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              className={`flex justify-between items-center py-3.5 px-4 bg-slate-950/40 hover:bg-slate-900 rounded-2xl border border-slate-800/80 shadow-sm transition-all ${
+                !ob.enabled ? 'opacity-40' : ''
+              }`}
             >
-              <div onClick={() => setEditing(ob.id)} style={{ cursor: 'pointer', flex: 1 }}>
-                <strong style={{ opacity: ob.enabled ? 1 : 0.5 }}>{ob.name}</strong>
-                <div style={{ fontSize: 12 }}>
-                  {ob.recurrence}
-                  {daysLeft !== null && ` | ${daysLeft} days left`}
-                  {' | '}{ob.tasks.length} task(s)
-                  {' | '}{ob.weightBrackets.length} bracket(s)
+              <div
+                onClick={() => setEditing(ob.id)}
+                className="cursor-pointer flex-1 space-y-1.5 pr-4"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-slate-205 text-[15px]">
+                    {ob.name}
+                  </span>
+                  {daysBadge}
+                </div>
+
+                <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
+                  <span className="bg-slate-950/60 border border-slate-850 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-mono">
+                    {ob.recurrence}
+                  </span>
+                  <span>• {ob.tasks.length} task(s)</span>
+                  <span>• {ob.weightBrackets.length} weight bracket(s)</span>
                 </div>
               </div>
-              <button onClick={() => toggleEnabled(ob.id)}>
-                {ob.enabled ? 'ON' : 'OFF'}
+
+              {/* Toggle Switch */}
+              <button
+                onClick={() => toggleEnabled(ob.id)}
+                className={`w-12 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-200 focus:outline-none ${
+                  ob.enabled ? 'bg-cyan-500' : 'bg-slate-850'
+                }`}
+              >
+                <span
+                  className={`w-5 h-5 rounded-full shadow-md transform transition-transform duration-200 ${
+                    ob.enabled ? 'translate-x-6 bg-slate-950' : 'translate-x-0 bg-slate-400'
+                  }`}
+                />
               </button>
             </div>
           )
         })}
+
         {obligations.length === 0 && !creating && (
-          <p style={{ fontSize: 12, fontStyle: 'italic' }}>No obligations yet.</p>
+          <p className="text-sm italic text-slate-500 py-4">
+            No obligations configured yet. Add obligations with dynamic weight bounds.
+          </p>
         )}
       </div>
     </div>
@@ -108,155 +193,269 @@ function ObligationEditor({
   }
 
   return (
-    <div style={{ border: '2px solid #333', padding: 12, marginBottom: 12 }}>
+    <div className="space-y-4">
       {/* Name */}
-      <div style={{ marginBottom: 8 }}>
-        <label style={{ fontSize: 13 }}>Name</label><br />
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ width: '100%' }} />
+      <div>
+        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
+          Obligation Name
+        </label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Tax Returns, Annual Checkup"
+          className="text-sm px-3.5 py-2 w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-205 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none"
+        />
       </div>
 
-      {/* Deadline + Recurrence + Enabled */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
+      {/* Deadline, Recurrence & Enabled Checkbox */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-900/30 p-3.5 rounded-xl border border-slate-800 flex-wrap">
         <div>
-          <label style={{ fontSize: 13 }}>Deadline</label><br />
-          <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">
+            Deadline Date
+          </label>
+          <input
+            type="date"
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+            className="text-xs px-2.5 py-1.5 w-full bg-slate-955 border border-slate-800 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
+          />
         </div>
         <div>
-          <label style={{ fontSize: 13 }}>Recurrence</label><br />
-          <select value={recurrence} onChange={(e) => setRecurrence(e.target.value as ObligationRecurrence)}>
+          <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider block mb-1">
+            Recurrence
+          </label>
+          <select
+            value={recurrence}
+            onChange={(e) => setRecurrence(e.target.value as ObligationRecurrence)}
+            className="text-xs px-2.5 py-1.5 w-full bg-slate-955 border border-slate-800 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
+          >
             <option value="one-time">one-time</option>
             <option value="yearly">yearly</option>
             <option value="quarterly">quarterly</option>
             <option value="custom">custom</option>
           </select>
         </div>
-        {recurrence !== 'one-time' && (
+
+        {recurrence !== 'one-time' ? (
           <div>
-            <label style={{ fontSize: 13 }}>Start month</label><br />
-            <select value={recurrenceMonth} onChange={(e) => setRecurrenceMonth(Number(e.target.value))}>
-              {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => (
-                <option key={i} value={i}>{m}</option>
+            <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider block mb-1">
+              Start Month
+            </label>
+            <select
+              value={recurrenceMonth}
+              onChange={(e) => setRecurrenceMonth(Number(e.target.value))}
+              className="text-xs px-2.5 py-1.5 w-full bg-slate-955 border border-slate-800 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
+            >
+              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
+                <option key={i} value={i}>
+                  {m}
+                </option>
               ))}
             </select>
+          </div>
+        ) : (
+          <div className="flex items-center pt-5 pl-2">
+            <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={(e) => setEnabled(e.target.checked)}
+                className="rounded border-slate-700 bg-slate-955 text-cyan-500 focus:ring-cyan-500 h-4 w-4 cursor-pointer"
+              />
+              Active Enabled
+            </label>
           </div>
         )}
-        <div>
-          <label style={{ fontSize: 13 }}>Enabled</label><br />
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-        </div>
       </div>
 
-      {/* Tasks */}
-      <div style={{ marginBottom: 8, paddingLeft: 12, borderLeft: '2px solid #666' }}>
-        <span style={{ fontSize: 13, fontWeight: 'bold' }}>Tasks</span>
-        {tasks.map((t, i) => (
-          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
-            <span style={{ fontSize: 12 }}>{t.order}.</span>
-            <select
-              value={t.taskId}
-              onChange={(e) => {
-                const updated = [...tasks]
-                updated[i] = { ...updated[i], taskId: e.target.value }
-                setTasks(updated)
-              }}
+      {/* Tasks in Obligation */}
+      <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+          Spawned Tasks
+        </span>
+        
+        <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+          {tasks.map((t, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-2 bg-slate-950/60 border border-slate-850 p-2 rounded-xl"
             >
-              <option value="">-- task --</option>
-              {allTasks.map((at) => (
-                <option key={at.id} value={at.id}>{at.title}</option>
-              ))}
-            </select>
-            <button onClick={() => setTasks(tasks.filter((_, j) => j !== i))}>x</button>
-          </div>
-        ))}
-        <button onClick={() => setTasks([...tasks, { taskId: '', order: tasks.length }])} style={{ marginTop: 4 }}>
-          + Add task
+              <span className="font-mono text-xs font-bold text-slate-500 w-5 text-center">
+                {t.order + 1}.
+              </span>
+              <select
+                value={t.taskId}
+                onChange={(e) => {
+                  const updated = [...tasks]
+                  updated[i] = { ...updated[i], taskId: e.target.value }
+                  setTasks(updated)
+                }}
+                className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-205 focus:outline-none cursor-pointer flex-1 min-w-[150px]"
+              >
+                <option value="">-- select task --</option>
+                {allTasks.map((at) => (
+                  <option key={at.id} value={at.id}>
+                    {at.title}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => setTasks(tasks.filter((_, j) => j !== i))}
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-955/20 hover:text-rose-455 transition-all cursor-pointer"
+              >
+                <XIcon />
+              </button>
+            </div>
+          ))}
+        </div>
+        
+        <button
+          onClick={() => setTasks([...tasks, { taskId: '', order: tasks.length }])}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-950 hover:bg-slate-900 text-slate-300 border border-slate-850 transition-all cursor-pointer"
+        >
+          <PlusIcon /> Add Task
         </button>
       </div>
 
-      {/* Weight Brackets */}
-      <div style={{ marginBottom: 8, paddingLeft: 12, borderLeft: '2px solid #666' }}>
-        <span style={{ fontSize: 13, fontWeight: 'bold' }}>Weight Brackets (date-range → time-of-day curve)</span>
-        {brackets
-          .sort((a, b) => a.maxDaysRemaining - b.maxDaysRemaining)
-          .map((bracket, bi) => (
-            <div key={bi} style={{ marginTop: 8, paddingLeft: 8, borderLeft: '1px solid #999' }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <label style={{ fontSize: 13 }}>When days left &le;</label>
-                <input
-                  type="number"
-                  value={bracket.maxDaysRemaining}
-                  onChange={(e) => {
-                    const updated = [...brackets]
-                    updated[bi] = { ...updated[bi], maxDaysRemaining: Number(e.target.value) || 0 }
-                    setBrackets(updated)
-                  }}
-                  style={{ width: 50 }}
-                />
-                <button onClick={() => setBrackets(brackets.filter((_, j) => j !== bi))}>x</button>
-              </div>
-
-              {/* Time curve for this bracket */}
-              <div style={{ marginLeft: 12, marginTop: 4 }}>
-                {bracket.timeCurve.map((pt, pi) => (
-                  <div key={pi} style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
-                    <span style={{ fontSize: 12 }}>{formatTime(pt.time)}</span>
-                    <input
-                      type="time"
-                      value={toTimeStr(pt.time)}
-                      onChange={(e) => {
-                        const updated = [...brackets]
-                        const curve = [...updated[bi].timeCurve]
-                        curve[pi] = { ...curve[pi], time: fromTimeStr(e.target.value) }
-                        updated[bi] = { ...updated[bi], timeCurve: curve }
-                        setBrackets(updated)
-                      }}
-                    />
-                    <label style={{ fontSize: 12 }}>=</label>
+      {/* Weight Brackets (Urgency Dynamics) */}
+      <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+          Weight Brackets (Urgency Curves by Days Remaining)
+        </span>
+        
+        <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+          {brackets
+            .sort((a, b) => a.maxDaysRemaining - b.maxDaysRemaining)
+            .map((bracket, bi) => (
+              <div
+                key={bi}
+                className="bg-slate-950/60 border border-slate-850 p-3 rounded-xl space-y-3"
+              >
+                <div className="flex justify-between items-center border-b border-slate-850 pb-1.5">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-300">
+                    <span className="font-semibold text-slate-500">Trigger when days left &le;</span>
                     <input
                       type="number"
-                      value={pt.value}
+                      value={bracket.maxDaysRemaining}
                       onChange={(e) => {
                         const updated = [...brackets]
-                        const curve = [...updated[bi].timeCurve]
-                        curve[pi] = { ...curve[pi], value: Number(e.target.value) || 0 }
-                        updated[bi] = { ...updated[bi], timeCurve: curve }
+                        updated[bi] = { ...updated[bi], maxDaysRemaining: Number(e.target.value) || 0 }
                         setBrackets(updated)
                       }}
-                      style={{ width: 60 }}
+                      className="w-14 px-2 py-0.5 bg-slate-900 border border-slate-800 rounded font-semibold text-center text-slate-205 focus:outline-none"
                     />
-                    <button onClick={() => {
-                      const updated = [...brackets]
-                      updated[bi] = { ...updated[bi], timeCurve: updated[bi].timeCurve.filter((_, j) => j !== pi) }
-                      setBrackets(updated)
-                    }}>x</button>
                   </div>
-                ))}
-                <button
-                  onClick={() => {
-                    const updated = [...brackets]
-                    const last = bracket.timeCurve[bracket.timeCurve.length - 1]
-                    updated[bi] = {
-                      ...updated[bi],
-                      timeCurve: [...updated[bi].timeCurve, { time: (last?.time ?? 0) + 60, value: 0 }],
-                    }
-                    setBrackets(updated)
-                  }}
-                  style={{ marginTop: 2 }}
-                >+ Add time point</button>
+                  <button
+                    onClick={() => setBrackets(brackets.filter((_, j) => j !== bi))}
+                    className="p-1 rounded-lg text-rose-400 hover:bg-rose-955/20 transition-all cursor-pointer"
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>
+
+                {/* Time curve within this bracket */}
+                <div className="space-y-1.5 pl-3">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Weight values by time of day:
+                  </span>
+                  {bracket.timeCurve.map((pt, pi) => (
+                    <div key={pi} className="flex items-center gap-1.5 text-xs flex-wrap">
+                      <span className="font-mono text-slate-500 w-10">{formatTime(pt.time)}</span>
+                      <input
+                        type="time"
+                        value={toTimeStr(pt.time)}
+                        onChange={(e) => {
+                          const updated = [...brackets]
+                          const curve = [...updated[bi].timeCurve]
+                          curve[pi] = { ...curve[pi], time: fromTimeStr(e.target.value) }
+                          updated[bi] = { ...updated[bi], timeCurve: curve }
+                          setBrackets(updated)
+                        }}
+                        className="text-xs px-2 py-0.5 bg-slate-900 border border-slate-800 rounded text-slate-205 cursor-pointer focus:outline-none"
+                      />
+                      <span className="text-slate-500 font-bold">=</span>
+                      <input
+                        type="number"
+                        value={pt.value}
+                        onChange={(e) => {
+                          const updated = [...brackets]
+                          const curve = [...updated[bi].timeCurve]
+                          curve[pi] = { ...curve[pi], value: Number(e.target.value) || 0 }
+                          updated[bi] = { ...updated[bi], timeCurve: curve }
+                          setBrackets(updated)
+                        }}
+                        className="w-14 px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded text-center text-slate-202 font-semibold focus:outline-none"
+                      />
+                      <button
+                        onClick={() => {
+                          const updated = [...brackets]
+                          updated[bi] = {
+                            ...updated[bi],
+                            timeCurve: updated[bi].timeCurve.filter((_, j) => j !== pi),
+                          }
+                          setBrackets(updated)
+                        }}
+                        className="p-1 rounded text-slate-500 hover:bg-rose-955/20 hover:text-rose-455 transition-all cursor-pointer"
+                      >
+                        <XIcon />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  <button
+                    onClick={() => {
+                      const updated = [...brackets]
+                      const last = bracket.timeCurve[bracket.timeCurve.length - 1]
+                      updated[bi] = {
+                        ...updated[bi],
+                        timeCurve: [...updated[bi].timeCurve, { time: (last?.time ?? 0) + 60, value: 0 }],
+                      }
+                      setBrackets(updated)
+                    }}
+                    className="text-[10px] font-bold text-cyan-400 hover:underline flex items-center gap-0.5 cursor-pointer mt-1"
+                  >
+                    <PlusIcon /> Add time point
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+        </div>
+        
         <button
-          onClick={() => setBrackets([...brackets, { maxDaysRemaining: 30, timeCurve: [{ time: 600, value: 50 }] }])}
-          style={{ marginTop: 8 }}
-        >+ Add bracket</button>
+          onClick={() =>
+            setBrackets([...brackets, { maxDaysRemaining: 30, timeCurve: [{ time: 600, value: 50 }] }])
+          }
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-950 hover:bg-slate-900 text-slate-350 border border-slate-850 transition-all cursor-pointer mt-1"
+        >
+          <PlusIcon /> Add Bracket
+        </button>
       </div>
 
-      {/* Actions */}
-      <div style={{ borderTop: '1px solid #999', paddingTop: 8 }}>
-        <button onClick={handleSave} style={{ marginRight: 8 }}>Save Changes</button>
-        <button onClick={onCancel} style={{ marginRight: 8 }}>Discard</button>
-        {onDelete && <button onClick={onDelete}>Delete</button>}
+      {/* Save / Discard Actions */}
+      <div className="flex items-center justify-between border-t border-slate-800 pt-4 mt-4">
+        <div className="flex gap-2">
+          <button
+            onClick={handleSave}
+            className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-950 shadow-md shadow-cyan-950/20 transition-all active:scale-95 cursor-pointer"
+          >
+            <CheckIcon /> Save Obligation
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-955 hover:bg-slate-900 text-slate-400 border border-slate-850 transition-all cursor-pointer"
+          >
+            Discard
+          </button>
+        </div>
+        {onDelete && (
+          <button
+            onClick={onDelete}
+            className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-rose-955/35 hover:bg-rose-900/30 text-rose-455 border border-rose-800/30 transition-all cursor-pointer"
+          >
+            <TrashIcon /> Delete
+          </button>
+        )}
       </div>
     </div>
   )
