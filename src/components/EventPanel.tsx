@@ -189,7 +189,7 @@ function EventPanel() {
 function TemplateSection({
   templates,
   dayPlans,
-  tasks,
+  tasks: _tasks,
   onAddTemplate,
   onDeleteTemplate,
   onUseTemplate,
