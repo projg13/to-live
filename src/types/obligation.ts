@@ -43,6 +43,7 @@ export interface Obligation {
 
   // Tasks in this obligation
   tasks: ObligationTask[]
+  blockIds?: string[]               // blocks as additional task source (same as recovery)
 
   // Deadline (optional — if absent, no escalation, uses the first bracket always)
   deadline?: string               // ISO date

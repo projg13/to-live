@@ -458,18 +458,42 @@ function resolveDay(
     const bracket = getActiveBracket(ob.weightBrackets, daysRemaining)
     if (!bracket) continue
 
-    for (const obTask of ob.tasks) {
-      if (skippedTaskIds.includes(obTask.taskId)) continue
-      if (doneTasks.includes(`${obTask.taskId}:${dateStr}`) || doneTasks.includes(`${obTask.taskId}:${periodKey}`)) continue
-      const task = context.tasks.find((t) => t.id === obTask.taskId)
-      if (!task) continue
+    // Base weight from bracket's time curve
+    let baseWeight = getObligationWeight(bracket.timeCurve, 720)
+    if (eventWeightOffset > 0) {
+      baseWeight = baseWeight - eventWeightOffset
+    }
+    if (baseWeight <= 0) continue
 
-      // Apply event weight offset to obligation weight
-      let weight = getObligationWeight(bracket.timeCurve, 720)
-      if (eventWeightOffset > 0) {
-        weight = weight - eventWeightOffset
+    // Collect all tasks in order: direct tasks first, then block entries
+    const orderedTaskIds: string[] = ob.tasks.map((t) => t.taskId)
+    for (const blockId of (ob.blockIds ?? [])) {
+      const block = context.blocks.find((b) => b.id === blockId)
+      if (!block) continue
+      for (const entry of [...block.entries].sort((a, b) => a.order - b.order)) {
+        if (!orderedTaskIds.includes(entry.taskId)) {
+          orderedTaskIds.push(entry.taskId)
+        }
       }
-      if (weight <= 0) continue
+    }
+
+    // Filter to valid, non-done, non-skipped tasks
+    const validTasks = orderedTaskIds.filter((tid) => {
+      if (skippedTaskIds.includes(tid)) return false
+      if (doneTasks.includes(`${tid}:${dateStr}`) || doneTasks.includes(`${tid}:${periodKey}`)) return false
+      if (!context.tasks.find((t) => t.id === tid)) return false
+      return true
+    })
+
+    const totalTasks = validTasks.length
+
+    for (let idx = 0; idx < validTasks.length; idx++) {
+      const tid = validTasks[idx]
+      const task = context.tasks.find((t) => t.id === tid)!
+
+      // Ascending weight: lower in list → higher weight (opposite of recovery)
+      // First task: base + 1, Last task: base + totalTasks
+      const taskWeight = baseWeight + (idx + 1)
 
       items.push({
         taskId: task.id,
@@ -478,7 +502,7 @@ function resolveDay(
         endMinutes: obStart + task.durationMinutes,
         isBackground: false,
         source: 'obligation',
-        weight,
+        weight: taskWeight,
         day: dayIndex,
         sourceId: ob.id,
         sourceName: ob.name,
