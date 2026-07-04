@@ -577,6 +577,12 @@ function placeItems(
 
     // Try placing at ideal startMinutes first
     let start = item.startMinutes
+
+    // Check expiry at ideal position
+    if (item.expiryTime !== undefined && start >= item.expiryTime) {
+      continue // already past expiry, drop
+    }
+
     if (!hasConflict(start, duration, occupied)) {
       item.startMinutes = start
       item.endMinutes = start + duration
@@ -589,6 +595,10 @@ function placeItems(
     let cursor = start
     let found = false
     while (cursor + duration <= 1440) {
+      // If scanning past expiry, drop the task
+      if (item.expiryTime !== undefined && cursor >= item.expiryTime) {
+        break
+      }
       if (!hasConflict(cursor, duration, occupied)) {
         item.startMinutes = cursor
         item.endMinutes = cursor + duration
@@ -600,7 +610,7 @@ function placeItems(
       cursor += 5
     }
 
-    // If no space after ideal time, task is dropped — never wrap to midnight
+    // If no space before expiry or end of day, task is dropped
   }
 
   return placed.sort((a, b) => a.startMinutes - b.startMinutes)
