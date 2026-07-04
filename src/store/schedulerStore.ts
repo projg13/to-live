@@ -225,9 +225,10 @@ function resolveDay(
           continue
         }
 
-        // Determine anchor start time
+        // Determine anchor start time — fall back to first anchor (Wake) if not matched
         const matchedAnchor = resolvedAnchors.find((a) => a.anchorId === bc.anchorId)
-        const anchorTime = matchedAnchor?.actualTime ?? 0
+        const fallbackAnchorTime = resolvedAnchors.length > 0 ? resolvedAnchors[0].actualTime : 360
+        const anchorTime = matchedAnchor?.actualTime ?? fallbackAnchorTime
 
         if (dayIndex === 0) {
           console.log(`    block "${block.name}" → anchor ${bc.anchorId.slice(0,8)} (matchedAnchor: ${!!matchedAnchor}, anchorTime: ${anchorTime}), ${block.entries.length} entries`)
