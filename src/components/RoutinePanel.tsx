@@ -4,7 +4,7 @@ import { useBlockStore } from '../store/blockStore'
 import { useTaskStore } from '../store/taskStore'
 import { useAnchorStore } from '../store/anchorStore'
 import type { Routine, RoutineTaskConfig, RoutineBlockConfig } from '../types/routine'
-import { formatTime } from '../types/anchor'
+
 
 // Icons
 const PlusIcon = () => (
@@ -101,8 +101,7 @@ function RoutinePanel() {
                 </span>
 
                 <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
-                  <span>spawn @ {formatTime(routine.idealSpawnTime)}</span>
-                  <span>• {routine.blockConfigs.length} block(s)</span>
+                  <span>{routine.blockConfigs.length} block(s)</span>
                   <span>• {routine.taskConfigs?.length ?? 0} task config(s)</span>
                 </div>
               </div>
@@ -166,7 +165,7 @@ function RoutineEditor({
 
   const [name, setName] = useState(initial?.name ?? '')
   const [blockConfigs, setBlockConfigs] = useState<RoutineBlockConfig[]>(initial?.blockConfigs ?? [])
-  const [idealSpawnTime, setIdealSpawnTime] = useState(initial?.idealSpawnTime ?? 360)
+
   const [taskConfigs, setTaskConfigs] = useState<RoutineTaskConfig[]>(initial?.taskConfigs ?? [])
   const [enabled, setEnabled] = useState(initial?.enabled ?? true)
 
@@ -183,7 +182,7 @@ function RoutineEditor({
       name: name.trim(),
       blockConfigs,
 
-      idealSpawnTime,
+
       taskConfigs: taskConfigs.length > 0 ? taskConfigs : undefined,
       enabled,
     })
@@ -339,19 +338,6 @@ function RoutineEditor({
             </div>
           )
         })()}
-      </div>
-
-      {/* Spawn time */}
-      <div>
-        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
-          Ideal Spawn Time
-        </label>
-        <input
-          type="time"
-          value={toTimeStr(idealSpawnTime)}
-          onChange={(e) => setIdealSpawnTime(fromTimeStr(e.target.value))}
-          className="text-xs px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
-        />
       </div>
 
 

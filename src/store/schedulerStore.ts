@@ -172,11 +172,38 @@ function resolveDay(
 
   // Skip routine/block tasks if event suspends regular AND no weightOffset lets them through
   const allowRoutines = !suspendRegular || eventWeightOffset > 0
+
+  // DEBUG: trace resolve chain
+  if (dayIndex === 0) {
+    console.group(`🔍 [Scheduler] Day ${dayIndex} (${dateStr})`)
+    console.log('dayPlanId:', dayPlanId, '| dayPlan found:', !!dayPlan)
+    console.log('weekPlan mapping:', context.weekPlan)
+    console.log('dayOfWeek:', dayOfWeek)
+    if (dayPlan) {
+      console.log('dayPlan.routineIds:', dayPlan.routineIds)
+      console.log('dayPlan.templateId:', dayPlan.templateId)
+    }
+    console.log('templates available:', context.templates?.length ?? 0)
+    console.log('dayTemplate found:', !!dayTemplate, dayTemplate?.id)
+    console.log('resolvedAnchors:', resolvedAnchors.map((a) => `${a.anchorName}@${a.actualTime}`))
+    console.log('allowRoutines:', allowRoutines)
+    console.log('all routines:', context.routines.map((r) => `${r.name}(${r.id.slice(0,8)}) enabled=${r.enabled} blocks=${r.blockConfigs.length}`))
+    console.log('all blocks:', context.blocks.map((b) => `${b.name}(${b.id.slice(0,8)}) entries=${b.entries.length}`))
+    console.log('all tasks:', context.tasks.length)
+  }
+
   if (allowRoutines && dayPlan) {
     // Get active routines for this day plan
     const activeRoutines = context.routines.filter(
       (r) => r.enabled && dayPlan.routineIds.includes(r.id)
     )
+
+    if (dayIndex === 0) {
+      console.log('activeRoutines:', activeRoutines.map((r) => r.name))
+      if (activeRoutines.length === 0) {
+        console.warn('⚠️ No active routines! Check: routineIds in dayPlan match actual routine IDs, and routines are enabled')
+      }
+    }
 
     // Collect tasks from routines → blocks
     for (const routine of activeRoutines) {
@@ -193,21 +220,35 @@ function resolveDay(
 
       for (const bc of routine.blockConfigs) {
         const block = context.blocks.find((b) => b.id === bc.blockId)
-        if (!block) continue
+        if (!block) {
+          if (dayIndex === 0) console.warn(`    ❌ block ${bc.blockId.slice(0,8)} NOT FOUND`)
+          continue
+        }
 
         // Determine anchor start time
         const matchedAnchor = resolvedAnchors.find((a) => a.anchorId === bc.anchorId)
-        const anchorTime = matchedAnchor
-          ? Math.max(routine.idealSpawnTime, matchedAnchor.actualTime)
-          : routine.idealSpawnTime
+        const anchorTime = matchedAnchor?.actualTime ?? 0
+
+        if (dayIndex === 0) {
+          console.log(`    block "${block.name}" → anchor ${bc.anchorId.slice(0,8)} (matchedAnchor: ${!!matchedAnchor}, anchorTime: ${anchorTime}), ${block.entries.length} entries`)
+        }
 
         for (const entry of block.entries) {
-          if (skippedTaskIds.includes(entry.taskId)) continue
+          if (skippedTaskIds.includes(entry.taskId)) {
+            if (dayIndex === 0) console.log(`      ⏭ ${entry.taskId.slice(0,8)}: SKIPPED`)
+            continue
+          }
           // Anchor-scoped done check: task resets per anchor cycle
           const anchorDoneKey = `${entry.taskId}:${bc.anchorId}:${dateStr}`
-          if (doneTasks.includes(anchorDoneKey) || doneTasks.includes(`${entry.taskId}:${periodKey}`)) continue
+          if (doneTasks.includes(anchorDoneKey) || doneTasks.includes(`${entry.taskId}:${periodKey}`)) {
+            if (dayIndex === 0) console.log(`      ✅ ${entry.taskId.slice(0,8)}: ALREADY DONE`)
+            continue
+          }
           const task = context.tasks.find((t) => t.id === entry.taskId)
-          if (!task) continue
+          if (!task) {
+            if (dayIndex === 0) console.warn(`      ❌ ${entry.taskId.slice(0,8)}: TASK NOT FOUND in context`)
+            continue
+          }
 
           // If any ancestor is skipped, skip this task too
           let ancestor = task.parentId
@@ -217,16 +258,22 @@ function resolveDay(
             const parentTask = context.tasks.find((t) => t.id === ancestor)
             ancestor = parentTask?.parentId
           }
-          if (ancestorSkipped) continue
+          if (ancestorSkipped) {
+            if (dayIndex === 0) console.log(`      ⏭ ${task.title}: ANCESTOR SKIPPED`)
+            continue
+          }
 
           // Resolve weight
           let weight = task.weight
           const taskConfig = routine.taskConfigs?.find((tc) => tc.taskId === task.id)
 
-          // Check expiry: relative to routine's IDEAL spawn time
+          // Check expiry: relative to the ANCHOR start time
           if (taskConfig?.expiresAfterMinutes !== undefined) {
-            const expiryTime = routine.idealSpawnTime + taskConfig.expiresAfterMinutes
-            if (anchorTime >= expiryTime) continue
+            const expiryTime = anchorTime + taskConfig.expiresAfterMinutes
+            if (anchorTime >= expiryTime) {
+              if (dayIndex === 0) console.log(`      ⏰ ${task.title}: EXPIRED (anchor@${anchorTime} >= expiry@${expiryTime})`)
+              continue
+            }
           }
 
           if (taskConfig?.slotWeights && Object.keys(taskConfig.slotWeights).length > 0) {
@@ -236,7 +283,7 @@ function resolveDay(
             if (slotId) {
               const slotCurve = taskConfig.slotWeights[slotId]
               if (slotCurve && slotCurve.length > 0) {
-                const offsetInSlot = Math.max(0, anchorTime - routine.idealSpawnTime)
+                const offsetInSlot = Math.max(0, anchorTime - (matchedAnchor?.idealTime ?? anchorTime))
                 weight = getSlotWeight(slotCurve, offsetInSlot)
               } else {
                 weight = fallback
@@ -244,6 +291,7 @@ function resolveDay(
             } else {
               weight = fallback
             }
+            if (dayIndex === 0) console.log(`      🎚 ${task.title}: slotWeight resolved to ${weight} (fallback=${fallback})`)
           }
 
           // Apply event weight offset
@@ -251,10 +299,17 @@ function resolveDay(
             weight = weight - eventWeightOffset
           }
 
-          if (weight <= 0) continue
+          if (weight <= 0) {
+            if (dayIndex === 0) console.log(`      ⚖️ ${task.title}: WEIGHT=0 (base=${task.weight}, resolved=${weight})`)
+            continue
+          }
 
+          if (dayIndex === 0) console.log(`      ✓ ${task.title}: weight=${weight} @${anchorTime}`)
           candidates.push({ task, entry, anchorId: bc.anchorId, anchorTime, weight })
         }
+      }
+      if (dayIndex === 0) {
+        console.log(`  routine "${routine.name}": ${candidates.length} candidates`, candidates.map((c) => `${c.task.title}(w=${c.weight},@${c.anchorTime})`))
       }
 
       // Sort candidates: first by anchor time (asc), then by weight (desc) within same anchor
@@ -289,7 +344,7 @@ function resolveDay(
 
         // Double-check expiry against actual placement time
         if (taskConfig?.expiresAfterMinutes !== undefined) {
-          const expiryTime = routine.idealSpawnTime + taskConfig.expiresAfterMinutes
+          const expiryTime = cand.anchorTime + taskConfig.expiresAfterMinutes
           if (idealStart >= expiryTime) continue
         }
 
@@ -336,6 +391,11 @@ function resolveDay(
         }
       }
     }
+  }
+
+  if (dayIndex === 0) {
+    console.log('Total items collected:', items.length)
+    console.groupEnd()
   }
 
 

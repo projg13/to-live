@@ -9,7 +9,7 @@ export interface RoutineTaskConfig {
   taskId: string
   slotWeights?: Record<string, SlotWeightPoint[]>  // slotId → piecewise weight curve relative to slot start
   fallbackWeight?: number                            // weight for slots NOT in slotWeights map (default: 0)
-  expiresAfterMinutes?: number                       // task dies after this many minutes from routine spawn
+  expiresAfterMinutes?: number                       // task dies after this many minutes from its ANCHOR start
   idealTime?: number                                 // minutes from midnight — ideal time for this task
 }
 
@@ -41,9 +41,6 @@ export interface Routine {
   id: string
   name: string
   blockConfigs: RoutineBlockConfig[]   // block → anchor mapping
-
-  // Ideal spawn time (minutes from midnight)
-  idealSpawnTime: number
 
   // Per-task overrides
   taskConfigs?: RoutineTaskConfig[]
