@@ -477,21 +477,41 @@ function resolveDay(
 
     if (debug) console.log(`    ✓ Bracket: maxDaysRemaining=${bracket.maxDaysRemaining} timeCurve=${JSON.stringify(bracket.timeCurve)}`)
 
-    // Find peak weight from the curve — used for weight evaluation
-    // Time curve controls WEIGHT, not placement. Placement starts at obStart.
+    // Find: (1) peak weight for priority, (2) earliest time weight > 0 for placement
     let peakWeight = 0
-    let peakTime = obStart
+    let windowStart = 0  // earliest time the curve has weight > 0
+
+    // Find peak weight
     for (const pt of bracket.timeCurve) {
       if (pt.value > peakWeight) {
         peakWeight = pt.value
-        peakTime = pt.time
       }
     }
 
-    // Evaluate weight at the peak time (where curve is strongest)
-    // but place at obStart — placeItems will find the actual slot via weight priority
-    let baseWeight = peakWeight > 0 ? peakWeight : getObligationWeight(bracket.timeCurve, obStart)
-    if (debug) console.log(`    ⚖️ peakWeight=${peakWeight} @peakTime=${peakTime} placement@${obStart} baseWeight=${baseWeight}`)
+    // Find start of weight window: first time where interpolated value > 0
+    // Scan curve segments for where weight transitions from 0 to non-zero
+    if (bracket.timeCurve.length > 0) {
+      if (bracket.timeCurve[0].value > 0) {
+        windowStart = bracket.timeCurve[0].time
+      } else {
+        for (let i = 0; i < bracket.timeCurve.length - 1; i++) {
+          const a = bracket.timeCurve[i]
+          const b = bracket.timeCurve[i + 1]
+          if (a.value === 0 && b.value > 0) {
+            // Weight starts rising right after the zero point
+            windowStart = a.time + 1  // 1 minute after zero-crossing
+            break
+          }
+        }
+      }
+    }
+
+    // Placement: max(obStart, windowStart) — never before now, never before weight window
+    const obPlacement = Math.max(obStart, windowStart)
+
+    // Use peak weight as the base (the obligation competes at its strongest)
+    let baseWeight = peakWeight > 0 ? peakWeight : getObligationWeight(bracket.timeCurve, obPlacement)
+    if (debug) console.log(`    ⚖️ peakWeight=${peakWeight} windowStart=${windowStart} placement@${obPlacement} baseWeight=${baseWeight}`)
 
     if (eventWeightOffset > 0) {
       baseWeight = baseWeight - eventWeightOffset
@@ -534,13 +554,13 @@ function resolveDay(
       // First task: base + 1, Last task: base + totalTasks
       const taskWeight = baseWeight + (idx + 1)
 
-      if (debug) console.log(`      ✓ ${task.title}: weight=${taskWeight} @${obStart}`)
+      if (debug) console.log(`      ✓ ${task.title}: weight=${taskWeight} @${obPlacement}`)
 
       items.push({
         taskId: task.id,
         title: task.title,
-        startMinutes: obStart,
-        endMinutes: obStart + task.durationMinutes,
+        startMinutes: obPlacement,
+        endMinutes: obPlacement + task.durationMinutes,
         isBackground: false,
         source: 'obligation',
         weight: taskWeight,
