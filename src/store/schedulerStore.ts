@@ -22,6 +22,7 @@ interface SchedulerStore {
   doneItems: ScheduledItem[]          // stored positions of done tasks for display
   postponedTasks: string[]
   lastDoneAt: Record<number, number>  // day → minutes from midnight (latest done-at time)
+  debugMode: boolean                  // persisted debug toggle
 
   // Actions
   resolve: (context: ResolveContext) => void
@@ -37,6 +38,7 @@ interface SchedulerStore {
   unmarkTask: (taskId: string) => void
   insertTask: (taskId: string, startTime: number, day: number) => void
   recalibrateFrom: (minutes: number, day: number) => void
+  toggleDebug: () => void
   undo: () => void
   clearSchedule: () => void
 }
@@ -75,7 +77,8 @@ function resolveDay(
   adhocTasks: AdhocTask[],
   skippedTaskIds: string[],
   doneTasks: string[],
-  lastDoneAt?: number
+  lastDoneAt?: number,
+  debug: boolean = false
 ): DaySchedule {
   const dayOfWeek = getDayOfWeek(dateStr)
   const periodKey = dateStr.slice(0, 7) // YYYY-MM
@@ -174,7 +177,7 @@ function resolveDay(
   const allowRoutines = !suspendRegular || eventWeightOffset > 0
 
   // DEBUG: trace resolve chain
-  if (dayIndex === 0) {
+  if (debug) {
     console.group(`🔍 [Scheduler] Day ${dayIndex} (${dateStr})`)
     console.log('dayPlanId:', dayPlanId, '| dayPlan found:', !!dayPlan)
     console.log('weekPlan mapping:', context.weekPlan)
@@ -198,7 +201,7 @@ function resolveDay(
       (r) => r.enabled && dayPlan.routineIds.includes(r.id)
     )
 
-    if (dayIndex === 0) {
+    if (debug) {
       console.log('activeRoutines:', activeRoutines.map((r) => r.name))
       if (activeRoutines.length === 0) {
         console.warn('⚠️ No active routines! Check: routineIds in dayPlan match actual routine IDs, and routines are enabled')
@@ -221,7 +224,7 @@ function resolveDay(
       for (const bc of routine.blockConfigs) {
         const block = context.blocks.find((b) => b.id === bc.blockId)
         if (!block) {
-          if (dayIndex === 0) console.warn(`    ❌ block ${bc.blockId.slice(0,8)} NOT FOUND`)
+          if (debug) console.warn(`    ❌ block ${bc.blockId.slice(0,8)} NOT FOUND`)
           continue
         }
 
@@ -230,24 +233,24 @@ function resolveDay(
         const fallbackAnchorTime = resolvedAnchors.length > 0 ? resolvedAnchors[0].actualTime : 360
         const anchorTime = matchedAnchor?.actualTime ?? fallbackAnchorTime
 
-        if (dayIndex === 0) {
+        if (debug) {
           console.log(`    block "${block.name}" → anchor ${bc.anchorId.slice(0,8)} (matchedAnchor: ${!!matchedAnchor}, anchorTime: ${anchorTime}), ${block.entries.length} entries`)
         }
 
         for (const entry of block.entries) {
           if (skippedTaskIds.includes(entry.taskId)) {
-            if (dayIndex === 0) console.log(`      ⏭ ${entry.taskId.slice(0,8)}: SKIPPED`)
+            if (debug) console.log(`      ⏭ ${entry.taskId.slice(0,8)}: SKIPPED`)
             continue
           }
           // Anchor-scoped done check: task resets per anchor cycle
           const anchorDoneKey = `${entry.taskId}:${bc.anchorId}:${dateStr}`
           if (doneTasks.includes(anchorDoneKey) || doneTasks.includes(`${entry.taskId}:${periodKey}`)) {
-            if (dayIndex === 0) console.log(`      ✅ ${entry.taskId.slice(0,8)}: ALREADY DONE`)
+            if (debug) console.log(`      ✅ ${entry.taskId.slice(0,8)}: ALREADY DONE`)
             continue
           }
           const task = context.tasks.find((t) => t.id === entry.taskId)
           if (!task) {
-            if (dayIndex === 0) console.warn(`      ❌ ${entry.taskId.slice(0,8)}: TASK NOT FOUND in context`)
+            if (debug) console.warn(`      ❌ ${entry.taskId.slice(0,8)}: TASK NOT FOUND in context`)
             continue
           }
 
@@ -260,7 +263,7 @@ function resolveDay(
             ancestor = parentTask?.parentId
           }
           if (ancestorSkipped) {
-            if (dayIndex === 0) console.log(`      ⏭ ${task.title}: ANCESTOR SKIPPED`)
+            if (debug) console.log(`      ⏭ ${task.title}: ANCESTOR SKIPPED`)
             continue
           }
 
@@ -272,7 +275,7 @@ function resolveDay(
           if (taskConfig?.expiresAfterMinutes !== undefined) {
             const expiryTime = anchorTime + taskConfig.expiresAfterMinutes
             if (anchorTime >= expiryTime) {
-              if (dayIndex === 0) console.log(`      ⏰ ${task.title}: EXPIRED (anchor@${anchorTime} >= expiry@${expiryTime})`)
+              if (debug) console.log(`      ⏰ ${task.title}: EXPIRED (anchor@${anchorTime} >= expiry@${expiryTime})`)
               continue
             }
           }
@@ -292,7 +295,7 @@ function resolveDay(
             } else {
               weight = fallback
             }
-            if (dayIndex === 0) console.log(`      🎚 ${task.title}: slotWeight resolved to ${weight} (fallback=${fallback})`)
+            if (debug) console.log(`      🎚 ${task.title}: slotWeight resolved to ${weight} (fallback=${fallback})`)
           }
 
           // Apply event weight offset
@@ -301,15 +304,15 @@ function resolveDay(
           }
 
           if (weight <= 0) {
-            if (dayIndex === 0) console.log(`      ⚖️ ${task.title}: WEIGHT=0 (base=${task.weight}, resolved=${weight})`)
+            if (debug) console.log(`      ⚖️ ${task.title}: WEIGHT=0 (base=${task.weight}, resolved=${weight})`)
             continue
           }
 
-          if (dayIndex === 0) console.log(`      ✓ ${task.title}: weight=${weight} @${anchorTime}`)
+          if (debug) console.log(`      ✓ ${task.title}: weight=${weight} @${anchorTime}`)
           candidates.push({ task, entry, anchorId: bc.anchorId, anchorTime, weight })
         }
       }
-      if (dayIndex === 0) {
+      if (debug) {
         console.log(`  routine "${routine.name}": ${candidates.length} candidates`, candidates.map((c) => `${c.task.title}(w=${c.weight},@${c.anchorTime})`))
       }
 
@@ -342,6 +345,10 @@ function resolveDay(
         // User can override per-task via taskConfig.idealTime
         const taskIdealTime = taskConfig?.idealTime ?? cand.anchorTime
         const idealStart = Math.max(taskIdealTime, cursor)
+
+        if (debug) {
+          console.log(`      📍 ${cand.task.title}: anchorTime=${cand.anchorTime} taskConfig.idealTime=${taskConfig?.idealTime} → taskIdealTime=${taskIdealTime} cursor=${cursor} → idealStart=${idealStart}`)
+        }
 
         // Double-check expiry against actual placement time
         if (taskConfig?.expiresAfterMinutes !== undefined) {
@@ -394,7 +401,7 @@ function resolveDay(
     }
   }
 
-  if (dayIndex === 0) {
+  if (debug) {
     console.log('Total items collected:', items.length)
     console.groupEnd()
   }
@@ -609,6 +616,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
       doneTasks: [],
       doneItems: [],
       postponedTasks: [],
+      debugMode: false,
       lastDoneAt: {},
 
       resolve: (context) => {
@@ -636,7 +644,8 @@ export const useSchedulerStore = create<SchedulerStore>()(
             state.adhocTasks,
             [...state.skippedTaskIds, ...state.postponedTasks],
             freshDoneTasks,
-            state.lastDoneAt[i]
+            state.lastDoneAt[i],
+            state.debugMode && i === 0  // only debug day 0
           ))
         }
 
@@ -647,6 +656,8 @@ export const useSchedulerStore = create<SchedulerStore>()(
             generated: new Date().toISOString(),
           },
         })
+
+        if (state.debugMode) console.log('🔍 [Scheduler] debugMode is ON — toggle with toggleDebug()')
 
         // Auto snapshot (debounced — avoids 409 SHA conflicts from rapid resolves)
         clearTimeout((globalThis as any).__backupTimer)
@@ -854,6 +865,12 @@ export const useSchedulerStore = create<SchedulerStore>()(
           }
           return {}
         }),
+
+      toggleDebug: () => {
+        const current = get().debugMode
+        set({ debugMode: !current })
+        console.log(`🔍 [Debug] ${!current ? 'ON' : 'OFF'} — recalculate to see logs`)
+      },
 
       clearSchedule: () =>
         set({ schedule: null, confirmedAnchors: [], adhocTasks: [], skippedTaskIds: [], doneTasks: [], doneItems: [], postponedTasks: [], lastDoneAt: {} }),

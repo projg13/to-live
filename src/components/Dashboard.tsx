@@ -260,6 +260,16 @@ function Dashboard() {
               Reset
             </button>
             <button
+              onClick={() => scheduler.toggleDebug()}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all border active:scale-95 cursor-pointer ${
+                scheduler.debugMode
+                  ? 'bg-amber-950/30 text-amber-400 border-amber-800/40'
+                  : 'bg-slate-950/65 text-slate-500 border-slate-850 hover:bg-slate-900'
+              }`}
+            >
+              🔍 {scheduler.debugMode ? 'Debug ON' : 'Debug'}
+            </button>
+            <button
               onClick={() => setShowDebug(!showDebug)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border cursor-pointer active:scale-95 ${
                 showDebug
