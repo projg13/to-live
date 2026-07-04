@@ -459,16 +459,50 @@ function RoutineEditor({
                   {/* Slot weights points */}
                   <div className="space-y-2 mt-2">
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Slot Weight Spikes (minutes offset from anchor ideal)
+                      Slot Weight Curves
                     </span>
-                    {slots.map((s) => {
-                      const points = config?.slotWeights?.[s.id] ?? []
+
+                    {/* Dropdown to add a slot */}
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          const current = config?.slotWeights ?? {}
+                          setTaskConfig(taskId, { slotWeights: { ...current, [e.target.value]: [{ offsetMinutes: 0, value: 100 }] } })
+                        }
+                      }}
+                      className="text-[10px] px-2 py-1 rounded-lg border border-slate-800 bg-slate-950 text-slate-350 focus:outline-none cursor-pointer w-full"
+                    >
+                      <option value="" className="bg-slate-950 text-slate-500">＋ Add slot curve…</option>
+                      {slots
+                        .filter((s) => !config?.slotWeights?.[s.id])
+                        .map((s) => (
+                          <option key={s.id} value={s.id} className="bg-slate-950 text-slate-200">{s.name}</option>
+                        ))}
+                    </select>
+
+                    {/* Only show slots that have curves */}
+                    {Object.entries(config?.slotWeights ?? {}).map(([slotId, points]) => {
+                      const slot = slots.find((s) => s.id === slotId)
                       return (
                         <div
-                          key={s.id}
+                          key={slotId}
                           className="pl-3 border-l border-slate-850 py-1.5 space-y-2 bg-slate-955/30 p-2.5 rounded-lg border border-slate-850/60"
                         >
-                          <span className="text-[10px] font-bold text-slate-400">{s.name}</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-slate-400">{slot?.name ?? slotId}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const current = { ...config?.slotWeights }
+                                delete current[slotId]
+                                setTaskConfig(taskId, { slotWeights: Object.keys(current).length > 0 ? current : undefined })
+                              }}
+                              className="p-0.5 rounded text-slate-500 hover:text-rose-400 cursor-pointer"
+                            >
+                              <XIcon />
+                            </button>
+                          </div>
                           
                           <div className="space-y-1.5">
                             {points.map((pt, pi) => (
@@ -481,7 +515,7 @@ function RoutineEditor({
                                     const updated = [...points]
                                     updated[pi] = { ...updated[pi], offsetMinutes: Number(e.target.value) || 0 }
                                     const current = config?.slotWeights ?? {}
-                                    setTaskConfig(taskId, { slotWeights: { ...current, [s.id]: updated } })
+                                    setTaskConfig(taskId, { slotWeights: { ...current, [slotId]: updated } })
                                   }}
                                   className="w-14 px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded text-center text-slate-300"
                                 />
@@ -493,7 +527,7 @@ function RoutineEditor({
                                     const updated = [...points]
                                     updated[pi] = { ...updated[pi], value: Number(e.target.value) || 0 }
                                     const current = config?.slotWeights ?? {}
-                                    setTaskConfig(taskId, { slotWeights: { ...current, [s.id]: updated } })
+                                    setTaskConfig(taskId, { slotWeights: { ...current, [slotId]: updated } })
                                   }}
                                   className="w-14 px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded text-center text-slate-202 font-semibold"
                                 />
@@ -503,10 +537,10 @@ function RoutineEditor({
                                     const updated = points.filter((_, j) => j !== pi)
                                     const current = config?.slotWeights ?? {}
                                     if (updated.length === 0) {
-                                      const { [s.id]: _, ...rest } = current
+                                      const { [slotId]: _, ...rest } = current
                                       setTaskConfig(taskId, { slotWeights: Object.keys(rest).length > 0 ? rest : undefined })
                                     } else {
-                                      setTaskConfig(taskId, { slotWeights: { ...current, [s.id]: updated } })
+                                      setTaskConfig(taskId, { slotWeights: { ...current, [slotId]: updated } })
                                     }
                                   }}
                                   className="p-1 rounded text-slate-400 hover:bg-rose-955/20 hover:text-rose-455 transition-all cursor-pointer"
@@ -523,7 +557,7 @@ function RoutineEditor({
                               const last = points[points.length - 1]
                               const newPt = { offsetMinutes: (last?.offsetMinutes ?? 0) + 60, value: 0 }
                               const current = config?.slotWeights ?? {}
-                              setTaskConfig(taskId, { slotWeights: { ...current, [s.id]: [...points, newPt] } })
+                              setTaskConfig(taskId, { slotWeights: { ...current, [slotId]: [...points, newPt] } })
                             }}
                             className="text-[9px] font-bold text-cyan-400 hover:underline flex items-center gap-0.5 cursor-pointer"
                           >
