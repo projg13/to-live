@@ -448,23 +448,40 @@ function resolveDay(
   if (dayIndex === 0 && allowRoutines) {
 
   // Obligations
+  if (debug) console.group(`📋 Obligations: ${context.obligations.length} total, obStart=${obStart}`)
   for (const ob of context.obligations) {
-    if (!ob.enabled) continue
+    if (!ob.enabled) {
+      if (debug) console.log(`  ⏭ "${ob.name}": disabled`)
+      continue
+    }
     const resolvedDeadline = resolveObligationDeadline(ob, dateStr)
     const daysRemaining = resolvedDeadline
       ? Math.max(0, Math.ceil((new Date(resolvedDeadline).getTime() - new Date(dateStr).getTime()) / 86400000))
       : 999
 
+    if (debug) console.log(`  📌 "${ob.name}": deadline=${resolvedDeadline ?? 'none'} daysRemaining=${daysRemaining} brackets=${ob.weightBrackets.length}`)
+
     const bracket = getActiveBracket(ob.weightBrackets, daysRemaining)
-    if (!bracket) continue
+    if (!bracket) {
+      if (debug) console.log(`    ❌ No matching bracket for daysRemaining=${daysRemaining}`)
+      continue
+    }
+
+    if (debug) console.log(`    ✓ Bracket: maxDaysRemaining=${bracket.maxDaysRemaining} timeCurve=${JSON.stringify(bracket.timeCurve)}`)
 
     // Base weight from bracket's time curve evaluated at actual scheduling time
     // This makes time-of-day curves work: e.g., evening-only weight when 10 days out
     let baseWeight = getObligationWeight(bracket.timeCurve, obStart)
+    if (debug) console.log(`    ⚖️ baseWeight at obStart(${obStart}): ${baseWeight}`)
+
     if (eventWeightOffset > 0) {
       baseWeight = baseWeight - eventWeightOffset
+      if (debug) console.log(`    ⚖️ after eventOffset(-${eventWeightOffset}): ${baseWeight}`)
     }
-    if (baseWeight <= 0) continue
+    if (baseWeight <= 0) {
+      if (debug) console.log(`    ❌ Weight <= 0, skipping`)
+      continue
+    }
 
     // Collect all tasks in order: direct tasks first, then block entries
     const orderedTaskIds: string[] = ob.tasks.map((t) => t.taskId)
@@ -486,6 +503,8 @@ function resolveDay(
       return true
     })
 
+    if (debug) console.log(`    📝 Tasks: ${orderedTaskIds.length} total → ${validTasks.length} valid`)
+
     const totalTasks = validTasks.length
 
     for (let idx = 0; idx < validTasks.length; idx++) {
@@ -495,6 +514,8 @@ function resolveDay(
       // Ascending weight: lower in list → higher weight (opposite of recovery)
       // First task: base + 1, Last task: base + totalTasks
       const taskWeight = baseWeight + (idx + 1)
+
+      if (debug) console.log(`      ✓ ${task.title}: weight=${taskWeight} @${obStart}`)
 
       items.push({
         taskId: task.id,
@@ -510,6 +531,7 @@ function resolveDay(
       })
     }
   }
+  if (debug) console.groupEnd()
 
   // Recovery plans (triggered only)
   // Blocks provide tasks (duration only), weight comes from plan + order offset
