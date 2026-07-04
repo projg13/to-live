@@ -469,10 +469,22 @@ function resolveDay(
 
     if (debug) console.log(`    ✓ Bracket: maxDaysRemaining=${bracket.maxDaysRemaining} timeCurve=${JSON.stringify(bracket.timeCurve)}`)
 
-    // Base weight from bracket's time curve evaluated at actual scheduling time
-    // This makes time-of-day curves work: e.g., evening-only weight when 10 days out
-    let baseWeight = getObligationWeight(bracket.timeCurve, obStart)
-    if (debug) console.log(`    ⚖️ baseWeight at obStart(${obStart}): ${baseWeight}`)
+    // Find peak time in the curve (where weight is highest) for placement
+    // This ensures obligations are placed during their active window, not at obStart
+    let peakTime = obStart
+    let peakWeight = 0
+    for (const pt of bracket.timeCurve) {
+      if (pt.value > peakWeight) {
+        peakWeight = pt.value
+        peakTime = pt.time
+      }
+    }
+    // Obligation starts at max(obStart, peakTime) — never before now, but target the peak
+    const obIdealTime = Math.max(obStart, peakTime)
+
+    // Evaluate weight at the ideal placement time
+    let baseWeight = getObligationWeight(bracket.timeCurve, obIdealTime)
+    if (debug) console.log(`    ⚖️ peakTime=${peakTime} obIdealTime=${obIdealTime} baseWeight=${baseWeight}`)
 
     if (eventWeightOffset > 0) {
       baseWeight = baseWeight - eventWeightOffset
@@ -515,13 +527,13 @@ function resolveDay(
       // First task: base + 1, Last task: base + totalTasks
       const taskWeight = baseWeight + (idx + 1)
 
-      if (debug) console.log(`      ✓ ${task.title}: weight=${taskWeight} @${obStart}`)
+      if (debug) console.log(`      ✓ ${task.title}: weight=${taskWeight} @${obIdealTime}`)
 
       items.push({
         taskId: task.id,
         title: task.title,
-        startMinutes: obStart,
-        endMinutes: obStart + task.durationMinutes,
+        startMinutes: obIdealTime,
+        endMinutes: obIdealTime + task.durationMinutes,
         isBackground: false,
         source: 'obligation',
         weight: taskWeight,
