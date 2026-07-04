@@ -106,14 +106,11 @@ function resolveDay(
   // Get confirmed anchors for this day
   const dayConfirmations = confirmedAnchors.filter((c) => c.day === dayIndex)
 
-  // Get template for this day — best match has same anchor set as day plan
+  // Get template for this day — directly from dayPlan.templateId
   const templates = context.templates ?? []
-  const planAnchors = dayPlan?.anchorIds ?? []
-  const dayTemplate = templates.find((t) => {
-    const tplAnchors = t.entries.map((e) => e.anchorId)
-    return tplAnchors.length === planAnchors.length &&
-      tplAnchors.every((a) => planAnchors.includes(a))
-  }) ?? templates[0]
+  const dayTemplate = dayPlan?.templateId
+    ? templates.find((t) => t.id === dayPlan.templateId)
+    : templates[0]
 
   // Build resolved anchor times (template ideal → adjusted by confirmations/overflow)
   const resolvedAnchors: { anchorId: string; anchorName: string; idealTime: number; actualTime: number }[] = []

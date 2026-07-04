@@ -3,6 +3,7 @@ import { usePlannerStore } from '../store/plannerStore'
 import { useAnchorStore } from '../store/anchorStore'
 import { useRoutineStore } from '../store/routineStore'
 import type { DayPlan } from '../types/planner'
+import { formatTime } from '../types/anchor'
 
 // Icons
 const PlusIcon = () => (
@@ -37,7 +38,7 @@ const CalendarIcon = () => (
 
 function DayPlannerPanel() {
   const { dayPlans, weekPlan, addDayPlan, updateDayPlan, deleteDayPlan, setWeekDay } = usePlannerStore()
-  const { anchors } = useAnchorStore()
+  const { templates, slots, anchors } = useAnchorStore()
   const { routines } = useRoutineStore()
   const [editing, setEditing] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -51,7 +52,7 @@ function DayPlannerPanel() {
         <div className="border-b border-slate-800 pb-2 flex justify-between items-center">
           <div>
             <h3 className="text-lg font-black tracking-wide text-slate-100">Day Templates</h3>
-            <p className="text-xs text-slate-400">Configure core anchor rules and routine pairings.</p>
+            <p className="text-xs text-slate-400">Pick an anchor template → see its slots → assign routines.</p>
           </div>
           {!creating && (
             <button
@@ -66,6 +67,8 @@ function DayPlannerPanel() {
         {creating && (
           <div className="bg-slate-955 border border-slate-800 rounded-2xl p-4">
             <DayPlanEditor
+              templates={templates}
+              slots={slots}
               anchors={anchors}
               routines={routines}
               onSave={(plan) => {
@@ -84,6 +87,8 @@ function DayPlannerPanel() {
                 <div key={plan.id} className="bg-slate-955 border border-slate-800 rounded-2xl p-4 md:col-span-2">
                   <DayPlanEditor
                     initial={plan}
+                    templates={templates}
+                    slots={slots}
                     anchors={anchors}
                     routines={routines}
                     onSave={(updated) => {
@@ -100,6 +105,8 @@ function DayPlannerPanel() {
               )
             }
 
+            const tpl = templates.find((t) => t.id === plan.templateId)
+
             return (
               <div
                 key={plan.id}
@@ -107,13 +114,18 @@ function DayPlannerPanel() {
                 className="group p-4 bg-slate-955/40 hover:bg-slate-900 rounded-2xl border border-slate-800/80 shadow-sm cursor-pointer hover:border-cyan-500/25 transition-all duration-200 flex flex-col justify-between"
               >
                 <div>
-                  <span className="font-bold text-slate-200 text-[15px] block mb-2">
+                  <span className="font-bold text-slate-200 text-[15px] block mb-1">
                     {plan.name}
                   </span>
+                  <span className="text-[11px] text-slate-500">
+                    {tpl ? tpl.name : 'No template'}
+                  </span>
                   <div className="flex flex-wrap gap-1.5 mt-2">
-                    <span className="inline-flex text-[10px] font-mono font-bold uppercase tracking-wider bg-slate-950 border border-slate-850 px-2 py-0.5 rounded text-slate-400">
-                      {plan.anchorIds.length} anchor(s)
-                    </span>
+                    {tpl && (
+                      <span className="inline-flex text-[10px] font-mono font-bold uppercase tracking-wider bg-slate-950 border border-slate-850 px-2 py-0.5 rounded text-slate-400">
+                        {tpl.entries.length} anchor(s)
+                      </span>
+                    )}
                     <span className="inline-flex text-[10px] font-mono font-bold uppercase tracking-wider bg-slate-950 border border-slate-850 px-2 py-0.5 rounded text-slate-400">
                       {plan.routineIds.length} routine(s)
                     </span>
@@ -122,7 +134,7 @@ function DayPlannerPanel() {
 
                 <div className="flex justify-end pt-3 mt-3 border-t border-slate-850 opacity-0 group-hover:opacity-100 transition-opacity">
                   <span className="text-[11px] font-bold text-cyan-400">
-                    Edit Plan pairing
+                    Edit Plan
                   </span>
                 </div>
               </div>
@@ -131,7 +143,7 @@ function DayPlannerPanel() {
           
           {dayPlans.length === 0 && !creating && (
             <p className="text-sm italic text-slate-500 py-4 col-span-2">
-              No day templates configured yet. Set one up to pair anchors & routines.
+              No day templates configured yet. Create one to pair an anchor template with routines.
             </p>
           )}
         </div>
@@ -177,6 +189,8 @@ function DayPlannerPanel() {
 
 function DayPlanEditor({
   initial,
+  templates,
+  slots,
   anchors,
   routines,
   onSave,
@@ -184,6 +198,8 @@ function DayPlanEditor({
   onDelete,
 }: {
   initial?: DayPlan
+  templates: { id: string; name: string; entries: { anchorId: string; spikeTime: number; slotId: string }[] }[]
+  slots: { id: string; name: string }[]
   anchors: { id: string; name: string }[]
   routines: { id: string; name: string }[]
   onSave: (plan: DayPlan) => void
@@ -191,15 +207,24 @@ function DayPlanEditor({
   onDelete?: () => void
 }) {
   const [name, setName] = useState(initial?.name ?? '')
-  const [anchorIds, setAnchorIds] = useState<string[]>(initial?.anchorIds ?? [])
+  const [templateId, setTemplateId] = useState(initial?.templateId ?? '')
   const [routineIds, setRoutineIds] = useState<string[]>(initial?.routineIds ?? [])
 
+  const selectedTemplate = templates.find((t) => t.id === templateId)
+  const inferredSlots = selectedTemplate
+    ? selectedTemplate.entries.map((e) => {
+        const anchor = anchors.find((a) => a.id === e.anchorId)
+        const slot = slots.find((s) => s.id === e.slotId)
+        return { anchorId: e.anchorId, anchorName: anchor?.name ?? e.anchorId, slotId: e.slotId, slotName: slot?.name ?? e.slotId, spikeTime: e.spikeTime }
+      }).sort((a, b) => a.spikeTime - b.spikeTime)
+    : []
+
   const handleSave = () => {
-    if (!name.trim()) return
+    if (!name.trim() || !templateId) return
     onSave({
       id: initial?.id ?? crypto.randomUUID(),
       name: name.trim(),
-      anchorIds,
+      templateId,
       routineIds,
     })
   }
@@ -220,96 +245,87 @@ function DayPlanEditor({
         />
       </div>
 
-      {/* Anchors Checklist */}
-      <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-          Anchors In Daily Flow
-        </span>
-        
-        <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-          {anchorIds.map((aid, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-2 bg-slate-950/60 border border-slate-850 p-2 rounded-xl"
-            >
-              <select
-                value={aid}
-                onChange={(e) => {
-                  const updated = [...anchorIds]
-                  updated[i] = e.target.value
-                  setAnchorIds(updated)
-                }}
-                className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-205 focus:outline-none cursor-pointer flex-1 min-w-[150px]"
-              >
-                <option value="">-- select anchor --</option>
-                {anchors.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => setAnchorIds(anchorIds.filter((_, j) => j !== i))}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-955/25 hover:text-rose-400 transition-all cursor-pointer"
-              >
-                <XIcon />
-              </button>
-            </div>
-          ))}
-        </div>
-        
-        <button
-          onClick={() => setAnchorIds([...anchorIds, ''])}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-955 hover:bg-slate-900 text-slate-350 border border-slate-850 transition-all cursor-pointer"
+      {/* Anchor Template selector */}
+      <div>
+        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
+          Anchor Template
+        </label>
+        <select
+          value={templateId}
+          onChange={(e) => setTemplateId(e.target.value)}
+          className="text-sm px-3.5 py-2 w-full bg-slate-955 border border-slate-800 rounded-xl text-slate-205 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none cursor-pointer"
         >
-          <PlusIcon /> Add Anchor
-        </button>
+          <option value="">-- select template --</option>
+          {templates.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
       </div>
 
-      {/* Routines Checklist */}
-      <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-          Triggered Routines
-        </span>
-        
-        <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-          {routineIds.map((rid, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-2 bg-slate-950/60 border border-slate-850 p-2 rounded-xl"
-            >
-              <select
-                value={rid}
-                onChange={(e) => {
-                  const updated = [...routineIds]
-                  updated[i] = e.target.value
-                  setRoutineIds(updated)
-                }}
-                className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-205 focus:outline-none cursor-pointer flex-1 min-w-[150px]"
-              >
-                <option value="">-- select routine --</option>
-                {routines.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => setRoutineIds(routineIds.filter((_, j) => j !== i))}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-955/20 hover:text-rose-455 transition-all cursor-pointer"
-              >
-                <XIcon />
-              </button>
+      {/* Inferred anchors & slots (read-only) */}
+      {selectedTemplate && inferredSlots.length > 0 && (
+        <div className="space-y-1.5 pl-4 border-l-2 border-slate-700 bg-slate-900/20 p-3 rounded-2xl">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
+            Structure (from template)
+          </span>
+          {inferredSlots.map((s, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs">
+              <span className="text-slate-500 font-mono w-16 text-right">{formatTime(s.spikeTime)}</span>
+              <span className="text-slate-400 font-bold">{s.anchorName}</span>
+              <span className="text-slate-600">→</span>
+              <span className="text-cyan-400 font-semibold">{s.slotName}</span>
             </div>
           ))}
         </div>
-        
-        <button
-          onClick={() => setRoutineIds([...routineIds, ''])}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-955 hover:bg-slate-900 text-slate-350 border border-slate-850 transition-all cursor-pointer"
+      )}
+
+      {/* Routines — add via dropdown */}
+      <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+          Routines
+        </span>
+
+        {/* Dropdown to add routine */}
+        <select
+          value=""
+          onChange={(e) => {
+            if (e.target.value && !routineIds.includes(e.target.value)) {
+              setRoutineIds([...routineIds, e.target.value])
+            }
+          }}
+          className="text-[10px] px-2 py-1.5 rounded-lg border border-slate-800 bg-slate-950 text-slate-350 focus:outline-none cursor-pointer w-full"
         >
-          <PlusIcon /> Add Routine
-        </button>
+          <option value="" className="text-slate-500">＋ Add routine…</option>
+          {routines
+            .filter((r) => !routineIds.includes(r.id))
+            .map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+        </select>
+        
+        <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+          {routineIds.map((rid) => {
+            const routine = routines.find((r) => r.id === rid)
+            return (
+              <div
+                key={rid}
+                className="flex items-center justify-between bg-slate-950/60 border border-slate-850 p-2 px-3 rounded-xl"
+              >
+                <span className="text-xs font-semibold text-slate-300">{routine?.name ?? rid}</span>
+                <button
+                  onClick={() => setRoutineIds(routineIds.filter((id) => id !== rid))}
+                  className="p-1 rounded-lg text-slate-400 hover:bg-rose-955/25 hover:text-rose-400 transition-all cursor-pointer"
+                >
+                  <XIcon />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        {routineIds.length === 0 && (
+          <p className="text-[11px] italic text-slate-600">No routines assigned yet.</p>
+        )}
       </div>
 
       {/* Save / Discard Actions */}
@@ -317,7 +333,8 @@ function DayPlanEditor({
         <div className="flex gap-2">
           <button
             onClick={handleSave}
-            className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-955 shadow-md shadow-cyan-950/20 transition-all active:scale-95 cursor-pointer"
+            disabled={!name.trim() || !templateId}
+            className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-955 shadow-md shadow-cyan-950/20 transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <CheckIcon /> Save Day Plan
           </button>

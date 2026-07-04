@@ -1,8 +1,8 @@
-// A Day Plan: named configuration of anchors + routines for a type of day
+// A Day Plan: named configuration linking an anchor template to routines
 export interface DayPlan {
   id: string
   name: string                     // e.g., "Bangalore Work Day", "Hometown Day"
-  anchorIds: string[]              // which anchors define this day's slots
+  templateId: string               // which anchor template defines this day's structure
   routineIds: string[]             // which routines are active on this day plan
 }
 
