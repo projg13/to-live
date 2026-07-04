@@ -453,18 +453,41 @@ function resolveDay(
   }
 
   // Recovery plans (triggered only)
-  // Recovery tasks start from Wake anchor and have high priority
+  // Blocks provide tasks (duration only), weight comes from plan + order offset
   for (const plan of context.recoveryPlans) {
     if (!plan.triggered) continue
-    const weight = getRecoveryWeight(plan, 720, dateStr)
-    if (weight <= 0) continue
+    const baseWeight = getRecoveryWeight(plan, 720, dateStr)
+    if (baseWeight <= 0) continue
 
+    // Collect all tasks in order: direct taskIds first, then block entries by order
+    const orderedTaskIds: string[] = [...plan.taskIds]
+    for (const blockId of plan.blockIds) {
+      const block = context.blocks.find((b) => b.id === blockId)
+      if (!block) continue
+      for (const entry of [...block.entries].sort((a, b) => a.order - b.order)) {
+        if (!orderedTaskIds.includes(entry.taskId)) {
+          orderedTaskIds.push(entry.taskId)
+        }
+      }
+    }
+
+    // Filter to valid, non-done, non-skipped tasks
+    const validTasks = orderedTaskIds.filter((tid) => {
+      if (skippedTaskIds.includes(tid)) return false
+      if (doneTasks.includes(`${tid}:${dateStr}`) || doneTasks.includes(`${tid}:${periodKey}`)) return false
+      if (!context.tasks.find((t) => t.id === tid)) return false
+      return true
+    })
+
+    const totalTasks = validTasks.length
     let recoveryCursor = obStart
-    for (const tid of plan.taskIds) {
-      if (skippedTaskIds.includes(tid)) continue
-      if (doneTasks.includes(`${tid}:${dateStr}`) || doneTasks.includes(`${tid}:${periodKey}`)) continue
-      const task = context.tasks.find((t) => t.id === tid)
-      if (!task) continue
+
+    for (let idx = 0; idx < validTasks.length; idx++) {
+      const tid = validTasks[idx]
+      const task = context.tasks.find((t) => t.id === tid)!
+
+      // Weight = base + (totalTasks - index) → first task highest, descending
+      const taskWeight = baseWeight + (totalTasks - idx)
 
       items.push({
         taskId: task.id,
@@ -473,7 +496,7 @@ function resolveDay(
         endMinutes: recoveryCursor + task.durationMinutes,
         isBackground: false,
         source: 'recovery',
-        weight,
+        weight: taskWeight,
         day: dayIndex,
         sourceId: plan.id,
         sourceName: plan.name,
