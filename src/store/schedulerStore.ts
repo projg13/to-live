@@ -477,22 +477,21 @@ function resolveDay(
 
     if (debug) console.log(`    ✓ Bracket: maxDaysRemaining=${bracket.maxDaysRemaining} timeCurve=${JSON.stringify(bracket.timeCurve)}`)
 
-    // Find peak time in the curve (where weight is highest) for placement
-    // This ensures obligations are placed during their active window, not at obStart
-    let peakTime = obStart
+    // Find peak weight from the curve — used for weight evaluation
+    // Time curve controls WEIGHT, not placement. Placement starts at obStart.
     let peakWeight = 0
+    let peakTime = obStart
     for (const pt of bracket.timeCurve) {
       if (pt.value > peakWeight) {
         peakWeight = pt.value
         peakTime = pt.time
       }
     }
-    // Obligation starts at max(obStart, peakTime) — never before now, but target the peak
-    const obIdealTime = Math.max(obStart, peakTime)
 
-    // Evaluate weight at the ideal placement time
-    let baseWeight = getObligationWeight(bracket.timeCurve, obIdealTime)
-    if (debug) console.log(`    ⚖️ peakTime=${peakTime} obIdealTime=${obIdealTime} baseWeight=${baseWeight}`)
+    // Evaluate weight at the peak time (where curve is strongest)
+    // but place at obStart — placeItems will find the actual slot via weight priority
+    let baseWeight = peakWeight > 0 ? peakWeight : getObligationWeight(bracket.timeCurve, obStart)
+    if (debug) console.log(`    ⚖️ peakWeight=${peakWeight} @peakTime=${peakTime} placement@${obStart} baseWeight=${baseWeight}`)
 
     if (eventWeightOffset > 0) {
       baseWeight = baseWeight - eventWeightOffset
@@ -535,13 +534,13 @@ function resolveDay(
       // First task: base + 1, Last task: base + totalTasks
       const taskWeight = baseWeight + (idx + 1)
 
-      if (debug) console.log(`      ✓ ${task.title}: weight=${taskWeight} @${obIdealTime}`)
+      if (debug) console.log(`      ✓ ${task.title}: weight=${taskWeight} @${obStart}`)
 
       items.push({
         taskId: task.id,
         title: task.title,
-        startMinutes: obIdealTime,
-        endMinutes: obIdealTime + task.durationMinutes,
+        startMinutes: obStart,
+        endMinutes: obStart + task.durationMinutes,
         isBackground: false,
         source: 'obligation',
         weight: taskWeight,
