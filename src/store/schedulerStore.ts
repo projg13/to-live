@@ -180,30 +180,28 @@ function resolveDay(
 
     // Collect tasks from routines → blocks
     for (const routine of activeRoutines) {
-      // Each routine starts at its own idealSpawnTime OR the pushed anchor time (whichever is later)
-      let routineStart = routine.idealSpawnTime
-
-      // Check if this routine's first block anchor has been pushed (by overflow or confirmation)
-      for (const bc of routine.blockConfigs) {
-        const matchedAnchor = resolvedAnchors.find((a) => a.anchorId === bc.anchorId)
-        if (matchedAnchor) {
-          routineStart = Math.max(routineStart, matchedAnchor.actualTime)
-          break
-        }
+      // Collect ALL candidate tasks from ALL blocks in this routine
+      interface CandidateTask {
+        task: Task
+        entry: { taskId: string; order: number; isBackground: boolean }
+        anchorId: string
+        anchorTime: number   // resolved start time for this anchor
+        weight: number
       }
 
-      // lastDoneAt takes priority if later
-      let cursor = lastDoneAt !== undefined && lastDoneAt > routineStart
-        ? lastDoneAt
-        : routineStart
+      const candidates: CandidateTask[] = []
 
       for (const bc of routine.blockConfigs) {
         const block = context.blocks.find((b) => b.id === bc.blockId)
         if (!block) continue
 
-        const sortedEntries = [...block.entries].sort((a, b) => a.order - b.order)
+        // Determine anchor start time
+        const matchedAnchor = resolvedAnchors.find((a) => a.anchorId === bc.anchorId)
+        const anchorTime = matchedAnchor
+          ? Math.max(routine.idealSpawnTime, matchedAnchor.actualTime)
+          : routine.idealSpawnTime
 
-        for (const entry of sortedEntries) {
+        for (const entry of block.entries) {
           if (skippedTaskIds.includes(entry.taskId)) continue
           // Anchor-scoped done check: task resets per anchor cycle
           const anchorDoneKey = `${entry.taskId}:${bc.anchorId}:${dateStr}`
@@ -221,26 +219,24 @@ function resolveDay(
           }
           if (ancestorSkipped) continue
 
-          // Resolve weight considering routine's slot weight overrides
+          // Resolve weight
           let weight = task.weight
           const taskConfig = routine.taskConfigs?.find((tc) => tc.taskId === task.id)
 
-          // Check expiry: relative to routine's IDEAL spawn time (absolute clock time)
+          // Check expiry: relative to routine's IDEAL spawn time
           if (taskConfig?.expiresAfterMinutes !== undefined) {
             const expiryTime = routine.idealSpawnTime + taskConfig.expiresAfterMinutes
-            if (cursor >= expiryTime) continue
+            if (anchorTime >= expiryTime) continue
           }
 
           if (taskConfig?.slotWeights && Object.keys(taskConfig.slotWeights).length > 0) {
-            // Slot-relative mode: weight depends on which slot we're in
             const fallback = taskConfig.fallbackWeight ?? 0
-            const anchorId = bc.anchorId
-            const templateEntry = dayTemplate?.entries.find((e) => e.anchorId === anchorId)
+            const templateEntry = dayTemplate?.entries.find((e) => e.anchorId === bc.anchorId)
             const slotId = templateEntry?.slotId
             if (slotId) {
               const slotCurve = taskConfig.slotWeights[slotId]
               if (slotCurve && slotCurve.length > 0) {
-                const offsetInSlot = Math.max(0, cursor - routineStart)
+                const offsetInSlot = Math.max(0, anchorTime - routine.idealSpawnTime)
                 weight = getSlotWeight(slotCurve, offsetInSlot)
               } else {
                 weight = fallback
@@ -250,17 +246,6 @@ function resolveDay(
             }
           }
 
-          // Use idealTime from taskConfig if set, but not earlier than cursor
-          const idealStart = taskConfig?.idealTime
-            ? Math.max(taskConfig.idealTime, cursor)
-            : cursor
-
-          // Double-check expiry against actual placement time
-          if (taskConfig?.expiresAfterMinutes !== undefined) {
-            const expiryTime = routine.idealSpawnTime + taskConfig.expiresAfterMinutes
-            if (idealStart >= expiryTime) continue
-          }
-
           // Apply event weight offset
           if (eventWeightOffset > 0) {
             weight = weight - eventWeightOffset
@@ -268,39 +253,76 @@ function resolveDay(
 
           if (weight <= 0) continue
 
-          if (entry.isBackground) {
-            items.push({
-              taskId: task.id,
-              title: task.title,
-              startMinutes: idealStart,
-              endMinutes: idealStart + task.durationMinutes,
-              isBackground: true,
-              source: 'routine',
-              weight,
-              day: dayIndex,
-              sourceId: routine.id,
-              sourceName: routine.name,
-              resetAnchorId: bc.anchorId,
-            })
-          } else {
-            items.push({
-              taskId: task.id,
-              title: task.title,
-              startMinutes: idealStart,
-              endMinutes: idealStart + task.durationMinutes,
-              isBackground: false,
-              source: 'routine',
-              weight,
-              day: dayIndex,
-              sourceId: routine.id,
-              sourceName: routine.name,
-              resetAnchorId: bc.anchorId,
-            })
-            cursor = idealStart + task.durationMinutes
-          }
+          candidates.push({ task, entry, anchorId: bc.anchorId, anchorTime, weight })
+        }
+      }
+
+      // Sort candidates: first by anchor time (asc), then by weight (desc) within same anchor
+      candidates.sort((a, b) => {
+        if (a.anchorTime !== b.anchorTime) return a.anchorTime - b.anchorTime
+        return b.weight - a.weight
+      })
+
+      // Place tasks sequentially, grouped by anchor
+      let cursor = lastDoneAt !== undefined && lastDoneAt > (candidates[0]?.anchorTime ?? 0)
+        ? lastDoneAt
+        : (candidates[0]?.anchorTime ?? 0)
+      let currentAnchorId = candidates[0]?.anchorId ?? ''
+
+      for (const cand of candidates) {
+        // When we move to a different anchor, reset cursor to that anchor's time
+        if (cand.anchorId !== currentAnchorId) {
+          currentAnchorId = cand.anchorId
+          cursor = Math.max(cursor, cand.anchorTime)
         }
 
-        // After placing block tasks, if cursor overflowed past next anchor, push it
+        const taskConfig = routine.taskConfigs?.find((tc) => tc.taskId === cand.task.id)
+
+        // Use idealTime if set
+        const idealStart = taskConfig?.idealTime
+          ? Math.max(taskConfig.idealTime, cursor)
+          : cursor
+
+        // Double-check expiry against actual placement time
+        if (taskConfig?.expiresAfterMinutes !== undefined) {
+          const expiryTime = routine.idealSpawnTime + taskConfig.expiresAfterMinutes
+          if (idealStart >= expiryTime) continue
+        }
+
+        if (cand.entry.isBackground) {
+          items.push({
+            taskId: cand.task.id,
+            title: cand.task.title,
+            startMinutes: idealStart,
+            endMinutes: idealStart + cand.task.durationMinutes,
+            isBackground: true,
+            source: 'routine',
+            weight: cand.weight,
+            day: dayIndex,
+            sourceId: routine.id,
+            sourceName: routine.name,
+            resetAnchorId: cand.anchorId,
+          })
+        } else {
+          items.push({
+            taskId: cand.task.id,
+            title: cand.task.title,
+            startMinutes: idealStart,
+            endMinutes: idealStart + cand.task.durationMinutes,
+            isBackground: false,
+            source: 'routine',
+            weight: cand.weight,
+            day: dayIndex,
+            sourceId: routine.id,
+            sourceName: routine.name,
+            resetAnchorId: cand.anchorId,
+          })
+          cursor = idealStart + cand.task.durationMinutes
+        }
+      }
+
+      // After placing all routine tasks, check if cursor overflowed past next anchors
+      for (const bc of routine.blockConfigs) {
         const blockAnchorIdx = resolvedAnchors.findIndex((a) => a.anchorId === bc.anchorId)
         if (blockAnchorIdx >= 0) {
           for (let ai = blockAnchorIdx + 1; ai < resolvedAnchors.length; ai++) {
