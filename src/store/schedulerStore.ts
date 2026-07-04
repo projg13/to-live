@@ -495,8 +495,18 @@ export const useSchedulerStore = create<SchedulerStore>()(
 
       resolve: (context) => {
         const state = get()
-        const days: DaySchedule[] = []
+        const today = getDateStr(0, context.baseDate)
+        const currentMonth = today.slice(0, 7) // YYYY-MM
 
+        // Purge stale doneTasks — keep only today + current obligation period
+        const freshDoneTasks = state.doneTasks.filter((key) => {
+          const colonIdx = key.lastIndexOf(':')
+          if (colonIdx === -1) return false // bare IDs from old format — drop
+          const suffix = key.slice(colonIdx + 1)
+          return suffix === today || suffix === currentMonth
+        })
+
+        const days: DaySchedule[] = []
         for (let i = 0; i < 7; i++) {
           const dateStr = getDateStr(i, context.baseDate)
           days.push(resolveDay(
@@ -506,12 +516,13 @@ export const useSchedulerStore = create<SchedulerStore>()(
             state.confirmedAnchors,
             state.adhocTasks,
             [...state.skippedTaskIds, ...state.postponedTasks],
-            state.doneTasks,
+            freshDoneTasks,
             state.lastDoneAt[i]
           ))
         }
 
         set({
+          doneTasks: freshDoneTasks,
           schedule: {
             days,
             generated: new Date().toISOString(),
