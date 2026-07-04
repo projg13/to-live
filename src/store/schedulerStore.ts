@@ -544,7 +544,7 @@ function resolveDay(
 
     if (debug) console.log(`    📝 Tasks: ${orderedTaskIds.length} total → ${validTasks.length} valid`)
 
-    const totalTasks = validTasks.length
+
 
     for (let idx = 0; idx < validTasks.length; idx++) {
       const tid = validTasks[idx]
@@ -708,7 +708,7 @@ function placeItems(
 
     // Conflict at ideal time — find next available gap from ideal start
     let cursor = start
-    let found = false
+
     while (cursor + duration <= 1440) {
       // If scanning past expiry, drop the task
       if (item.expiryTime !== undefined && cursor >= item.expiryTime) {
@@ -719,7 +719,6 @@ function placeItems(
         item.endMinutes = cursor + duration
         occupied.push({ start: cursor, end: cursor + duration })
         placed.push(item)
-        found = true
         break
       }
       cursor += 5
