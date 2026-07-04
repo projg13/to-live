@@ -338,10 +338,10 @@ function resolveDay(
 
         const taskConfig = routine.taskConfigs?.find((tc) => tc.taskId === cand.task.id)
 
-        // Use idealTime if set
-        const idealStart = taskConfig?.idealTime
-          ? Math.max(taskConfig.idealTime, cursor)
-          : cursor
+        // idealTime defaults to the block's anchor time (from day plan template)
+        // User can override per-task via taskConfig.idealTime
+        const taskIdealTime = taskConfig?.idealTime ?? cand.anchorTime
+        const idealStart = Math.max(taskIdealTime, cursor)
 
         // Double-check expiry against actual placement time
         if (taskConfig?.expiresAfterMinutes !== undefined) {
