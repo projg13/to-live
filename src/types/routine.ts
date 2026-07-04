@@ -1,13 +1,3 @@
-export type RecurrencePattern = 'daily' | 'weekly' | 'monthly' | 'one-time' | 'repeat-until'
-
-export interface RecurrenceConfig {
-  pattern: RecurrencePattern
-  daysOfWeek?: number[]        // 0-6 (Sun-Sat), for weekly
-  dayOfMonth?: number          // for monthly
-  repeatUntil?: string         // ISO date, for repeat-until
-  interval?: number            // every N days/weeks/months
-}
-
 // A weight point relative to the slot's ideal start time (anchor dominance start)
 export interface SlotWeightPoint {
   offsetMinutes: number   // minutes from slot's ideal start time
@@ -50,10 +40,7 @@ export function getSlotWeight(points: SlotWeightPoint[], offsetMinutes: number):
 export interface Routine {
   id: string
   name: string
-  blockConfigs: RoutineBlockConfig[]   // block + scheduling behavior
-
-  // Recurrence
-  recurrence: RecurrenceConfig
+  blockConfigs: RoutineBlockConfig[]   // block → anchor mapping
 
   // Ideal spawn time (minutes from midnight)
   idealSpawnTime: number
@@ -64,4 +51,3 @@ export interface Routine {
   // Active/enabled
   enabled: boolean
 }
-
