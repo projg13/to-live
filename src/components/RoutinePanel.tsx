@@ -192,8 +192,8 @@ function RoutineEditor({
     return (h || 0) * 60 + (m || 0)
   }
 
-  const getTaskConfig = (taskId: string) =>
-    taskConfigs.find((tc) => tc.taskId === taskId)
+  const removeTaskConfig = (taskId: string) =>
+    setTaskConfigs(taskConfigs.filter((tc) => tc.taskId !== taskId))
 
   const setTaskConfig = (taskId: string, updates: Partial<RoutineTaskConfig>) => {
     const existing = taskConfigs.find((tc) => tc.taskId === taskId)
@@ -233,37 +233,42 @@ function RoutineEditor({
         </label>
       </div>
 
-      {/* Blocks checkboxes list */}
+      {/* Blocks dropdown */}
       <div className="space-y-2">
         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
           Target Blocks
         </span>
-        <div className="flex flex-wrap gap-2">
-          {blocks.map((b) => {
-            const isChecked = blockIds.includes(b.id)
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {blockIds.map((bid) => {
+            const b = blocks.find((bl) => bl.id === bid)
             return (
-              <label
-                key={b.id}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                  isChecked
-                    ? 'bg-cyan-955/35 text-cyan-400 border-cyan-900/30 shadow-sm'
-                    : 'bg-slate-950 border-slate-900 text-slate-500 hover:bg-slate-900'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isChecked}
-                  onChange={(e) => {
-                    if (e.target.checked) setBlockIds([...blockIds, b.id])
-                    else setBlockIds(blockIds.filter((id) => id !== b.id))
-                  }}
-                  className="rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-cyan-500 h-3.5 w-3.5 cursor-pointer"
-                />
-                {b.name}
-              </label>
+              <span key={bid} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-cyan-955/35 text-cyan-400 border border-cyan-900/30">
+                {b?.name ?? bid}
+                <button
+                  type="button"
+                  onClick={() => setBlockIds(blockIds.filter((id) => id !== bid))}
+                  className="hover:text-rose-400 cursor-pointer"
+                >
+                  <XIcon />
+                </button>
+              </span>
             )
           })}
         </div>
+        <select
+          value=""
+          onChange={(e) => {
+            if (e.target.value && !blockIds.includes(e.target.value)) {
+              setBlockIds([...blockIds, e.target.value])
+            }
+          }}
+          className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-950 text-slate-350 focus:outline-none cursor-pointer w-full"
+        >
+          <option value="" className="bg-slate-950 text-slate-500">＋ Add block…</option>
+          {blocks.filter((b) => !blockIds.includes(b.id)).map((b) => (
+            <option key={b.id} value={b.id} className="bg-slate-950 text-slate-200">{b.name}</option>
+          ))}
+        </select>
       </div>
 
       {/* Spawn time */}
@@ -374,23 +379,55 @@ function RoutineEditor({
       {uniqueTaskIds.length > 0 && (
         <div className="space-y-3 pl-4 border-l-2 border-cyan-555 bg-slate-900/10 p-3 rounded-2xl">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-            Specific Task Constraints & curves
+            Task Weight & Constraint Overrides
           </span>
+
+          {/* Dropdown to add a task config */}
+          <select
+            value=""
+            onChange={(e) => {
+              if (e.target.value) {
+                setTaskConfig(e.target.value, {})
+              }
+            }}
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-950 text-slate-350 focus:outline-none cursor-pointer w-full"
+          >
+            <option value="" className="bg-slate-950 text-slate-500">＋ Configure a task…</option>
+            {uniqueTaskIds
+              .filter((tid) => !taskConfigs.find((tc) => tc.taskId === tid))
+              .map((tid) => {
+                const t = tasks.find((tt) => tt.id === tid)
+                return <option key={tid} value={tid} className="bg-slate-950 text-slate-200">{t?.title ?? tid}</option>
+              })}
+          </select>
           
           <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
-            {uniqueTaskIds.map((taskId) => {
+            {taskConfigs.map((cfg) => {
+              const taskId = cfg.taskId
               const task = tasks.find((t) => t.id === taskId)
               if (!task) return null
-              const config = getTaskConfig(taskId)
+              const config = cfg
 
               return (
                 <div
                   key={taskId}
                   className="bg-slate-955 border border-slate-850 p-3.5 rounded-xl space-y-3"
                 >
-                  <span className="text-xs font-bold text-slate-202 tracking-wide block border-b border-slate-850 pb-1.5">
-                    {task.title}
-                  </span>
+                  <div className="flex items-center justify-between border-b border-slate-850 pb-1.5">
+                    <div>
+                      <span className="text-xs font-bold text-slate-202 tracking-wide">{task.title}</span>
+                      <span className="ml-2 text-[9px] font-medium text-slate-500">
+                        {config.slotWeights && Object.keys(config.slotWeights).length > 0 ? '⟡ slot-relative' : '◆ absolute'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeTaskConfig(taskId)}
+                      className="p-1 rounded text-slate-500 hover:bg-rose-955/20 hover:text-rose-400 transition-all cursor-pointer"
+                    >
+                      <XIcon />
+                    </button>
+                  </div>
 
                   {/* Ideal time & expiry offset */}
                   <div className="grid grid-cols-2 gap-3 flex-wrap">

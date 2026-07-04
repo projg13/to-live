@@ -235,18 +235,27 @@ function resolveDay(
             if (cursor >= expiryTime) continue
           }
 
-          if (taskConfig?.slotWeights) {
+          if (taskConfig?.slotWeights && Object.keys(taskConfig.slotWeights).length > 0) {
+            // Slot-relative mode: weight depends on which slot we're in
             const anchorId = block.anchorId
             const templateEntry = dayTemplate?.entries.find((e) => e.anchorId === anchorId)
             const slotId = templateEntry?.slotId
             if (slotId) {
               const slotCurve = taskConfig.slotWeights[slotId]
               if (slotCurve && slotCurve.length > 0) {
+                // Slot has a curve — interpolate
                 const offsetInSlot = Math.max(0, cursor - routineStart)
                 weight = getSlotWeight(slotCurve, offsetInSlot)
+              } else {
+                // slotWeights defined but this slot has no curve — task doesn't belong here
+                weight = 0
               }
+            } else {
+              // Can't resolve slot — fall back to 0 (safe drop)
+              weight = 0
             }
           }
+          // else: no slotWeights → absolute mode, use task.weight as-is
 
           // Use idealTime from taskConfig if set, but not earlier than cursor
           const idealStart = taskConfig?.idealTime
