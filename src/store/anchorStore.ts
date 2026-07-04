@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Anchor, Slot, AnchorTemplate } from '../types/anchor'
-import { toMinutes } from '../types/anchor'
 
 interface AnchorStore {
   anchors: Anchor[]
@@ -21,57 +20,9 @@ interface AnchorStore {
 export const useAnchorStore = create<AnchorStore>()(
   persist(
     (set) => ({
-      anchors: [
-        { id: 'anchor-wake', name: 'Wake' },
-        { id: 'anchor-work-start', name: 'Work Start' },
-        { id: 'anchor-work-end', name: 'Work End' },
-        { id: 'anchor-evening', name: 'Evening' },
-        { id: 'anchor-game-start', name: 'Game Start' },
-        { id: 'anchor-game-end', name: 'Game End' },
-        { id: 'anchor-sleep', name: 'Sleep' },
-      ],
-      slots: [
-        { id: 'slot-morning', name: 'Morning' },
-        { id: 'slot-work', name: 'Work Hours' },
-        { id: 'slot-work2', name: 'Work 2' },
-        { id: 'slot-evening', name: 'Evening' },
-        { id: 'slot-game', name: 'Game Time' },
-        { id: 'slot-free', name: 'Free Time' },
-        { id: 'slot-sleep', name: 'Sleep' },
-      ],
-      templates: [
-        {
-          id: 'tpl-workday',
-          name: 'Workday',
-          entries: [
-            { anchorId: 'anchor-sleep', spikeTime: toMinutes(21, 0), slotId: 'slot-sleep' },
-            { anchorId: 'anchor-wake', spikeTime: toMinutes(6, 0), slotId: 'slot-morning' },
-            { anchorId: 'anchor-work-start', spikeTime: toMinutes(9, 0), slotId: 'slot-work' },
-            { anchorId: 'anchor-work-end', spikeTime: toMinutes(18, 0), slotId: 'slot-evening' },
-          ],
-        },
-        {
-          id: 'tpl-friday',
-          name: 'Friday',
-          entries: [
-            { anchorId: 'anchor-sleep', spikeTime: toMinutes(21, 0), slotId: 'slot-sleep' },
-            { anchorId: 'anchor-wake', spikeTime: toMinutes(6, 0), slotId: 'slot-morning' },
-            { anchorId: 'anchor-work-start', spikeTime: toMinutes(9, 0), slotId: 'slot-work' },
-            { anchorId: 'anchor-game-start', spikeTime: toMinutes(13, 30), slotId: 'slot-game' },
-            { anchorId: 'anchor-game-end', spikeTime: toMinutes(16, 30), slotId: 'slot-work2' },
-            { anchorId: 'anchor-work-end', spikeTime: toMinutes(18, 0), slotId: 'slot-evening' },
-          ],
-        },
-        {
-          id: 'tpl-weekend',
-          name: 'Weekend',
-          entries: [
-            { anchorId: 'anchor-sleep', spikeTime: toMinutes(21, 0), slotId: 'slot-sleep' },
-            { anchorId: 'anchor-wake', spikeTime: toMinutes(6, 0), slotId: 'slot-morning' },
-            { anchorId: 'anchor-evening', spikeTime: toMinutes(18, 0), slotId: 'slot-evening' },
-          ],
-        },
-      ],
+      anchors: [],
+      slots: [],
+      templates: [],
       addAnchor: (anchor) => set((state) => ({ anchors: [...state.anchors, anchor] })),
       updateAnchor: (id, updates) => set((state) => ({ anchors: state.anchors.map((a) => (a.id === id ? { ...a, ...updates } : a)) })),
       deleteAnchor: (id) => set((state) => ({ anchors: state.anchors.filter((a) => a.id !== id) })),
@@ -82,6 +33,6 @@ export const useAnchorStore = create<AnchorStore>()(
       updateTemplate: (id, updates) => set((state) => ({ templates: state.templates.map((t) => (t.id === id ? { ...t, ...updates } : t)) })),
       deleteTemplate: (id) => set((state) => ({ templates: state.templates.filter((t) => t.id !== id) })),
     }),
-    { name: 'to-live-anchors' }
+    { name: 'to-live-anchors', version: 2 }
   )
 )

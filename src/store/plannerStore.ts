@@ -23,49 +23,8 @@ interface PlannerStore {
 export const usePlannerStore = create<PlannerStore>()(
   persist(
     (set, get) => ({
-      dayPlans: [
-        {
-          id: 'dp-gym-day',
-          name: 'Gym Day (Mon/Wed)',
-          anchorIds: ['anchor-wake', 'anchor-work-start', 'anchor-work-end', 'anchor-sleep'],
-          routineIds: ['routine-gym-morning', 'routine-gym-evening'],
-        },
-        {
-          id: 'dp-study-day',
-          name: 'Study Day (Tue/Thu)',
-          anchorIds: ['anchor-wake', 'anchor-work-start', 'anchor-work-end', 'anchor-sleep'],
-          routineIds: ['routine-study-morning', 'routine-study-evening'],
-        },
-        {
-          id: 'dp-friday',
-          name: 'Friday',
-          anchorIds: ['anchor-wake', 'anchor-work-start', 'anchor-game-start', 'anchor-game-end', 'anchor-work-end', 'anchor-sleep'],
-          routineIds: ['routine-fri-morning', 'routine-fri-game', 'routine-fri-post-game', 'routine-fri-evening'],
-        },
-        {
-          id: 'dp-saturday',
-          name: 'Saturday',
-          anchorIds: ['anchor-wake', 'anchor-evening', 'anchor-sleep'],
-          routineIds: ['routine-sat-morning', 'routine-sat-evening'],
-        },
-        {
-          id: 'dp-sunday',
-          name: 'Sunday',
-          anchorIds: ['anchor-wake', 'anchor-evening', 'anchor-sleep'],
-          routineIds: ['routine-sun-morning', 'routine-sun-groceries', 'routine-sun-evening'],
-        },
-      ],
-      weekPlan: {
-        days: {
-          0: 'dp-sunday',
-          1: 'dp-gym-day',
-          2: 'dp-study-day',
-          3: 'dp-gym-day',
-          4: 'dp-study-day',
-          5: 'dp-friday',
-          6: 'dp-saturday',
-        },
-      },
+      dayPlans: [],
+      weekPlan: { days: {} },
       calendarEvents: [],
       eventTemplates: [],
 
@@ -99,7 +58,6 @@ export const usePlannerStore = create<PlannerStore>()(
           return false
         })
         if (event) {
-          // Piecewise override takes priority
           const pieceId = event.dayPlanOverrides?.[date]
           if (pieceId) return state.dayPlans.find((p) => p.id === pieceId)
           if (event.dayPlanOverride) return state.dayPlans.find((p) => p.id === event.dayPlanOverride)
@@ -109,6 +67,6 @@ export const usePlannerStore = create<PlannerStore>()(
         return state.dayPlans.find((p) => p.id === planId)
       },
     }),
-    { name: 'to-live-planner' }
+    { name: 'to-live-planner', version: 2 }
   )
 )
