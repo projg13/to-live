@@ -18,8 +18,9 @@ export interface SlotWeightPoint {
 export interface RoutineTaskConfig {
   taskId: string
   slotWeights?: Record<string, SlotWeightPoint[]>  // slotId → piecewise weight curve relative to slot start
-  expiresAfterMinutes?: number                     // task dies after this many minutes from routine spawn
-  idealTime?: number                               // minutes from midnight — ideal time for this task
+  fallbackWeight?: number                            // weight for slots NOT in slotWeights map (default: 0)
+  expiresAfterMinutes?: number                       // task dies after this many minutes from routine spawn
+  idealTime?: number                                 // minutes from midnight — ideal time for this task
 }
 
 // Interpolate slot weight at a given offset from slot start

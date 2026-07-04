@@ -458,9 +458,20 @@ function RoutineEditor({
 
                   {/* Slot weights */}
                   <div className="space-y-2 mt-2">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Active Slots <span className="text-slate-600 font-normal">(unselected slots = weight 0)</span>
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Active Slots
+                      </span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                        <span>Other slots →</span>
+                        <input
+                          type="number"
+                          value={config?.fallbackWeight ?? 0}
+                          onChange={(e) => setTaskConfig(taskId, { fallbackWeight: Number(e.target.value) || 0 })}
+                          className="w-12 px-1 py-0.5 bg-slate-900 border border-slate-800 rounded text-center text-amber-400 font-bold text-[10px]"
+                        />
+                      </div>
+                    </div>
 
                     {/* Dropdown to add a slot */}
                     <select

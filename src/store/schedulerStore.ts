@@ -237,6 +237,7 @@ function resolveDay(
 
           if (taskConfig?.slotWeights && Object.keys(taskConfig.slotWeights).length > 0) {
             // Slot-relative mode: weight depends on which slot we're in
+            const fallback = taskConfig.fallbackWeight ?? 0
             const anchorId = block.anchorId
             const templateEntry = dayTemplate?.entries.find((e) => e.anchorId === anchorId)
             const slotId = templateEntry?.slotId
@@ -247,12 +248,12 @@ function resolveDay(
                 const offsetInSlot = Math.max(0, cursor - routineStart)
                 weight = getSlotWeight(slotCurve, offsetInSlot)
               } else {
-                // slotWeights defined but this slot has no curve — task doesn't belong here
-                weight = 0
+                // Slot not in map — use fallback weight
+                weight = fallback
               }
             } else {
-              // Can't resolve slot — fall back to 0 (safe drop)
-              weight = 0
+              // Can't resolve slot — use fallback
+              weight = fallback
             }
           }
           // else: no slotWeights → absolute mode, use task.weight as-is
