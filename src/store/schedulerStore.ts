@@ -351,9 +351,13 @@ function resolveDay(
         }
 
         // Double-check expiry against actual placement time
+        // expiryTime uses ORIGINAL anchor — if pushed anchor makes idealStart exceed it, task is dropped
         if (taskConfig?.expiresAfterMinutes !== undefined) {
           const expiryTime = cand.anchorTime + taskConfig.expiresAfterMinutes
-          if (idealStart >= expiryTime) continue
+          if (idealStart >= expiryTime) {
+            if (debug) console.log(`      ⏰ EXPIRED: ${cand.task.title} — idealStart=${idealStart} >= expiryTime=${expiryTime} (anchor=${cand.anchorTime} + ${taskConfig.expiresAfterMinutes}min)`)
+            continue
+          }
         }
 
         if (cand.entry.isBackground) {
@@ -392,6 +396,7 @@ function resolveDay(
           if (thisAnchorIdx >= 0) {
             for (let ai = thisAnchorIdx + 1; ai < resolvedAnchors.length; ai++) {
               if (cursor > resolvedAnchors[ai].actualTime) {
+                if (debug) console.log(`      🔀 ANCHOR PUSH: "${resolvedAnchors[ai].anchorName}" ${resolvedAnchors[ai].actualTime} → ${cursor} (overflow from "${cand.task.title}")`)
                 resolvedAnchors[ai].actualTime = cursor
               }
             }
