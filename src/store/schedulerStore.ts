@@ -403,10 +403,17 @@ function resolveDay(
   const wakeAnchor = resolvedAnchors.find((a) => a.anchorName === 'Wake')
   const wakeTime = wakeAnchor?.actualTime ?? 360
 
-  // Obligation/recovery start: use lastDoneAt if later than wake
-  const obStart = lastDoneAt !== undefined && lastDoneAt > wakeTime
-    ? lastDoneAt
-    : wakeTime
+  // Current time in minutes from midnight (only relevant for today)
+  const now = new Date()
+  const nowMinutes = dayIndex === 0 ? now.getHours() * 60 + now.getMinutes() : wakeTime
+
+  // Obligation/recovery start: latest of wake, lastDoneAt, or current time
+  // This ensures on recalculate, pending tasks move to NOW
+  const obStart = Math.max(
+    wakeTime,
+    lastDoneAt !== undefined ? lastDoneAt : 0,
+    nowMinutes
+  )
 
   // Obligations and recovery: only on today (day 0).
   // When tomorrow becomes day 0, undone obligations naturally reappear.
