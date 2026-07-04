@@ -490,6 +490,13 @@ export const useSchedulerStore = create<SchedulerStore>()(
             generated: new Date().toISOString(),
           },
         })
+
+        // Auto snapshot (fire-and-forget)
+        import('../backup').then(({ snapshotToGitHub }) => {
+          snapshotToGitHub().catch((err) => {
+            console.error('Auto backup to GitHub failed:', err)
+          })
+        })
       },
 
       confirmAnchor: (conf) =>
