@@ -641,12 +641,6 @@ function resolveDay(
 
     const recPlacement = Math.max(obStart, recWindowStart)
 
-    // Evaluate weight at peak, with growth multiplier applied
-    const baseWeight = recPeakWeight > 0
-      ? getRecoveryWeight({ ...plan, baseTimeCurve: [{ time: 0, value: recPeakWeight }] }, 0, dateStr)
-      : getRecoveryWeight(plan, recPlacement, dateStr)
-    if (baseWeight <= 0) continue
-
     // Collect all tasks in order: direct taskIds first, then block entries by order
     const orderedTaskIds: string[] = [...plan.taskIds]
     for (const blockId of plan.blockIds) {
@@ -675,8 +669,16 @@ function resolveDay(
       const tid = validTasks[idx]
       const task = context.tasks.find((t) => t.id === tid)!
 
-      // Weight = base + (totalTasks - index) → first task highest, descending
-      const taskWeight = baseWeight + (totalTasks - idx)
+      // Evaluate the piecewise curve at THIS task's actual start time
+      const curveWeight = getRecoveryWeight(plan, recoveryCursor, dateStr)
+      if (curveWeight <= 0) {
+        if (debug) console.log(`      ⚖️ [R] ${task.title}: WEIGHT=0 at ${recoveryCursor}min, skipping`)
+        recoveryCursor += task.durationMinutes
+        continue
+      }
+
+      // Weight = curve value at this time + order bonus (first task highest)
+      const taskWeight = curveWeight + (totalTasks - idx)
 
       const recIKey = makeInstanceKey('recovery', plan.id, '', task.id)
       items.push({
