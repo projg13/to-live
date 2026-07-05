@@ -684,28 +684,23 @@ function Dashboard() {
                         )}
                         {/* Weight offset control */}
                         {!isDone && (
-                          <div className="flex items-center gap-0.5">
-                            <button
-                              onClick={() => scheduler.setWeightOffset(item.instanceKey, weightOffset - 10)}
-                              className="p-1 rounded-lg text-[10px] font-bold bg-slate-950/60 hover:bg-slate-900 text-slate-400 border border-slate-850 transition-all cursor-pointer"
-                              title="Decrease priority (-10)"
-                            >−</button>
-                            {weightOffset !== 0 && (
-                              <button
-                                onClick={() => scheduler.clearWeightOffset(item.instanceKey)}
-                                className={`px-1.5 py-0.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
-                                  weightOffset > 0
-                                    ? 'bg-emerald-950/30 text-emerald-400 border-emerald-800/30'
-                                    : 'bg-rose-950/30 text-rose-400 border-rose-800/30'
-                                }`}
-                                title="Clear offset"
-                              >{weightOffset > 0 ? '+' : ''}{weightOffset}</button>
-                            )}
-                            <button
-                              onClick={() => scheduler.setWeightOffset(item.instanceKey, weightOffset + 10)}
-                              className="p-1 rounded-lg text-[10px] font-bold bg-slate-950/60 hover:bg-slate-900 text-slate-400 border border-slate-850 transition-all cursor-pointer"
-                              title="Increase priority (+10)"
-                            >+</button>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-slate-500 font-semibold" title="Weight Offset">⚖️</span>
+                            <input
+                              type="number"
+                              value={weightOffset || ''}
+                              placeholder="0"
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                if (isNaN(val) || val === 0) {
+                                  scheduler.clearWeightOffset(item.instanceKey);
+                                } else {
+                                  scheduler.setWeightOffset(item.instanceKey, val);
+                                }
+                              }}
+                              className="w-12 px-1 py-0.5 rounded text-center text-[10px] font-bold bg-slate-950 border border-slate-850 text-slate-300 focus:outline-none focus:border-slate-700"
+                              title="Set priority offset"
+                            />
                           </div>
                         )}
                         {item.source === 'adhoc' && (
