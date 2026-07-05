@@ -804,15 +804,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
 
         if (state.debugMode) console.log('🔍 [Scheduler] debugMode is ON — toggle with toggleDebug()')
 
-        // Auto snapshot (debounced — avoids 409 SHA conflicts from rapid resolves)
-        clearTimeout((globalThis as any).__backupTimer)
-        ;(globalThis as any).__backupTimer = setTimeout(() => {
-          import('../backup').then(({ snapshotToGitHub }) => {
-            snapshotToGitHub().catch((err) => {
-              console.error('Auto backup to GitHub failed:', err)
-            })
-          })
-        }, 3000)
+        // Auto-backup handled by hourly timer in backup.ts (started from SettingsPanel)
       },
 
       confirmAnchor: (conf) =>

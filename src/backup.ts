@@ -1,5 +1,7 @@
 import { useSettingsStore } from './store/settingsStore'
 
+const MAX_SNAPSHOTS = 5
+
 // Serialize the full app state (all keys starting with 'to-live-')
 export function serializeAppState(): string {
   const backupData: Record<string, string | null> = {}
@@ -35,87 +37,172 @@ export function restoreAppState(json: string) {
   window.location.reload()
 }
 
-export async function snapshotToGitHub(): Promise<void> {
-  const settings = useSettingsStore.getState()
-  const { githubOwner, githubRepo, githubToken, setLastSnapshotAt } = settings
+// --- GitHub helpers ---
 
-  if (!githubOwner || !githubRepo || !githubToken) {
-    // Silently skip if settings are incomplete
-    return
-  }
-
-  const json = serializeAppState()
-  // Unicode-safe base64 of the JSON
-  const content = btoa(unescape(encodeURIComponent(json)))
-
-  const url = `https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/state.json`
-  const headers = {
+function getGitHubHeaders() {
+  const { githubToken } = useSettingsStore.getState()
+  return {
     'Authorization': `Bearer ${githubToken}`,
     'Accept': 'application/vnd.github+json',
     'Content-Type': 'application/json'
   }
+}
 
-  // GET the same URL first to check if file exists and get SHA
-  let sha: string | undefined = undefined
-  try {
-    const getRes = await fetch(url, { headers })
-    if (getRes.status === 200) {
-      const getJson = await getRes.json()
-      sha = getJson.sha
-    } else if (getRes.status !== 404) {
-      throw new Error(`GET failed with status code: ${getRes.status}`)
-    }
-  } catch (error) {
-    console.error('GET check failed:', error)
-    throw error
+function getRepoUrl() {
+  const { githubOwner, githubRepo } = useSettingsStore.getState()
+  return `https://api.github.com/repos/${githubOwner}/${githubRepo}/contents`
+}
+
+function isConfigured(): boolean {
+  const { githubOwner, githubRepo, githubToken } = useSettingsStore.getState()
+  return !!(githubOwner && githubRepo && githubToken)
+}
+
+// Get file SHA (needed for updates)
+async function getFileSha(path: string): Promise<string | undefined> {
+  const res = await fetch(`${getRepoUrl()}/${path}`, { headers: getGitHubHeaders() })
+  if (res.status === 200) {
+    const json = await res.json()
+    return json.sha
   }
+  return undefined
+}
 
-  const timestamp = new Date().toISOString()
-  const putBody = {
-    message: `snapshot ${timestamp}`,
-    content,
-    ...(sha ? { sha } : {})
-  }
-
-  const putRes = await fetch(url, {
+// Put file to GitHub
+async function putFile(path: string, content: string, message: string): Promise<void> {
+  const sha = await getFileSha(path)
+  const encoded = btoa(unescape(encodeURIComponent(content)))
+  const res = await fetch(`${getRepoUrl()}/${path}`, {
     method: 'PUT',
-    headers,
-    body: JSON.stringify(putBody)
+    headers: getGitHubHeaders(),
+    body: JSON.stringify({
+      message,
+      content: encoded,
+      ...(sha ? { sha } : {})
+    })
   })
-
-  if (putRes.ok || putRes.status === 200 || putRes.status === 201) {
-    setLastSnapshotAt(timestamp)
-  } else {
-    throw new Error(`PUT failed with status code: ${putRes.status}`)
+  if (!res.ok) {
+    throw new Error(`PUT ${path} failed: ${res.status}`)
   }
 }
 
+// Get file content from GitHub
+async function getFileContent(path: string): Promise<string> {
+  const res = await fetch(`${getRepoUrl()}/${path}`, { headers: getGitHubHeaders() })
+  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
+  const json = await res.json()
+  const clean = json.content.replace(/\r?\n|\r/g, '')
+  return decodeURIComponent(escape(atob(clean)))
+}
+
+// --- Snapshot manifest ---
+
+export interface SnapshotEntry {
+  slot: number        // 1-5
+  filename: string    // state_1.json
+  timestamp: string   // ISO string
+  label: string       // human-readable
+}
+
+interface Manifest {
+  snapshots: SnapshotEntry[]
+  nextSlot: number    // which slot to write next (1-5, wraps)
+}
+
+const MANIFEST_FILE = 'backup_manifest.json'
+
+async function getManifest(): Promise<Manifest> {
+  try {
+    const content = await getFileContent(MANIFEST_FILE)
+    return JSON.parse(content)
+  } catch {
+    return { snapshots: [], nextSlot: 1 }
+  }
+}
+
+async function saveManifest(manifest: Manifest): Promise<void> {
+  await putFile(MANIFEST_FILE, JSON.stringify(manifest, null, 2), 'update backup manifest')
+}
+
+// --- Public API ---
+
+/** Save a snapshot to the next rotating slot */
+export async function snapshotToGitHub(): Promise<void> {
+  if (!isConfigured()) return
+
+  const manifest = await getManifest()
+  const slot = manifest.nextSlot
+  const filename = `state_${slot}.json`
+  const timestamp = new Date().toISOString()
+  const label = new Date().toLocaleString()
+
+  const json = serializeAppState()
+  await putFile(filename, json, `snapshot ${timestamp} (slot ${slot})`)
+
+  // Update manifest: replace or add entry for this slot
+  const existing = manifest.snapshots.findIndex((s) => s.slot === slot)
+  const entry: SnapshotEntry = { slot, filename, timestamp, label }
+  if (existing >= 0) {
+    manifest.snapshots[existing] = entry
+  } else {
+    manifest.snapshots.push(entry)
+  }
+
+  // Advance to next slot (1-based, wraps at MAX_SNAPSHOTS)
+  manifest.nextSlot = (slot % MAX_SNAPSHOTS) + 1
+
+  await saveManifest(manifest)
+
+  useSettingsStore.getState().setLastSnapshotAt(timestamp)
+}
+
+/** List available restore points (newest first) */
+export async function listSnapshots(): Promise<SnapshotEntry[]> {
+  if (!isConfigured()) return []
+  const manifest = await getManifest()
+  // Sort by timestamp descending (newest first)
+  return [...manifest.snapshots].sort((a, b) =>
+    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  )
+}
+
+/** Restore from a specific snapshot slot */
+export async function restoreFromSnapshot(filename: string): Promise<void> {
+  if (!isConfigured()) throw new Error('Incomplete GitHub settings')
+  if (!confirm(`Restore from ${filename}? This will overwrite your local state and reload.`)) return
+
+  const json = await getFileContent(filename)
+  restoreAppState(json)
+}
+
+/** Legacy: restore from state.json (backward compat) */
 export async function restoreFromGitHub(): Promise<void> {
-  const settings = useSettingsStore.getState()
-  const { githubOwner, githubRepo, githubToken } = settings
+  if (!isConfigured()) throw new Error('Incomplete GitHub settings')
+  if (!confirm('Overwrite local state with this backup? The app will reload.')) return
 
-  if (!githubOwner || !githubRepo || !githubToken) {
-    throw new Error('Incomplete GitHub settings')
+  const json = await getFileContent('state.json')
+  restoreAppState(json)
+}
+
+// --- Hourly auto-backup ---
+
+let _hourlyTimer: ReturnType<typeof setInterval> | null = null
+
+export function startHourlyBackup(): void {
+  if (_hourlyTimer) return // already running
+  const HOUR = 60 * 60 * 1000
+  _hourlyTimer = setInterval(() => {
+    snapshotToGitHub().catch((err) => {
+      console.error('[Hourly backup] failed:', err)
+    })
+  }, HOUR)
+  console.log('[Backup] Hourly auto-backup started')
+}
+
+export function stopHourlyBackup(): void {
+  if (_hourlyTimer) {
+    clearInterval(_hourlyTimer)
+    _hourlyTimer = null
+    console.log('[Backup] Hourly auto-backup stopped')
   }
-
-  if (!confirm('Overwrite local state with this backup? The app will reload.')) {
-    return
-  }
-
-  const url = `https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/state.json`
-  const headers = {
-    'Authorization': `Bearer ${githubToken}`,
-    'Accept': 'application/vnd.github+json'
-  }
-
-  const res = await fetch(url, { headers })
-  if (!res.ok) {
-    throw new Error(`GET failed with status code: ${res.status}`)
-  }
-
-  const resJson = await res.json()
-  const cleanContent = resJson.content.replace(/\r?\n|\r/g, '')
-  const decodedJson = decodeURIComponent(escape(atob(cleanContent)))
-
-  restoreAppState(decodedJson)
 }
