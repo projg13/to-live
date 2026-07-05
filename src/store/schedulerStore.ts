@@ -24,6 +24,7 @@ interface SchedulerStore {
   postponedTasks: string[]
   lastDoneAt: Record<number, number>   // day → minutes from midnight (latest done-at time)
   weightOffsets: Record<string, number> // instanceKey → weight offset (session-only, not persisted)
+  resolveVersion: number               // bumped to trigger re-resolve from actions
   debugMode: boolean                   // persisted debug toggle
 
   // Actions
@@ -809,6 +810,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
       doneItems: [],
       postponedTasks: [],
       weightOffsets: {},
+      resolveVersion: 0,
       debugMode: false,
       lastDoneAt: {},
 
@@ -937,6 +939,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
           const result: Partial<SchedulerStore> = {
             doneTasks: [...state.doneTasks.filter((id) => id !== completionKey), completionKey],
             doneItems: newDoneItems,
+            resolveVersion: state.resolveVersion + 1,
           }
 
           // Recovery auto-resolve: check if all tasks in this recovery plan are now done
@@ -997,6 +1000,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
             doneTasks: allDoneIds,
             doneItems: newDoneItems,
             lastDoneAt: { ...state.lastDoneAt, [day]: doneAtMinutes },
+            resolveVersion: state.resolveVersion + 1,
           }
         }),
 
@@ -1004,17 +1008,19 @@ export const useSchedulerStore = create<SchedulerStore>()(
         set((state) => ({
           doneTasks: state.doneTasks.filter((id) => !id.startsWith(instanceKey + ':')),
           doneItems: state.doneItems.filter((i) => i.instanceKey !== instanceKey),
+          resolveVersion: state.resolveVersion + 1,
         })),
 
       setWeightOffset: (instanceKey, offset) =>
         set((state) => ({
           weightOffsets: { ...state.weightOffsets, [instanceKey]: offset },
+          resolveVersion: state.resolveVersion + 1,
         })),
 
       clearWeightOffset: (instanceKey) =>
         set((state) => {
           const { [instanceKey]: _, ...rest } = state.weightOffsets
-          return { weightOffsets: rest }
+          return { weightOffsets: rest, resolveVersion: state.resolveVersion + 1 }
         }),
 
       insertTask: (taskId, startTime, day) => {
@@ -1076,7 +1082,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
       name: 'to-live-scheduler',
       partialize: (state) => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { weightOffsets, ...rest } = state
+        const { weightOffsets, resolveVersion, ...rest } = state
         return rest
       },
     }
