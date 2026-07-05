@@ -341,7 +341,7 @@ function resolveDay(
       const firstAnchorTime = candidates[0]?.anchorTime ?? 0
       let cursor = Math.max(
         firstAnchorTime,
-        lastDoneAt !== undefined ? lastDoneAt : 0,
+        dayIndex === 0 && lastDoneAt !== undefined ? lastDoneAt : 0,
         dayIndex === 0 ? nowMinutes : 0
       )
       let currentAnchorId = candidates[0]?.anchorId ?? ''
@@ -776,7 +776,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
             [...state.skippedTaskIds, ...state.postponedTasks],
             freshDoneTasks,
             state.lastDoneAt[i],
-            state.debugMode && i === 0  // only debug day 0
+            state.debugMode  // debug all days when enabled
           ))
         }
 
