@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useObligationStore } from '../store/obligationStore'
 import { useTaskStore } from '../store/taskStore'
 import type { Obligation, ObligationTask, WeightBracket, ObligationRecurrence, MonthlyRecurrenceType, WeekOfMonthSelection, DayOfWeekSelection } from '../types/obligation'
+import { resolveObligationDeadline, getActiveBracket } from '../types/obligation'
 import { formatTime } from '../types/anchor'
 
 // Icons
@@ -84,24 +85,33 @@ function ObligationPanel() {
             )
           }
 
-          const daysLeft = ob.deadline
-            ? Math.ceil((new Date(ob.deadline).getTime() - Date.now()) / 86400000)
+          const today = new Date().toISOString().split('T')[0]
+          const resolvedDeadline = resolveObligationDeadline(ob, today)
+          const daysLeft = resolvedDeadline
+            ? Math.ceil((new Date(resolvedDeadline).getTime() - new Date(today).getTime()) / 86400000)
             : null
 
           let daysBadge = null
           if (daysLeft !== null) {
             let badgeColor = 'bg-slate-950/60 text-slate-400 border-slate-850'
-            if (daysLeft <= 3) {
+            if (daysLeft <= 0) {
               badgeColor = 'bg-rose-955/30 text-rose-400 border-rose-900/30 animate-pulse'
+            } else if (daysLeft <= 3) {
+              badgeColor = 'bg-rose-955/30 text-rose-400 border-rose-900/30'
             } else if (daysLeft <= 7) {
               badgeColor = 'bg-amber-955/35 text-amber-400 border-amber-900/30'
             }
             daysBadge = (
               <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${badgeColor}`}>
-                {daysLeft} days left
+                {daysLeft <= 0 ? 'overdue' : `${daysLeft}d left`}
               </span>
             )
           }
+
+          // Find active bracket for display
+          const activeBracket = daysLeft !== null
+            ? getActiveBracket(ob.weightBrackets, Math.max(0, daysLeft))
+            : null
 
           return (
             <div
@@ -130,8 +140,18 @@ function ObligationPanel() {
                       : ob.recurrence}
                   </span>
                   <span>• {ob.tasks.length} task(s)</span>
-                  <span>• {ob.weightBrackets.length} weight bracket(s)</span>
+                  <span>• {ob.weightBrackets.length} bracket(s)</span>
                 </div>
+
+                {/* Read-only deadline + weight info for recurring obligations */}
+                {ob.recurrence !== 'one-time' && resolvedDeadline && (
+                  <div className="flex flex-wrap gap-2 text-[10px] font-mono text-slate-500">
+                    <span>📅 Next: {resolvedDeadline}</span>
+                    {activeBracket && (
+                      <span>⚖️ Bracket: ≤{activeBracket.maxDaysRemaining}d → peak {Math.max(...activeBracket.timeCurve.map(p => p.value))}w</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Toggle Switch */}
