@@ -28,6 +28,7 @@ interface SchedulerStore {
   resolve: (context: ResolveContext) => void
   confirmAnchor: (conf: AnchorConfirmation) => void
   addAdhocTask: (task: AdhocTask) => void
+  updateAdhocTask: (id: string, updates: Partial<AdhocTask>) => void
   removeAdhocTask: (id: string) => void
   skipTask: (taskId: string) => void
   unskipTask: (taskId: string) => void
@@ -819,6 +820,13 @@ export const useSchedulerStore = create<SchedulerStore>()(
 
       addAdhocTask: (task) =>
         set((state) => ({ adhocTasks: [...state.adhocTasks, task] })),
+
+      updateAdhocTask: (id, updates) =>
+        set((state) => ({
+          adhocTasks: state.adhocTasks.map((t) =>
+            t.id === id ? { ...t, ...updates } : t
+          )
+        })),
 
       removeAdhocTask: (id) =>
         set((state) => ({ adhocTasks: state.adhocTasks.filter((t) => t.id !== id) })),
