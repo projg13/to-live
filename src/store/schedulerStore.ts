@@ -95,7 +95,6 @@ function resolveDay(
   debug: boolean = false
 ): DaySchedule {
   const dayOfWeek = getDayOfWeek(dateStr)
-  const periodKey = dateStr.slice(0, 7) // YYYY-MM
 
   // Find day plan (event override → week plan)
   const event = context.calendarEvents.find((e) => {
@@ -504,7 +503,15 @@ function resolveDay(
       ? Math.max(0, Math.ceil((new Date(resolvedDeadline).getTime() - new Date(dateStr).getTime()) / 86400000))
       : 999
 
-    if (debug) console.log(`  📌 "${ob.name}": deadline=${resolvedDeadline ?? 'none'} daysRemaining=${daysRemaining} brackets=${ob.weightBrackets.length}`)
+    // Compute the period key for this obligation's done tracking.
+    // For recurring obligations, this is the resolved deadline itself (e.g. "2026-07-01").
+    // This way, when a new period starts (e.g. "2026-08-01"), old done entries don't match.
+    // For one-time obligations, it's the deadline or dateStr.
+    const obPeriodKey = resolvedDeadline
+      ? (ob.recurrence !== 'one-time' ? resolvedDeadline : dateStr)
+      : dateStr
+
+    if (debug) console.log(`  📌 "${ob.name}": deadline=${resolvedDeadline ?? 'none'} daysRemaining=${daysRemaining} obPeriodKey=${obPeriodKey} brackets=${ob.weightBrackets.length}`)
 
     const bracket = getActiveBracket(ob.weightBrackets, daysRemaining)
     if (!bracket) {
@@ -514,19 +521,8 @@ function resolveDay(
 
     if (debug) console.log(`    ✓ Bracket: maxDaysRemaining=${bracket.maxDaysRemaining} timeCurve=${JSON.stringify(bracket.timeCurve)}`)
 
-    // Find: (1) peak weight for priority, (2) earliest time weight > 0 for placement
-    let peakWeight = 0
-    let windowStart = 0  // earliest time the curve has weight > 0
-
-    // Find peak weight
-    for (const pt of bracket.timeCurve) {
-      if (pt.value > peakWeight) {
-        peakWeight = pt.value
-      }
-    }
-
-    // Find start of weight window: first time where interpolated value > 0
-    // Scan curve segments for where weight transitions from 0 to non-zero
+    // Find earliest time the curve has weight > 0 for placement
+    let windowStart = 0
     if (bracket.timeCurve.length > 0) {
       if (bracket.timeCurve[0].value > 0) {
         windowStart = bracket.timeCurve[0].time
@@ -535,8 +531,7 @@ function resolveDay(
           const a = bracket.timeCurve[i]
           const b = bracket.timeCurve[i + 1]
           if (a.value === 0 && b.value > 0) {
-            // Weight starts rising right after the zero point
-            windowStart = a.time + 1  // 1 minute after zero-crossing
+            windowStart = a.time + 1
             break
           }
         }
@@ -545,19 +540,6 @@ function resolveDay(
 
     // Placement: max(obStart, windowStart) — never before now, never before weight window
     const obPlacement = Math.max(obStart, windowStart)
-
-    // Use peak weight as the base (the obligation competes at its strongest)
-    let baseWeight = peakWeight > 0 ? peakWeight : getObligationWeight(bracket.timeCurve, obPlacement)
-    if (debug) console.log(`    ⚖️ peakWeight=${peakWeight} windowStart=${windowStart} placement@${obPlacement} baseWeight=${baseWeight}`)
-
-    if (eventWeightOffset > 0) {
-      baseWeight = baseWeight - eventWeightOffset
-      if (debug) console.log(`    ⚖️ after eventOffset(-${eventWeightOffset}): ${baseWeight}`)
-    }
-    if (baseWeight <= 0) {
-      if (debug) console.log(`    ❌ Weight <= 0, skipping`)
-      continue
-    }
 
     // Collect all tasks in order: direct tasks first, then block entries
     const orderedTaskIds: string[] = ob.tasks.map((t) => t.taskId)
@@ -572,13 +554,14 @@ function resolveDay(
     }
 
     // Filter to valid, non-done, non-skipped tasks
+    // Done key uses obPeriodKey (deadline-scoped) so tasks from old periods are automatically undone
     const validTasks = orderedTaskIds.filter((tid) => {
       if (skippedTaskIds.includes(tid)) return false
       const obIKey = makeInstanceKey('obligation', ob.id, '', tid)
+      const periodDoneKey = `${obIKey}:${obPeriodKey}`
       const dailyKey = `${obIKey}:${dateStr}`
-      const monthKey = `${obIKey}:${periodKey}`
-      const isDone = doneTasks.includes(dailyKey) || doneTasks.includes(monthKey)
-      if (debug) console.log(`      📝 ${tid}: obIKey=${obIKey} dailyKey=${dailyKey} monthKey=${monthKey} isDone=${isDone} (doneTasks has ${doneTasks.filter(d => d.startsWith('obligation:')).length} obligation entries)`)
+      const isDone = doneTasks.includes(periodDoneKey) || doneTasks.includes(dailyKey)
+      if (debug) console.log(`      📝 ${tid}: periodDoneKey=${periodDoneKey} dailyKey=${dailyKey} isDone=${isDone}`)
       if (isDone) return false
       if (!context.tasks.find((t) => t.id === tid)) return false
       return true
@@ -587,24 +570,39 @@ function resolveDay(
     if (debug) console.log(`    📝 Tasks: ${orderedTaskIds.length} total → ${validTasks.length} valid`)
 
 
+    let obCursor = obPlacement
 
     for (let idx = 0; idx < validTasks.length; idx++) {
       const tid = validTasks[idx]
       const task = context.tasks.find((t) => t.id === tid)!
 
-      // Ascending weight: lower in list → higher weight (opposite of recovery)
-      // First task: base + 1, Last task: base + totalTasks
-      const taskWeight = baseWeight + (idx + 1)
+      // Evaluate the weight curve at THIS task's actual scheduled time
+      const curveWeight = getObligationWeight(bracket.timeCurve, obCursor)
+      if (curveWeight <= 0) {
+        if (debug) console.log(`      ⚖️ ${task.title}: WEIGHT=0 at ${obCursor}min, skipping`)
+        obCursor += task.durationMinutes
+        continue
+      }
 
-      if (debug) console.log(`      ✓ ${task.title}: weight=${taskWeight} @${obPlacement}`)
+      if (eventWeightOffset > 0 && curveWeight - eventWeightOffset <= 0) {
+        if (debug) console.log(`      ⚖️ ${task.title}: weight ${curveWeight} - eventOffset ${eventWeightOffset} <= 0, skipping`)
+        obCursor += task.durationMinutes
+        continue
+      }
+
+      const effectiveWeight = eventWeightOffset > 0 ? curveWeight - eventWeightOffset : curveWeight
+      // Order bonus: first task gets +1, last gets +totalTasks
+      const taskWeight = effectiveWeight + (idx + 1)
+
+      if (debug) console.log(`      ✓ ${task.title}: weight=${taskWeight} (curve=${curveWeight}) @${obCursor}`)
 
       const obIKey = makeInstanceKey('obligation', ob.id, '', task.id)
       items.push({
         taskId: task.id,
         instanceKey: obIKey,
         title: task.title,
-        startMinutes: obPlacement,
-        endMinutes: obPlacement + task.durationMinutes,
+        startMinutes: obCursor,
+        endMinutes: obCursor + task.durationMinutes,
         isBackground: false,
         source: 'obligation',
         weight: taskWeight + (weightOffsets[obIKey] ?? 0),
@@ -612,6 +610,7 @@ function resolveDay(
         sourceId: ob.id,
         sourceName: ob.name,
       })
+      obCursor += task.durationMinutes
     }
   }
   if (debug) console.groupEnd()
@@ -827,10 +826,18 @@ export const useSchedulerStore = create<SchedulerStore>()(
         const today = getDateStr(0, context.baseDate)
         const currentMonth = today.slice(0, 7) // YYYY-MM
 
-        // Purge stale doneTasks — keep today, yesterday, current obligation period,
+        // Purge stale doneTasks — keep today, yesterday, current obligation deadlines,
         // AND all recovery-sourced done entries (they persist until plan is resolved)
         const yesterday = getDateStr(-1, context.baseDate)
         const triggeredRecoveryIds = new Set(context.recoveryPlans.filter((p) => p.triggered).map((p) => p.id))
+        // Collect all active obligation deadline periods to keep their done keys
+        const activeObDeadlines = new Set<string>()
+        for (const ob of context.obligations) {
+          if (!ob.enabled) continue
+          const dl = resolveObligationDeadline(ob, today)
+          if (dl && ob.recurrence !== 'one-time') activeObDeadlines.add(dl)
+        }
+        activeObDeadlines.add(currentMonth) // backward compat
         const freshDoneTasks = state.doneTasks.filter((key) => {
           const colonIdx = key.lastIndexOf(':')
           if (colonIdx === -1) return false // bare IDs from old format — drop
@@ -838,10 +845,11 @@ export const useSchedulerStore = create<SchedulerStore>()(
           // Keep recovery done entries for active (triggered) plans
           if (key.startsWith('recovery:')) {
             const parts = key.split(':')
-            // instanceKey format: recovery:planId:anchorId:taskId
             const planId = parts[1]
             if (triggeredRecoveryIds.has(planId)) return true
           }
+          // Keep obligation done entries for current deadline periods
+          if (key.startsWith('obligation:') && activeObDeadlines.has(suffix)) return true
           return suffix === today || suffix === yesterday || suffix === currentMonth
         })
 
@@ -940,12 +948,15 @@ export const useSchedulerStore = create<SchedulerStore>()(
           // Use instanceKey:date as the completion key
           let completionKey = `${instanceKey}:${dateStr}`
 
-          // Obligations with recurrence: key by month
+          // Obligations with recurrence: key by resolved deadline period
           if (item && item.source === 'obligation' && item.sourceId) {
             const obligations = useObligationStore.getState().obligations
             const matchingOb = obligations.find((o) => o.id === item.sourceId)
             if (matchingOb && matchingOb.recurrence !== 'one-time') {
-              completionKey = `${instanceKey}:${dateStr.slice(0, 7)}`
+              const resolvedDeadline = resolveObligationDeadline(matchingOb, dateStr)
+              if (resolvedDeadline) {
+                completionKey = `${instanceKey}:${resolvedDeadline}`
+              }
             }
           }
 
@@ -1001,7 +1012,10 @@ export const useSchedulerStore = create<SchedulerStore>()(
             const obligations = useObligationStore.getState().obligations
             const matchingOb = obligations.find((o) => o.id === item.sourceId)
             if (matchingOb && matchingOb.recurrence !== 'one-time') {
-              completionKey = `${instanceKey}:${dateStr.slice(0, 7)}`
+              const resolvedDeadline = resolveObligationDeadline(matchingOb, dateStr)
+              if (resolvedDeadline) {
+                completionKey = `${instanceKey}:${resolvedDeadline}`
+              }
             }
           }
 

@@ -144,23 +144,33 @@ export function getActiveBracket(
   return sorted.find((b) => daysRemaining <= b.maxDaysRemaining)
 }
 
-// Interpolate the time-of-day weight within a bracket
+// Interpolate the time-of-day weight within a bracket (circular 24h wrapping)
 export function getObligationWeight(
   timeCurve: TimeWeight[],
   timeMinutes: number
 ): number {
   if (timeCurve.length === 0) return 0
   if (timeCurve.length === 1) return timeCurve[0].value
-  if (timeMinutes <= timeCurve[0].time) return timeCurve[0].value
-  if (timeMinutes >= timeCurve[timeCurve.length - 1].time) return timeCurve[timeCurve.length - 1].value
+
+  const DAY = 1440
+  const t = ((timeMinutes % DAY) + DAY) % DAY
+
+  const first = timeCurve[0]
+  const last = timeCurve[timeCurve.length - 1]
 
   for (let i = 0; i < timeCurve.length - 1; i++) {
     const a = timeCurve[i]
     const b = timeCurve[i + 1]
-    if (timeMinutes >= a.time && timeMinutes <= b.time) {
-      const t = (timeMinutes - a.time) / (b.time - a.time)
-      return a.value + t * (b.value - a.value)
+    if (t >= a.time && t <= b.time) {
+      const frac = (t - a.time) / (b.time - a.time)
+      return a.value + frac * (b.value - a.value)
     }
   }
-  return 0
+
+  // Wrap around midnight
+  const wrapDistance = (DAY - last.time) + first.time
+  if (wrapDistance <= 0) return last.value
+  const distFromLast = t >= last.time ? (t - last.time) : (DAY - last.time + t)
+  const frac = distFromLast / wrapDistance
+  return last.value + frac * (first.value - last.value)
 }
