@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useRecoveryStore } from '../store/recoveryStore'
 import { useTaskStore } from '../store/taskStore'
 import { useBlockStore } from '../store/blockStore'
+import { useSchedulerStore } from '../store/schedulerStore'
 import type { RecoveryPlan, TriggerType, AutoTriggerCondition, TimeWeight } from '../types/recovery'
 
 // Icons
@@ -37,8 +38,12 @@ const FlameIcon = () => (
 
 function RecoveryPanel() {
   const { plans, addPlan, updatePlan, deletePlan, trigger, resolve } = useRecoveryStore()
+  const { tasks } = useTaskStore()
+  const { blocks } = useBlockStore()
+  const scheduler = useSchedulerStore()
   const [editing, setEditing] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [expandedPlan, setExpandedPlan] = useState<string | null>(null)
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -99,10 +104,11 @@ function RecoveryPanel() {
           return (
             <div
               key={plan.id}
-              className={`flex justify-between items-center py-3.5 px-4 bg-slate-950/40 hover:bg-slate-900 rounded-2xl border border-slate-800/80 shadow-sm transition-all ${
+              className={`flex flex-col bg-slate-950/40 hover:bg-slate-900 rounded-2xl border border-slate-800/80 shadow-sm transition-all ${
                 plan.triggered ? 'border-rose-900/50 bg-rose-955/5' : ''
               }`}
             >
+              <div className="flex justify-between items-center py-3.5 px-4">
               <div
                 onClick={() => setEditing(plan.id)}
                 className="cursor-pointer flex-1 space-y-1.5 pr-4"
@@ -139,14 +145,67 @@ function RecoveryPanel() {
                     Trigger
                   </button>
                 ) : (
-                  <button
-                    onClick={() => resolve(plan.id)}
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-955/30 hover:bg-cyan-900/40 text-cyan-400 border border-cyan-800/30 transition-all active:scale-95 cursor-pointer"
-                  >
-                    Resolve
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setExpandedPlan(expandedPlan === plan.id ? null : plan.id)}
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-950/60 hover:bg-slate-900 text-slate-300 border border-slate-850 transition-all active:scale-95 cursor-pointer"
+                    >
+                      {expandedPlan === plan.id ? '▲ Hide' : '▼ Tasks'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        scheduler.clearRecoveryDone(plan.id)
+                        resolve(plan.id)
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-955/30 hover:bg-cyan-900/40 text-cyan-400 border border-cyan-800/30 transition-all active:scale-95 cursor-pointer"
+                    >
+                      Resolve
+                    </button>
+                  </>
                 )}
               </div>
+            </div>
+
+            {/* Expanded pending/done task list */}
+            {plan.triggered && expandedPlan === plan.id && (() => {
+              // Collect all task IDs for this plan
+              const allTaskIds: string[] = [...plan.taskIds]
+              for (const blockId of plan.blockIds) {
+                const block = blocks.find((b) => b.id === blockId)
+                if (!block) continue
+                for (const entry of [...block.entries].sort((a, b) => a.order - b.order)) {
+                  if (!allTaskIds.includes(entry.taskId)) allTaskIds.push(entry.taskId)
+                }
+              }
+
+              return (
+                <div className="mt-2 mx-4 mb-3 p-3 bg-slate-950/60 border border-slate-850 rounded-xl space-y-1.5">
+                  <div className="text-[10px] font-bold text-slate-450 uppercase tracking-widest mb-2">Recovery Tasks</div>
+                  {allTaskIds.map((tid) => {
+                    const task = tasks.find((t) => t.id === tid)
+                    if (!task) return null
+                    const recIKey = `recovery:${plan.id}::${tid}`
+                    const isDone = scheduler.doneTasks.some((dk) => dk.startsWith(recIKey + ':'))
+                    return (
+                      <div key={tid} className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-xs border ${
+                        isDone
+                          ? 'bg-emerald-950/15 border-emerald-900/20 text-slate-500 line-through'
+                          : 'bg-slate-900/40 border-slate-850 text-slate-300'
+                      }`}>
+                        <span className="font-semibold">{task.title}</span>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                          isDone
+                            ? 'bg-emerald-950/30 text-emerald-400'
+                            : 'bg-amber-950/30 text-amber-400'
+                        }`}>
+                          {isDone ? '✓ Done' : 'Pending'}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
             </div>
           )
         })}

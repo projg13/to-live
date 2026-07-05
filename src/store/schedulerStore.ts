@@ -40,6 +40,7 @@ interface SchedulerStore {
   unmarkTask: (instanceKey: string) => void
   setWeightOffset: (instanceKey: string, offset: number) => void
   clearWeightOffset: (instanceKey: string) => void
+  clearRecoveryDone: (planId: string) => void
   insertTask: (taskId: string, startTime: number, day: number) => void
   recalibrateFrom: (minutes: number, day: number) => void
   toggleDebug: () => void
@@ -1034,6 +1035,12 @@ export const useSchedulerStore = create<SchedulerStore>()(
           const { [instanceKey]: _, ...rest } = state.weightOffsets
           return { weightOffsets: rest, resolveVersion: state.resolveVersion + 1 }
         }),
+
+      clearRecoveryDone: (planId) =>
+        set((state) => ({
+          doneTasks: state.doneTasks.filter((dk) => !dk.startsWith(`recovery:${planId}:`)),
+          resolveVersion: state.resolveVersion + 1,
+        })),
 
       insertTask: (taskId, startTime, day) => {
         // Find actual task to get title and duration from context
