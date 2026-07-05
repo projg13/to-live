@@ -34,8 +34,8 @@ function App() {
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans pb-10 transition-colors duration-300">
       {/* Top Segmented Controls */}
-      <header className="border-b border-slate-900/60 bg-[#0b0f19]/80 backdrop-blur-md sticky top-0 z-30 px-4">
-        <nav className="flex justify-center p-1 bg-slate-950/90 rounded-2xl max-w-sm mx-auto my-3 border border-slate-800/80 shadow-inner">
+      <header className="border-b border-slate-900/60 bg-[#0b0f19]/80 backdrop-blur-md sticky top-0 z-30 px-4 py-3">
+        <nav className="flex justify-center p-1 bg-slate-950/90 rounded-2xl max-w-sm mx-auto border border-slate-800/80 shadow-inner">
           <button
             onClick={() => setTab('dashboard')}
             className={`flex-1 py-1.5 text-center text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer active:scale-95 ${
