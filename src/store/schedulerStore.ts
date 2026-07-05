@@ -677,13 +677,20 @@ function resolveDay(
   // Sort by weight descending, then place sequentially into available time
   const placed = placeItems(items, [], [], dayConfirmations)
 
-  // Post-placement anchor adjustment: if any placed item overlaps an anchor's time, push the anchor forward
-  for (const ra of resolvedAnchors) {
+  // Post-placement anchor adjustment: push anchors past any items placed before them
+  // Process anchors in time order so cascading pushes propagate
+  const sortedAnchors = [...resolvedAnchors].sort((a, b) => a.actualTime - b.actualTime)
+  for (const ra of sortedAnchors) {
+    let maxEnd = 0
     for (const item of placed) {
-      if (item.startMinutes < ra.actualTime && item.endMinutes > ra.actualTime) {
-        if (debug) console.log(`  🔀 POST-PLACE ANCHOR PUSH: "${ra.anchorName}" ${ra.actualTime} → ${item.endMinutes} (overlap from "${item.title}")`)
-        ra.actualTime = item.endMinutes
+      // Any item that starts before this anchor and ends after it should push
+      if (item.startMinutes < ra.actualTime && item.endMinutes > maxEnd) {
+        maxEnd = item.endMinutes
       }
+    }
+    if (maxEnd > ra.actualTime) {
+      if (debug) console.log(`  🔀 POST-PLACE ANCHOR PUSH: "${ra.anchorName}" ${ra.actualTime} → ${maxEnd}`)
+      ra.actualTime = maxEnd
     }
   }
 
