@@ -575,7 +575,11 @@ function resolveDay(
     const validTasks = orderedTaskIds.filter((tid) => {
       if (skippedTaskIds.includes(tid)) return false
       const obIKey = makeInstanceKey('obligation', ob.id, '', tid)
-      if (doneTasks.includes(`${obIKey}:${dateStr}`) || doneTasks.includes(`${obIKey}:${periodKey}`)) return false
+      const dailyKey = `${obIKey}:${dateStr}`
+      const monthKey = `${obIKey}:${periodKey}`
+      const isDone = doneTasks.includes(dailyKey) || doneTasks.includes(monthKey)
+      if (debug) console.log(`      📝 ${tid}: obIKey=${obIKey} dailyKey=${dailyKey} monthKey=${monthKey} isDone=${isDone} (doneTasks has ${doneTasks.filter(d => d.startsWith('obligation:')).length} obligation entries)`)
+      if (isDone) return false
       if (!context.tasks.find((t) => t.id === tid)) return false
       return true
     })
