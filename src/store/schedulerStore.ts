@@ -654,10 +654,11 @@ function resolveDay(
     }
 
     // Filter to valid, non-done, non-skipped tasks
+    // Recovery uses prefix match (any date) — tasks stay done until plan is resolved
     const validTasks = orderedTaskIds.filter((tid) => {
       if (skippedTaskIds.includes(tid)) return false
       const recIKey = makeInstanceKey('recovery', plan.id, '', tid)
-      if (doneTasks.includes(`${recIKey}:${dateStr}`) || doneTasks.includes(`${recIKey}:${periodKey}`)) return false
+      if (doneTasks.some((dk) => dk.startsWith(recIKey + ':'))) return false
       if (!context.tasks.find((t) => t.id === tid)) return false
       return true
     })
@@ -821,12 +822,21 @@ export const useSchedulerStore = create<SchedulerStore>()(
         const today = getDateStr(0, context.baseDate)
         const currentMonth = today.slice(0, 7) // YYYY-MM
 
-        // Purge stale doneTasks — keep today, yesterday (for undo/recovery), and current obligation period
+        // Purge stale doneTasks — keep today, yesterday, current obligation period,
+        // AND all recovery-sourced done entries (they persist until plan is resolved)
         const yesterday = getDateStr(-1, context.baseDate)
+        const triggeredRecoveryIds = new Set(context.recoveryPlans.filter((p) => p.triggered).map((p) => p.id))
         const freshDoneTasks = state.doneTasks.filter((key) => {
           const colonIdx = key.lastIndexOf(':')
           if (colonIdx === -1) return false // bare IDs from old format — drop
           const suffix = key.slice(colonIdx + 1)
+          // Keep recovery done entries for active (triggered) plans
+          if (key.startsWith('recovery:')) {
+            const parts = key.split(':')
+            // instanceKey format: recovery:planId:anchorId:taskId
+            const planId = parts[1]
+            if (triggeredRecoveryIds.has(planId)) return true
+          }
           return suffix === today || suffix === yesterday || suffix === currentMonth
         })
 
