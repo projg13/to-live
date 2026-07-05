@@ -211,6 +211,20 @@ function resolveDay(
       (r) => r.enabled && dayPlan.routineIds.includes(r.id)
     )
 
+    // Sort routines by their earliest anchor time (ascending)
+    // This ensures overflow from earlier anchors pushes later anchors before they're processed
+    activeRoutines.sort((a, b) => {
+      const aMinAnchor = Math.min(...a.blockConfigs.map((bc) => {
+        const anchor = resolvedAnchors.find((ra) => ra.anchorId === bc.anchorId)
+        return anchor?.actualTime ?? 9999
+      }))
+      const bMinAnchor = Math.min(...b.blockConfigs.map((bc) => {
+        const anchor = resolvedAnchors.find((ra) => ra.anchorId === bc.anchorId)
+        return anchor?.actualTime ?? 9999
+      }))
+      return aMinAnchor - bMinAnchor
+    })
+
     if (debug) {
       console.log('activeRoutines:', activeRoutines.map((r) => r.name))
       if (activeRoutines.length === 0) {
