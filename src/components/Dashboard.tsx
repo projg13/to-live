@@ -687,10 +687,11 @@ function Dashboard() {
                           <div className="flex items-center gap-1">
                             <span className="text-[10px] text-slate-500 font-semibold" title="Weight Offset">⚖️</span>
                             <input
-                              type="number"
-                              value={weightOffset || ''}
+                              type="text"
+                              defaultValue={weightOffset || ''}
                               placeholder="0"
-                              onChange={(e) => {
+                              key={item.instanceKey + '-' + weightOffset}
+                              onBlur={(e) => {
                                 const val = parseInt(e.target.value, 10);
                                 if (isNaN(val) || val === 0) {
                                   scheduler.clearWeightOffset(item.instanceKey);
@@ -698,8 +699,19 @@ function Dashboard() {
                                   scheduler.setWeightOffset(item.instanceKey, val);
                                 }
                               }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const val = parseInt((e.target as HTMLInputElement).value, 10);
+                                  if (isNaN(val) || val === 0) {
+                                    scheduler.clearWeightOffset(item.instanceKey);
+                                  } else {
+                                    scheduler.setWeightOffset(item.instanceKey, val);
+                                  }
+                                  (e.target as HTMLInputElement).blur();
+                                }
+                              }}
                               className="w-12 px-1 py-0.5 rounded text-center text-[10px] font-bold bg-slate-950 border border-slate-850 text-slate-300 focus:outline-none focus:border-slate-700"
-                              title="Set priority offset"
+                              title="Set priority offset (press Enter to apply)"
                             />
                           </div>
                         )}
