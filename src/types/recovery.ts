@@ -64,16 +64,30 @@ export function getRecoveryWeight(
 function interpolateTimeCurve(curve: TimeWeight[], timeMinutes: number): number {
   if (curve.length === 0) return 0
   if (curve.length === 1) return curve[0].value
-  if (timeMinutes <= curve[0].time) return curve[0].value
-  if (timeMinutes >= curve[curve.length - 1].time) return curve[curve.length - 1].value
 
+  const DAY = 1440 // minutes in 24 hours
+  const t = ((timeMinutes % DAY) + DAY) % DAY // normalize to [0, 1440)
+
+  // Sorted curve assumed (by time ascending)
+  const first = curve[0]
+  const last = curve[curve.length - 1]
+
+  // Check if time falls between two adjacent points
   for (let i = 0; i < curve.length - 1; i++) {
     const a = curve[i]
     const b = curve[i + 1]
-    if (timeMinutes >= a.time && timeMinutes <= b.time) {
-      const t = (timeMinutes - a.time) / (b.time - a.time)
-      return a.value + t * (b.value - a.value)
+    if (t >= a.time && t <= b.time) {
+      const frac = (t - a.time) / (b.time - a.time)
+      return a.value + frac * (b.value - a.value)
     }
   }
-  return 0
+
+  // Time is outside the defined points → wrap around midnight
+  // Interpolate between last point and first point through midnight
+  const wrapDistance = (DAY - last.time) + first.time
+  if (wrapDistance <= 0) return last.value
+
+  const distFromLast = t >= last.time ? (t - last.time) : (DAY - last.time + t)
+  const frac = distFromLast / wrapDistance
+  return last.value + frac * (first.value - last.value)
 }
