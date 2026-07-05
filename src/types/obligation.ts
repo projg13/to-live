@@ -70,64 +70,66 @@ export function resolveObligationDeadline(ob: Obligation, dateStr: string): stri
     return ob.deadline
   }
 
+  if (ob.recurrence === 'monthly') {
+    // Try current month first, then next month if deadline already passed
+    const result = resolveMonthlyDeadline(ob, dateStr)
+    if (result && result < dateStr) {
+      // Deadline passed — resolve for next month
+      const d = new Date(dateStr)
+      d.setMonth(d.getMonth() + 1, 1)
+      const nextMonthStr = d.toISOString().split('T')[0]
+      return resolveMonthlyDeadline(ob, nextMonthStr)
+    }
+    return result
+  }
+
+  // Fallback to absolute deadline if custom/yearly/quarterly
+  return ob.deadline
+}
+
+function resolveMonthlyDeadline(ob: Obligation, dateStr: string): string | undefined {
   const currentDate = new Date(dateStr)
   const year = currentDate.getFullYear()
-  const month = currentDate.getMonth() // 0-11
+  const month = currentDate.getMonth()
 
   let targetDay = 1
 
-  if (ob.recurrence === 'monthly') {
-    if (!ob.monthlyType || ob.monthlyType === 'specific-day') {
-      targetDay = ob.recurrenceDayOfMonth ?? 1
-    } else {
-      // relative monthly type
-      const week = ob.recurrenceWeekOfMonth ?? 'first'
-      const daySel = ob.recurrenceDayOfWeek ?? 'monday'
-
-      // Generate all matching days in the month
-      const totalDays = new Date(year, month + 1, 0).getDate()
-      const matches: number[] = []
-
-      for (let d = 1; d <= totalDays; d++) {
-        const testDate = new Date(year, month, d)
-        const dayOfWeek = testDate.getDay() // 0 = Sun, 6 = Sat
-
-        let matchesDay = false
-        if (daySel === 'weekday') {
-          matchesDay = dayOfWeek >= 1 && dayOfWeek <= 5
-        } else if (daySel === 'weekend-day') {
-          matchesDay = dayOfWeek === 0 || dayOfWeek === 6
-        } else {
-          const dayMap: Record<string, number> = {
-            sunday: 0,
-            monday: 1,
-            tuesday: 2,
-            wednesday: 3,
-            thursday: 4,
-            friday: 5,
-            saturday: 6,
-          }
-          matchesDay = dayOfWeek === dayMap[daySel]
-        }
-
-        if (matchesDay) {
-          matches.push(d)
-        }
-      }
-
-      if (matches.length > 0) {
-        if (week === 'first') targetDay = matches[0]
-        else if (week === 'second') targetDay = matches[1] ?? matches[matches.length - 1]
-        else if (week === 'third') targetDay = matches[2] ?? matches[matches.length - 1]
-        else if (week === 'fourth') targetDay = matches[3] ?? matches[matches.length - 1]
-        else if (week === 'last') targetDay = matches[matches.length - 1]
-      } else {
-        targetDay = 1
-      }
-    }
+  if (!ob.monthlyType || ob.monthlyType === 'specific-day') {
+    targetDay = ob.recurrenceDayOfMonth ?? 1
   } else {
-    // Fallback to absolute deadline if custom/yearly/quarterly
-    return ob.deadline
+    const week = ob.recurrenceWeekOfMonth ?? 'first'
+    const daySel = ob.recurrenceDayOfWeek ?? 'monday'
+
+    const totalDays = new Date(year, month + 1, 0).getDate()
+    const matches: number[] = []
+
+    for (let d = 1; d <= totalDays; d++) {
+      const testDate = new Date(year, month, d)
+      const dayOfWeek = testDate.getDay()
+
+      let matchesDay = false
+      if (daySel === 'weekday') {
+        matchesDay = dayOfWeek >= 1 && dayOfWeek <= 5
+      } else if (daySel === 'weekend-day') {
+        matchesDay = dayOfWeek === 0 || dayOfWeek === 6
+      } else {
+        const dayMap: Record<string, number> = {
+          sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+          thursday: 4, friday: 5, saturday: 6,
+        }
+        matchesDay = dayOfWeek === dayMap[daySel]
+      }
+
+      if (matchesDay) matches.push(d)
+    }
+
+    if (matches.length > 0) {
+      if (week === 'first') targetDay = matches[0]
+      else if (week === 'second') targetDay = matches[1] ?? matches[matches.length - 1]
+      else if (week === 'third') targetDay = matches[2] ?? matches[matches.length - 1]
+      else if (week === 'fourth') targetDay = matches[3] ?? matches[matches.length - 1]
+      else if (week === 'last') targetDay = matches[matches.length - 1]
+    }
   }
 
   const pad = (n: number) => n.toString().padStart(2, '0')
