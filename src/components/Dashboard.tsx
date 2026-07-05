@@ -118,6 +118,7 @@ function Dashboard() {
 
   // Debug mode state
   const [showDebug, setShowDebug] = useState(false)
+  const [showCompleted, setShowCompleted] = useState(false)
   const [debugTimeOverride, setDebugTimeOverride] = useState<number | null>(null)
   const [debugDateOverride, setDebugDateOverride] = useState<string | null>(null)
 
@@ -190,8 +191,10 @@ function Dashboard() {
 
   // Add done items
   const dayDoneItems = scheduler.doneItems.filter((i) => i.day === selectedDay)
-  for (const item of dayDoneItems) {
-    timelineItems.push({ type: 'task', time: item.startMinutes, data: item })
+  if (showCompleted) {
+    for (const item of dayDoneItems) {
+      timelineItems.push({ type: 'task', time: item.startMinutes, data: item })
+    }
   }
 
   // Add active scheduled tasks (exclude done ones)
@@ -269,6 +272,21 @@ function Dashboard() {
               }`}
             >
               🔍 {scheduler.debugMode ? 'Debug ON' : 'Debug'}
+            </button>
+            <button
+              onClick={() => setShowCompleted(!showCompleted)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all border active:scale-95 cursor-pointer ${
+                showCompleted
+                  ? 'bg-emerald-950/30 text-emerald-400 border-emerald-800/40'
+                  : 'bg-slate-950/65 text-slate-500 border-slate-850 hover:bg-slate-900'
+              }`}
+            >
+              ✓ {showCompleted ? 'Hide Done' : 'Show Done'}
+              {dayDoneItems.length > 0 && (
+                <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  showCompleted ? 'bg-emerald-800/40 text-emerald-300' : 'bg-slate-800 text-slate-400'
+                }`}>{dayDoneItems.length}</span>
+              )}
             </button>
             <button
               onClick={() => setShowDebug(!showDebug)}
