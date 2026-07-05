@@ -580,7 +580,6 @@ function Dashboard() {
 
               // Task item
               const item: ScheduledItem = entry.data
-              const dayDate = scheduler.schedule?.days[selectedDay]?.date ?? ''
               const isDone = scheduler.doneTasks.some((dk) => dk.startsWith(item.instanceKey + ':'))
               const isCurrent = virtualTime >= item.startMinutes && virtualTime < item.endMinutes
               const weightPct = Math.round((item.weight / maxWeight) * 100)
@@ -653,16 +652,6 @@ function Dashboard() {
                           {isDone && (
                             <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-950/35 text-emerald-400 border border-emerald-800/30">
                               Done
-                            </span>
-                          )}
-                          {isPostponed && (
-                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-950/35 text-amber-400 border border-amber-800/30">
-                              Postponed
-                            </span>
-                          )}
-                          {isSkipped && (
-                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-950/40 text-slate-400 border border-slate-800/30">
-                              Skipped
                             </span>
                           )}
                         </div>
