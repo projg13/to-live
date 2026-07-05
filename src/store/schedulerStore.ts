@@ -10,6 +10,7 @@ import type { RecoveryPlan } from '../types/recovery'
 import type { DayPlan, CalendarEvent } from '../types/planner'
 import { getActiveBracket, getObligationWeight, resolveObligationDeadline } from '../types/obligation'
 import { getRecoveryWeight } from '../types/recovery'
+import { useRecoveryStore } from './recoveryStore'
 import { getSlotWeight } from '../types/routine'
 import { useObligationStore } from './obligationStore'
 
@@ -18,11 +19,12 @@ interface SchedulerStore {
   confirmedAnchors: AnchorConfirmation[]
   adhocTasks: AdhocTask[]
   skippedTaskIds: string[]
-  doneTasks: string[]
-  doneItems: ScheduledItem[]          // stored positions of done tasks for display
+  doneTasks: string[]                  // instanceKey:date entries
+  doneItems: ScheduledItem[]           // stored positions of done tasks for display
   postponedTasks: string[]
-  lastDoneAt: Record<number, number>  // day → minutes from midnight (latest done-at time)
-  debugMode: boolean                  // persisted debug toggle
+  lastDoneAt: Record<number, number>   // day → minutes from midnight (latest done-at time)
+  weightOffsets: Record<string, number> // instanceKey → weight offset (session-only, not persisted)
+  debugMode: boolean                   // persisted debug toggle
 
   // Actions
   resolve: (context: ResolveContext) => void
@@ -32,11 +34,11 @@ interface SchedulerStore {
   removeAdhocTask: (id: string) => void
   skipTask: (taskId: string) => void
   unskipTask: (taskId: string) => void
-  markDone: (taskId: string) => void
-  markDoneAt: (taskId: string, doneAtMinutes: number, day: number) => void
-  postpone: (taskId: string) => void
-  preponeTask: (taskId: string, targetTime: number, day: number) => void
-  unmarkTask: (taskId: string) => void
+  markDone: (instanceKey: string) => void
+  markDoneAt: (instanceKey: string, doneAtMinutes: number, day: number) => void
+  unmarkTask: (instanceKey: string) => void
+  setWeightOffset: (instanceKey: string, offset: number) => void
+  clearWeightOffset: (instanceKey: string) => void
   insertTask: (taskId: string, startTime: number, day: number) => void
   recalibrateFrom: (minutes: number, day: number) => void
   toggleDebug: () => void
@@ -74,6 +76,10 @@ function getDayOfWeek(dateStr: string): number {
 }
 
 // Core scheduler: resolves a single day
+function makeInstanceKey(source: string, sourceId: string, anchorId: string, taskId: string): string {
+  return `${source}:${sourceId}:${anchorId}:${taskId}`
+}
+
 function resolveDay(
   dayIndex: number,
   dateStr: string,
@@ -82,6 +88,7 @@ function resolveDay(
   adhocTasks: AdhocTask[],
   skippedTaskIds: string[],
   doneTasks: string[],
+  weightOffsets: Record<string, number>,
   lastDoneAt?: number,
   debug: boolean = false
 ): DaySchedule {
@@ -144,14 +151,16 @@ function resolveDay(
 
   // Add adhoc tasks first (user-specified times, highest priority placement)
   for (const adhoc of dayAdhocs) {
+    const iKey = makeInstanceKey('adhoc', adhoc.id, '', adhoc.id)
     items.push({
       taskId: adhoc.id,
+      instanceKey: iKey,
       title: adhoc.title,
       startMinutes: adhoc.startTime,
       endMinutes: adhoc.startTime + adhoc.durationMinutes,
       isBackground: false,
       source: 'adhoc',
-      weight: adhoc.weight,
+      weight: adhoc.weight + (weightOffsets[iKey] ?? 0),
       day: dayIndex,
       sourceId: adhoc.id,
       sourceName: 'Adhoc',
@@ -163,14 +172,16 @@ function resolveDay(
     for (const tid of event.taskIds) {
       const task = context.tasks.find((t) => t.id === tid)
       if (!task || skippedTaskIds.includes(tid)) continue
+      const iKey = makeInstanceKey('event', event.id, '', task.id)
       items.push({
         taskId: task.id,
+        instanceKey: iKey,
         title: task.title,
         startMinutes: 0, // scheduler will place
         endMinutes: task.durationMinutes,
         isBackground: false,
         source: 'event',
-        weight: task.weight * 2, // events get priority boost
+        weight: task.weight * 2 + (weightOffsets[iKey] ?? 0),
         day: dayIndex,
         sourceId: event.id,
         sourceName: event.name,
@@ -267,10 +278,11 @@ function resolveDay(
             if (debug) console.log(`      ⏭ ${entry.taskId.slice(0,8)}: SKIPPED`)
             continue
           }
-          // Anchor-scoped done check: task resets per anchor cycle
-          const anchorDoneKey = `${entry.taskId}:${bc.anchorId}:${dateStr}`
-          if (doneTasks.includes(anchorDoneKey) || doneTasks.includes(`${entry.taskId}:${periodKey}`)) {
-            if (debug) console.log(`      ✅ ${entry.taskId.slice(0,8)}: ALREADY DONE`)
+          // Instance-scoped done check
+          const routineInstanceKey = makeInstanceKey('routine', routine.id, bc.anchorId, entry.taskId)
+          const routineDoneKey = `${routineInstanceKey}:${dateStr}`
+          if (doneTasks.includes(routineDoneKey)) {
+            if (debug) console.log(`      ✅ ${entry.taskId.slice(0,8)}: ALREADY DONE (${routineInstanceKey})`)
             continue
           }
           const task = context.tasks.find((t) => t.id === entry.taskId)
@@ -399,15 +411,19 @@ function resolveDay(
           ? taskIdealTime + taskConfig.expiresAfterMinutes
           : undefined
 
+        const routineIKey = makeInstanceKey('routine', routine.id, cand.anchorId, cand.task.id)
+        const offsetWeight = cand.weight + (weightOffsets[routineIKey] ?? 0)
+
         if (cand.entry.isBackground) {
            items.push({
             taskId: cand.task.id,
+            instanceKey: routineIKey,
             title: cand.task.title,
             startMinutes: idealStart,
             endMinutes: idealStart + cand.task.durationMinutes,
             isBackground: true,
             source: 'routine',
-            weight: cand.weight,
+            weight: offsetWeight,
             day: dayIndex,
             sourceId: routine.id,
             sourceName: routine.name,
@@ -418,12 +434,13 @@ function resolveDay(
         } else {
           items.push({
             taskId: cand.task.id,
+            instanceKey: routineIKey,
             title: cand.task.title,
             startMinutes: idealStart,
             endMinutes: idealStart + cand.task.durationMinutes,
             isBackground: false,
             source: 'routine',
-            weight: cand.weight,
+            weight: offsetWeight,
             day: dayIndex,
             sourceId: routine.id,
             sourceName: routine.name,
@@ -555,7 +572,8 @@ function resolveDay(
     // Filter to valid, non-done, non-skipped tasks
     const validTasks = orderedTaskIds.filter((tid) => {
       if (skippedTaskIds.includes(tid)) return false
-      if (doneTasks.includes(`${tid}:${dateStr}`) || doneTasks.includes(`${tid}:${periodKey}`)) return false
+      const obIKey = makeInstanceKey('obligation', ob.id, '', tid)
+      if (doneTasks.includes(`${obIKey}:${dateStr}`) || doneTasks.includes(`${obIKey}:${periodKey}`)) return false
       if (!context.tasks.find((t) => t.id === tid)) return false
       return true
     })
@@ -574,14 +592,16 @@ function resolveDay(
 
       if (debug) console.log(`      ✓ ${task.title}: weight=${taskWeight} @${obPlacement}`)
 
+      const obIKey = makeInstanceKey('obligation', ob.id, '', task.id)
       items.push({
         taskId: task.id,
+        instanceKey: obIKey,
         title: task.title,
         startMinutes: obPlacement,
         endMinutes: obPlacement + task.durationMinutes,
         isBackground: false,
         source: 'obligation',
-        weight: taskWeight,
+        weight: taskWeight + (weightOffsets[obIKey] ?? 0),
         day: dayIndex,
         sourceId: ob.id,
         sourceName: ob.name,
@@ -641,7 +661,8 @@ function resolveDay(
     // Filter to valid, non-done, non-skipped tasks
     const validTasks = orderedTaskIds.filter((tid) => {
       if (skippedTaskIds.includes(tid)) return false
-      if (doneTasks.includes(`${tid}:${dateStr}`) || doneTasks.includes(`${tid}:${periodKey}`)) return false
+      const recIKey = makeInstanceKey('recovery', plan.id, '', tid)
+      if (doneTasks.includes(`${recIKey}:${dateStr}`) || doneTasks.includes(`${recIKey}:${periodKey}`)) return false
       if (!context.tasks.find((t) => t.id === tid)) return false
       return true
     })
@@ -656,14 +677,16 @@ function resolveDay(
       // Weight = base + (totalTasks - index) → first task highest, descending
       const taskWeight = baseWeight + (totalTasks - idx)
 
+      const recIKey = makeInstanceKey('recovery', plan.id, '', task.id)
       items.push({
         taskId: task.id,
+        instanceKey: recIKey,
         title: `[R] ${task.title}`,
         startMinutes: recoveryCursor,
         endMinutes: recoveryCursor + task.durationMinutes,
         isBackground: false,
         source: 'recovery',
-        weight: taskWeight,
+        weight: taskWeight + (weightOffsets[recIKey] ?? 0),
         day: dayIndex,
         sourceId: plan.id,
         sourceName: plan.name,
@@ -785,6 +808,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
       doneTasks: [],
       doneItems: [],
       postponedTasks: [],
+      weightOffsets: {},
       debugMode: false,
       lastDoneAt: {},
 
@@ -813,13 +837,22 @@ export const useSchedulerStore = create<SchedulerStore>()(
             state.adhocTasks,
             [...state.skippedTaskIds, ...state.postponedTasks],
             freshDoneTasks,
+            state.weightOffsets,
             state.lastDoneAt[i],
             state.debugMode  // debug all days when enabled
           ))
         }
 
+        // Prune orphaned weight offsets
+        const allInstanceKeys = new Set(days.flatMap((d) => d.items.map((i) => i.instanceKey)))
+        const prunedOffsets: Record<string, number> = {}
+        for (const [key, val] of Object.entries(state.weightOffsets)) {
+          if (allInstanceKeys.has(key)) prunedOffsets[key] = val
+        }
+
         set({
           doneTasks: freshDoneTasks,
+          weightOffsets: prunedOffsets,
           schedule: {
             days,
             generated: new Date().toISOString(),
@@ -878,75 +911,86 @@ export const useSchedulerStore = create<SchedulerStore>()(
           skippedTaskIds: state.skippedTaskIds.filter((id) => id !== taskId),
         })),
 
-      markDone: (taskId) =>
+      markDone: (instanceKey) =>
         set((state) => {
           const schedule = state.schedule
-          const item = schedule?.days.flatMap((d) => d.items).find((i) => i.taskId === taskId)
+          const item = schedule?.days.flatMap((d) => d.items).find((i) => i.instanceKey === instanceKey)
           const dayIdx = item?.day ?? 0
           const dateStr = getDateStr(dayIdx)
 
-          // Default: key by date so task respawns next routine cycle
-          let completionKey = `${taskId}:${dateStr}`
+          // Use instanceKey:date as the completion key
+          let completionKey = `${instanceKey}:${dateStr}`
 
-          // Routine tasks: anchor-scoped key so same task at different anchors tracks independently
-          if (item && item.source === 'routine' && item.resetAnchorId) {
-            completionKey = `${taskId}:${item.resetAnchorId}:${dateStr}`
-          }
-
-          // Obligations: key by month so they stay done for the period
+          // Obligations with recurrence: key by month
           if (item && item.source === 'obligation' && item.sourceId) {
             const obligations = useObligationStore.getState().obligations
             const matchingOb = obligations.find((o) => o.id === item.sourceId)
             if (matchingOb && matchingOb.recurrence !== 'one-time') {
-              const periodKey = dateStr.slice(0, 7) // YYYY-MM
-              completionKey = `${taskId}:${periodKey}`
+              completionKey = `${instanceKey}:${dateStr.slice(0, 7)}`
             }
           }
 
           const newDoneItems = item
-            ? [...state.doneItems.filter((i) => i.taskId !== taskId), item]
+            ? [...state.doneItems.filter((i) => i.instanceKey !== instanceKey), item]
             : state.doneItems
-          return {
+
+          const result: Partial<SchedulerStore> = {
             doneTasks: [...state.doneTasks.filter((id) => id !== completionKey), completionKey],
             doneItems: newDoneItems,
           }
+
+          // Recovery auto-resolve: check if all tasks in this recovery plan are now done
+          if (item && item.source === 'recovery' && item.sourceId) {
+            const allDone = [...state.doneTasks, completionKey]
+            const recoveryPlans = useRecoveryStore.getState().plans
+            const plan = recoveryPlans.find((p) => p.id === item.sourceId)
+            if (plan) {
+              const allTaskIds = [...plan.taskIds]
+              for (const blockId of plan.blockIds) {
+                const block = JSON.parse(localStorage.getItem('to-live-blocks') ?? '{}')?.state?.blocks ?? []
+                const b = block.find((bl: any) => bl.id === blockId)
+                if (b) for (const e of b.entries) allTaskIds.push(e.taskId)
+              }
+              const allRecoveryDone = allTaskIds.every((tid) => {
+                const recKey = makeInstanceKey('recovery', plan.id, '', tid)
+                return allDone.some((dk) => dk.startsWith(recKey + ':'))
+              })
+              if (allRecoveryDone) {
+                setTimeout(() => useRecoveryStore.getState().resolve(plan.id), 0)
+              }
+            }
+          }
+
+          return result
         }),
 
       // Mark done at specific time — marks ONLY this task as done
       // and sets lastDoneAt so the scheduler recalibrates remaining
       // tasks from this point onwards on next resolve.
-      markDoneAt: (taskId, doneAtMinutes, day) =>
+      markDoneAt: (instanceKey, doneAtMinutes, day) =>
         set((state) => {
           const schedule = state.schedule
           const dayItems = schedule?.days[day]?.items ?? []
-          const obligations = useObligationStore.getState().obligations
-
           const dateStr = getDateStr(day)
-          const resolveKey = (tid: string) => {
-            const item = dayItems.find((i) => i.taskId === tid)
-            // Routine tasks: anchor-scoped
-            if (item && item.source === 'routine' && item.resetAnchorId) {
-              return `${tid}:${item.resetAnchorId}:${dateStr}`
+
+          const item = dayItems.find((i) => i.instanceKey === instanceKey)
+
+          // Build completion key using instanceKey
+          let completionKey = `${instanceKey}:${dateStr}`
+          if (item && item.source === 'obligation' && item.sourceId) {
+            const obligations = useObligationStore.getState().obligations
+            const matchingOb = obligations.find((o) => o.id === item.sourceId)
+            if (matchingOb && matchingOb.recurrence !== 'one-time') {
+              completionKey = `${instanceKey}:${dateStr.slice(0, 7)}`
             }
-            // Obligations: period-scoped
-            if (item && item.source === 'obligation' && item.sourceId) {
-              const matchingOb = obligations.find((o) => o.id === item.sourceId)
-              if (matchingOb && matchingOb.recurrence !== 'one-time') {
-                const periodKey = dateStr.slice(0, 7)
-                return `${tid}:${periodKey}`
-              }
-            }
-            return `${tid}:${dateStr}`
           }
 
-          const currentTaskIdKey = resolveKey(taskId)
-          const allDoneIds = [...new Set([...state.doneTasks, currentTaskIdKey])]
+          const allDoneIds = [...new Set([...state.doneTasks, completionKey])]
 
           // Save position of the done task for display
           const newDoneItems = [...state.doneItems]
-          const doneItem = dayItems.find((i) => i.taskId === taskId)
-          if (doneItem && !newDoneItems.find((d) => d.taskId === taskId)) {
-            newDoneItems.push(doneItem)
+          if (item && !newDoneItems.find((d) => d.instanceKey === instanceKey)) {
+            newDoneItems.push(item)
           }
 
           return {
@@ -956,37 +1000,22 @@ export const useSchedulerStore = create<SchedulerStore>()(
           }
         }),
 
-      postpone: (taskId) =>
+      unmarkTask: (instanceKey) =>
         set((state) => ({
-          postponedTasks: [...state.postponedTasks.filter((id) => id !== taskId), taskId],
+          doneTasks: state.doneTasks.filter((id) => !id.startsWith(instanceKey + ':')),
+          doneItems: state.doneItems.filter((i) => i.instanceKey !== instanceKey),
         })),
 
-      preponeTask: (taskId, targetTime, day) => {
-        // Find actual task to get title and duration
-        const schedule = get().schedule
-        const item = schedule?.days[day]?.items.find((i) => i.taskId === taskId)
-        const duration = item ? (item.endMinutes - item.startMinutes) : 30
-        const title = item?.title ?? taskId
-
+      setWeightOffset: (instanceKey, offset) =>
         set((state) => ({
-          adhocTasks: [...state.adhocTasks, {
-            id: `prepone-${taskId}-${Date.now()}`,
-            title: `[preponed] ${title}`,
-            durationMinutes: duration,
-            startTime: targetTime,
-            day,
-            weight: 9999,
-          }],
-          skippedTaskIds: [...state.skippedTaskIds.filter((id) => id !== taskId), taskId],
-        }))
-      },
-
-      unmarkTask: (taskId) =>
-        set((state) => ({
-          doneTasks: state.doneTasks.filter((id) => id !== taskId && !id.startsWith(taskId + ':')),
-          doneItems: state.doneItems.filter((i) => i.taskId !== taskId),
-          postponedTasks: state.postponedTasks.filter((id) => id !== taskId),
+          weightOffsets: { ...state.weightOffsets, [instanceKey]: offset },
         })),
+
+      clearWeightOffset: (instanceKey) =>
+        set((state) => {
+          const { [instanceKey]: _, ...rest } = state.weightOffsets
+          return { weightOffsets: rest }
+        }),
 
       insertTask: (taskId, startTime, day) => {
         // Find actual task to get title and duration from context
@@ -1041,8 +1070,15 @@ export const useSchedulerStore = create<SchedulerStore>()(
       },
 
       clearSchedule: () =>
-        set({ schedule: null, confirmedAnchors: [], adhocTasks: [], skippedTaskIds: [], doneTasks: [], doneItems: [], postponedTasks: [], lastDoneAt: {} }),
+        set({ schedule: null, confirmedAnchors: [], adhocTasks: [], skippedTaskIds: [], doneTasks: [], doneItems: [], postponedTasks: [], weightOffsets: {}, lastDoneAt: {} }),
     }),
-    { name: 'to-live-scheduler' }
+    {
+      name: 'to-live-scheduler',
+      partialize: (state) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { weightOffsets, ...rest } = state
+        return rest
+      },
+    }
   )
 )

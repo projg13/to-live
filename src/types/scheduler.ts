@@ -1,6 +1,7 @@
 // A resolved task placement on the timeline
 export interface ScheduledItem {
   taskId: string
+  instanceKey: string            // unique key: source:sourceId:anchorId:taskId
   title: string
   startMinutes: number       // minutes from midnight (actual slotted time)
   endMinutes: number         // startMinutes + duration

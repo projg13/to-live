@@ -55,17 +55,7 @@ const CheckIcon = () => (
   </svg>
 )
 
-const PostponeIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-)
 
-const SkipIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-  </svg>
-)
 
 const ArrowUpIcon = () => (
   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -109,8 +99,7 @@ function Dashboard() {
   const [showAdhocForm, setShowAdhocForm] = useState(false)
   const [showInsertForm, setShowInsertForm] = useState(false)
   const [showRecovery, setShowRecovery] = useState(false)
-  const [showPrepone, setShowPrepone] = useState<string | null>(null)
-  const [preponeTime, setPreponeTime] = useState('')
+
   const [showDoneAt, setShowDoneAt] = useState<string | null>(null)
   const [doneAtTime, setDoneAtTime] = useState('')
   const [showInsertAt, setShowInsertAt] = useState<{ taskId: string; position: 'above' | 'below' } | null>(null)
@@ -164,6 +153,8 @@ function Dashboard() {
     scheduler.adhocTasks,
     scheduler.skippedTaskIds,
     scheduler.postponedTasks,
+    scheduler.doneTasks,
+    scheduler.weightOffsets,
     scheduler.lastDoneAt,
     debugDateOverride,
     virtualTime,
@@ -200,12 +191,9 @@ function Dashboard() {
 
   // Add active scheduled tasks (exclude done ones)
   if (daySchedule) {
-    const dayDate = daySchedule.date ?? ''
-    const pKey = dayDate.slice(0, 7) // YYYY-MM
     for (const item of daySchedule.items) {
-      const isDoneRaw = scheduler.doneTasks.includes(item.taskId)
-      const isDonePeriod = pKey && scheduler.doneTasks.includes(`${item.taskId}:${pKey}`)
-      if (!isDoneRaw && !isDonePeriod) {
+      const itemIsDone = scheduler.doneTasks.some((dk) => dk.startsWith(item.instanceKey + ':'))
+      if (!itemIsDone) {
         timelineItems.push({ type: 'task', time: item.startMinutes, data: item })
       }
     }
@@ -593,12 +581,10 @@ function Dashboard() {
               // Task item
               const item: ScheduledItem = entry.data
               const dayDate = scheduler.schedule?.days[selectedDay]?.date ?? ''
-              const periodKey = dayDate.slice(0, 7) // YYYY-MM
-              const isDone = scheduler.doneTasks.includes(item.taskId) || scheduler.doneTasks.includes(`${item.taskId}:${periodKey}`)
-              const isPostponed = scheduler.postponedTasks.includes(item.taskId)
-              const isSkipped = scheduler.skippedTaskIds.includes(item.taskId)
+              const isDone = scheduler.doneTasks.some((dk) => dk.startsWith(item.instanceKey + ':'))
               const isCurrent = virtualTime >= item.startMinutes && virtualTime < item.endMinutes
               const weightPct = Math.round((item.weight / maxWeight) * 100)
+              const weightOffset = scheduler.weightOffsets[item.instanceKey] ?? 0
 
               let borderClass = 'border-slate-850 bg-slate-900/30'
               let glowDot = 'bg-slate-700'
@@ -609,12 +595,6 @@ function Dashboard() {
               } else if (isDone) {
                 borderClass = 'border-slate-850/50 bg-slate-950/15 opacity-55'
                 glowDot = 'bg-emerald-450'
-              } else if (isSkipped) {
-                borderClass = 'border-dashed border-slate-800/80 bg-slate-950/10 opacity-45'
-                glowDot = 'bg-slate-600'
-              } else if (isPostponed) {
-                borderClass = 'border-slate-850/60 bg-slate-950/20 opacity-55'
-                glowDot = 'bg-amber-400'
               }
 
               return (
@@ -694,55 +674,51 @@ function Dashboard() {
 
                       {/* Right: Actions */}
                       <div className="flex items-center gap-1.5 flex-wrap self-end lg:self-auto">
-                        {!isDone && !isPostponed && !isSkipped && (
-                          <>
-                            <button
-                              onClick={() => {
-                                setShowDoneAt(showDoneAt === item.taskId ? null : item.taskId)
-                                setDoneAtTime(toTimeStr(virtualTime))
-                              }}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-emerald-950/30 hover:bg-emerald-900/30 text-emerald-400 border border-emerald-800/30 transition-all active:scale-95 cursor-pointer"
-                            >
-                              <CheckIcon />
-                              Done
-                            </button>
-                            <button
-                              onClick={() => scheduler.postpone(item.taskId)}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-amber-950/30 hover:bg-amber-900/30 text-amber-400 border border-amber-800/30 transition-all active:scale-95 cursor-pointer"
-                            >
-                              <PostponeIcon />
-                              Postpone
-                            </button>
-                            <button
-                              onClick={() => setShowPrepone(showPrepone === item.taskId ? null : item.taskId)}
-                              className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-950/60 hover:bg-slate-900 text-slate-405 border border-slate-850 transition-all active:scale-95 cursor-pointer"
-                            >
-                              Prepone
-                            </button>
-                            <button
-                              onClick={() => scheduler.skipTask(item.taskId)}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-950/60 hover:bg-slate-900 text-slate-400 border border-slate-850 transition-all active:scale-95 cursor-pointer"
-                            >
-                              <SkipIcon />
-                              Skip
-                            </button>
-                          </>
-                        )}
-                        {isSkipped && (
+                        {!isDone && (
                           <button
-                            onClick={() => scheduler.unskipTask(item.taskId)}
-                            className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-950/80 hover:bg-slate-900 text-slate-300 transition-all border border-slate-850 active:scale-95 cursor-pointer"
+                            onClick={() => {
+                              setShowDoneAt(showDoneAt === item.instanceKey ? null : item.instanceKey)
+                              setDoneAtTime(toTimeStr(virtualTime))
+                            }}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-emerald-950/30 hover:bg-emerald-900/30 text-emerald-400 border border-emerald-800/30 transition-all active:scale-95 cursor-pointer"
                           >
-                            Unskip
+                            <CheckIcon />
+                            Done
                           </button>
                         )}
-                        {(isDone || isPostponed) && (
+                        {isDone && (
                           <button
-                            onClick={() => scheduler.unmarkTask(item.taskId)}
+                            onClick={() => scheduler.unmarkTask(item.instanceKey)}
                             className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-cyan-950/30 hover:bg-cyan-900/30 text-cyan-400 border border-cyan-800/30 transition-all active:scale-95 cursor-pointer"
                           >
                             Undo
                           </button>
+                        )}
+                        {/* Weight offset control */}
+                        {!isDone && (
+                          <div className="flex items-center gap-0.5">
+                            <button
+                              onClick={() => scheduler.setWeightOffset(item.instanceKey, weightOffset - 10)}
+                              className="p-1 rounded-lg text-[10px] font-bold bg-slate-950/60 hover:bg-slate-900 text-slate-400 border border-slate-850 transition-all cursor-pointer"
+                              title="Decrease priority (-10)"
+                            >−</button>
+                            {weightOffset !== 0 && (
+                              <button
+                                onClick={() => scheduler.clearWeightOffset(item.instanceKey)}
+                                className={`px-1.5 py-0.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                                  weightOffset > 0
+                                    ? 'bg-emerald-950/30 text-emerald-400 border-emerald-800/30'
+                                    : 'bg-rose-950/30 text-rose-400 border-rose-800/30'
+                                }`}
+                                title="Clear offset"
+                              >{weightOffset > 0 ? '+' : ''}{weightOffset}</button>
+                            )}
+                            <button
+                              onClick={() => scheduler.setWeightOffset(item.instanceKey, weightOffset + 10)}
+                              className="p-1 rounded-lg text-[10px] font-bold bg-slate-950/60 hover:bg-slate-900 text-slate-400 border border-slate-850 transition-all cursor-pointer"
+                              title="Increase priority (+10)"
+                            >+</button>
+                          </div>
                         )}
                         {item.source === 'adhoc' && (
                           <>
@@ -787,7 +763,7 @@ function Dashboard() {
                     </div>
 
                     {/* Conditional: Done at time picker */}
-                    {showDoneAt === item.taskId && (
+                    {showDoneAt === item.instanceKey && (
                       <div className="mt-3 ml-2 pl-4 border-l-2 border-emerald-450 flex flex-wrap gap-2 items-center bg-emerald-950/10 border border-emerald-900/20 p-3 rounded-xl">
                         <span className="text-xs font-bold text-slate-400">Done at:</span>
                         <input
@@ -800,9 +776,9 @@ function Dashboard() {
                           onClick={() => {
                             if (doneAtTime) {
                               const [h, m] = doneAtTime.split(':').map(Number)
-                              scheduler.markDoneAt(item.taskId, (h || 0) * 60 + (m || 0), selectedDay)
+                              scheduler.markDoneAt(item.instanceKey, (h || 0) * 60 + (m || 0), selectedDay)
                             } else {
-                              scheduler.markDone(item.taskId)
+                              scheduler.markDone(item.instanceKey)
                             }
                             setShowDoneAt(null)
                             setDoneAtTime('')
@@ -813,7 +789,7 @@ function Dashboard() {
                         </button>
                         <button
                           onClick={() => {
-                            scheduler.markDone(item.taskId)
+                            scheduler.markDone(item.instanceKey)
                             setShowDoneAt(null)
                             setDoneAtTime('')
                           }}
@@ -892,39 +868,7 @@ function Dashboard() {
                     })()}
 
                     {/* Conditional: Prepone form */}
-                    {showPrepone === item.taskId && (
-                      <div className="mt-3 ml-2 pl-4 border-l-2 border-indigo-400 flex flex-wrap gap-2 items-center bg-indigo-950/10 border border-indigo-900/20 p-3 rounded-xl">
-                        <span className="text-xs font-bold text-slate-400">Move to:</span>
-                        <input
-                          type="time"
-                          defaultValue={preponeTime}
-                          onChange={(e) => setPreponeTime(e.target.value)}
-                          className="text-xs px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:ring-1 focus:ring-indigo-500 focus:outline-none cursor-pointer"
-                        />
-                        <button
-                          onClick={() => {
-                            if (preponeTime) {
-                              const [h, m] = preponeTime.split(':').map(Number)
-                              scheduler.preponeTask(item.taskId, (h || 0) * 60 + (m || 0), selectedDay)
-                              setShowPrepone(null)
-                              setPreponeTime('')
-                            }
-                          }}
-                          className="px-2.5 py-1 text-xs font-bold bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-all cursor-pointer"
-                        >
-                          Move
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowPrepone(null)
-                            setPreponeTime('')
-                          }}
-                          className="px-2.5 py-1 text-xs font-semibold text-slate-450 hover:text-slate-200 transition-all cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    )}
+
 
                     {/* Conditional: Info Details */}
                     {showInfo === `${item.taskId}-${item.startMinutes}` && (
