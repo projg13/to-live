@@ -677,23 +677,19 @@ function resolveDay(
   // Sort by weight descending, then place sequentially into available time
   const placed = placeItems(items, [], [], dayConfirmations)
 
-  // Post-placement anchor adjustment: push anchors past any items that should be before them
-  // Process anchors in time order so cascading pushes propagate
+  // Post-placement anchor adjustment: push anchors past any routine items that should be before them
+  // Only routine tasks push anchors — adhoc/obligation/recovery/event do not
+  const routinePlaced = placed.filter((i) => i.source === 'routine')
   const sortedAnchors = [...resolvedAnchors].sort((a, b) => a.actualTime - b.actualTime)
   for (const ra of sortedAnchors) {
     let maxEnd = 0
-    // Find the anchor's position in the sorted order
     const raIdx = sortedAnchors.indexOf(ra)
-    // Collect anchor IDs that come BEFORE this anchor (i.e., earlier in the day)
     const earlierAnchorIds = new Set(sortedAnchors.slice(0, raIdx).map((a) => a.anchorId))
 
-    for (const item of placed) {
-      // Case 1: item starts before anchor and ends after → overlap push
+    for (const item of routinePlaced) {
       if (item.startMinutes < ra.actualTime && item.endMinutes > maxEnd) {
         maxEnd = item.endMinutes
       }
-      // Case 2: item belongs to an earlier anchor group but got placed after this anchor
-      // (e.g., evening task pushed past Sleep by weight conflict)
       if (item.resetAnchorId && earlierAnchorIds.has(item.resetAnchorId) && item.endMinutes > maxEnd) {
         maxEnd = item.endMinutes
       }
