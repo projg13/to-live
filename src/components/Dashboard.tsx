@@ -240,6 +240,19 @@ function Dashboard() {
               <ResetIcon />
               Recalculate
             </button>
+            {/* Recalculate from committed time */}
+            {Object.keys(scheduler.committedTasks).length > 0 && (() => {
+              const commitTime = Object.values(scheduler.committedTasks)[0]
+              return (
+                <button
+                  onClick={() => scheduler.recalibrateFrom(commitTime, selectedDay)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-emerald-950/30 hover:bg-emerald-900/30 text-emerald-400 border border-emerald-800/30 transition-all active:scale-95 cursor-pointer"
+                  title={`Recalculate from commit time (${formatTime(commitTime)})`}
+                >
+                  📍 From {formatTime(commitTime)}
+                </button>
+              )
+            })()}
             <button
               onClick={() => scheduler.undo()}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-slate-950/65 hover:bg-slate-900 text-slate-300 transition-all border border-slate-850 active:scale-95 cursor-pointer"
