@@ -706,7 +706,7 @@ function resolveDay(
   } // end dayIndex === 0 guard for obligations + recovery
 
   // Sort by weight descending, then place sequentially into available time
-  const placed = placeItems(items, [], [], dayConfirmations)
+  const placed = placeItems(items, [], [], dayConfirmations, context.tasks)
 
   // Post-placement anchor adjustment: push anchors past any routine items that should be before them
   // Only routine tasks push anchors — adhoc/obligation/recovery/event do not
@@ -748,13 +748,42 @@ function placeItems(
   items: ScheduledItem[],
   _slots: { startTime: number; endTime: number; anchorName: string }[],
   _anchors: Anchor[],
-  _confirmations: AnchorConfirmation[]
+  _confirmations: AnchorConfirmation[],
+  tasks?: { id: string; parentId?: string }[]
 ): ScheduledItem[] {
   const background = items.filter((i) => i.isBackground)
   const active = items.filter((i) => !i.isBackground)
 
   // Sort by weight descending — highest weight gets first pick of time
   active.sort((a, b) => b.weight - a.weight)
+
+  // Topological fixup: ensure child tasks always come AFTER their parent
+  // A child with higher weight would otherwise be placed before its mother
+  if (tasks) {
+    const parentMap = new Map<string, string>()
+    for (const t of tasks) {
+      if (t.parentId) parentMap.set(t.id, t.parentId)
+    }
+    // Walk the sorted list; if a child appears before its parent, move it after
+    let changed = true
+    let passes = 0
+    while (changed && passes < 50) {
+      changed = false
+      passes++
+      for (let i = 0; i < active.length; i++) {
+        const parentId = parentMap.get(active[i].taskId)
+        if (!parentId) continue
+        const parentIdx = active.findIndex((a) => a.taskId === parentId)
+        if (parentIdx > i) {
+          // Parent is later — move child right after parent
+          const [child] = active.splice(i, 1)
+          active.splice(parentIdx, 0, child) // insert after parent (parent shifted left by 1)
+          changed = true
+          break // restart scan
+        }
+      }
+    }
+  }
 
   const occupied: { start: number; end: number }[] = []
   const placed: ScheduledItem[] = [...background]
