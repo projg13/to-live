@@ -757,13 +757,17 @@ function placeItems(
   // Sort by weight descending — highest weight gets first pick of time
   active.sort((a, b) => b.weight - a.weight)
 
-  // Topological fixup: ensure child tasks always come AFTER their parent
-  // A child with higher weight would otherwise be placed before its mother
+  // Build parent map for ordering + placement constraints
+  const parentMap = new Map<string, string>()
   if (tasks) {
-    const parentMap = new Map<string, string>()
     for (const t of tasks) {
       if (t.parentId) parentMap.set(t.id, t.parentId)
     }
+  }
+
+  // Topological fixup: ensure child tasks always come AFTER their parent
+  // A child with higher weight would otherwise be placed before its mother
+  if (parentMap.size > 0) {
     // Walk the sorted list; if a child appears before its parent, move it after
     let changed = true
     let passes = 0
@@ -787,12 +791,25 @@ function placeItems(
 
   const occupied: { start: number; end: number }[] = []
   const placed: ScheduledItem[] = [...background]
+  // Track where each task was actually placed, so children can't start before parent ends
+  const placedEndByTaskId = new Map<string, number>()
 
   for (const item of active) {
     const duration = item.endMinutes - item.startMinutes
 
     // Try placing at ideal startMinutes first
     let start = item.startMinutes
+
+    // If this task has a parent, it can't start before the parent's end
+    if (parentMap.size > 0) {
+      const pid = parentMap.get(item.taskId)
+      if (pid) {
+        const parentEnd = placedEndByTaskId.get(pid)
+        if (parentEnd !== undefined && start < parentEnd) {
+          start = parentEnd
+        }
+      }
+    }
 
     // Check expiry at ideal position
     if (item.expiryTime !== undefined && start >= item.expiryTime) {
@@ -804,6 +821,7 @@ function placeItems(
       item.endMinutes = start + duration
       occupied.push({ start, end: start + duration })
       placed.push(item)
+      placedEndByTaskId.set(item.taskId, start + duration)
       continue
     }
 
@@ -820,6 +838,7 @@ function placeItems(
         item.endMinutes = cursor + duration
         occupied.push({ start: cursor, end: cursor + duration })
         placed.push(item)
+        placedEndByTaskId.set(item.taskId, cursor + duration)
         break
       }
       cursor += 5
