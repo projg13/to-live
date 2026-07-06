@@ -749,7 +749,7 @@ function placeItems(
   _slots: { startTime: number; endTime: number; anchorName: string }[],
   _anchors: Anchor[],
   _confirmations: AnchorConfirmation[],
-  tasks?: { id: string; parentId?: string }[]
+  tasks?: Task[]
 ): ScheduledItem[] {
   const background = items.filter((i) => i.isBackground)
   const active = items.filter((i) => !i.isBackground)
@@ -765,10 +765,22 @@ function placeItems(
     }
   }
 
+  // Build link continuity map: childTaskId → continuity rule
+  // Check the parent's links[] to find the continuity for each child
+  const continuityOf = new Map<string, string>()
+  if (tasks) {
+    for (const t of tasks) {
+      if (t.links) {
+        for (const link of t.links) {
+          // Default continuity is 'continuous' if not specified
+          continuityOf.set(link.linkedTaskId, link.continuity ?? 'continuous')
+        }
+      }
+    }
+  }
+
   // Topological fixup: ensure child tasks always come AFTER their parent
-  // A child with higher weight would otherwise be placed before its mother
   if (parentMap.size > 0) {
-    // Walk the sorted list; if a child appears before its parent, move it after
     let changed = true
     let passes = 0
     while (changed && passes < 50) {
@@ -779,11 +791,10 @@ function placeItems(
         if (!parentId) continue
         const parentIdx = active.findIndex((a) => a.taskId === parentId)
         if (parentIdx > i) {
-          // Parent is later — move child right after parent
           const [child] = active.splice(i, 1)
-          active.splice(parentIdx, 0, child) // insert after parent (parent shifted left by 1)
+          active.splice(parentIdx, 0, child)
           changed = true
-          break // restart scan
+          break
         }
       }
     }
@@ -792,17 +803,21 @@ function placeItems(
   const occupied: { start: number; end: number }[] = []
   const placed: ScheduledItem[] = [...background]
 
-  // Build child map: parentTaskId → [child items in order]
-  const childrenOf = new Map<string, ScheduledItem[]>()
-  const isChild = new Set<string>()
+  // Build child map: parentTaskId → [continuous child items]
+  // Only continuous children get stitched; discontinuable ones are placed independently
+  const continuousChildrenOf = new Map<string, ScheduledItem[]>()
+  const isContinuousChild = new Set<string>()
   if (parentMap.size > 0) {
     for (const item of active) {
       const pid = parentMap.get(item.taskId)
       if (pid) {
-        isChild.add(item.taskId)
-        const kids = childrenOf.get(pid) ?? []
-        kids.push(item)
-        childrenOf.set(pid, kids)
+        const rule = continuityOf.get(item.taskId) ?? 'continuous'
+        if (rule === 'continuous') {
+          isContinuousChild.add(item.taskId)
+          const kids = continuousChildrenOf.get(pid) ?? []
+          kids.push(item)
+          continuousChildrenOf.set(pid, kids)
+        }
       }
     }
   }
@@ -818,22 +833,33 @@ function placeItems(
   }
 
   for (const item of active) {
-    // Skip children — they get placed when their parent is placed
-    if (isChild.has(item.taskId)) continue
+    // Skip continuous children — they get placed when their parent is placed
+    if (isContinuousChild.has(item.taskId)) continue
 
     const duration = item.endMinutes - item.startMinutes
-    const children = childrenOf.get(item.taskId) ?? []
+    const children = continuousChildrenOf.get(item.taskId) ?? []
     const childDuration = children.reduce((sum, c) => sum + (c.endMinutes - c.startMinutes), 0)
     const totalDuration = duration + childDuration
 
     let start = item.startMinutes
+
+    // Discontinuable children: ensure they start after parent's end
+    if (parentMap.size > 0 && !isContinuousChild.has(item.taskId)) {
+      const pid = parentMap.get(item.taskId)
+      if (pid) {
+        const parentItem = placed.find((p) => p.taskId === pid)
+        if (parentItem && start < parentItem.endMinutes) {
+          start = parentItem.endMinutes
+        }
+      }
+    }
 
     // Check expiry at ideal position
     if (item.expiryTime !== undefined && start >= item.expiryTime) {
       continue
     }
 
-    // Try placing the entire block (parent + children) at ideal time
+    // Try placing the entire block (parent + continuous children) at ideal time
     if (!hasConflict(start, totalDuration, occupied)) {
       let cursor = placeAt(item, start)
       for (const child of children) cursor = placeAt(child, cursor)
@@ -862,7 +888,6 @@ function placeItems(
         if (item.expiryTime !== undefined && cursor >= item.expiryTime) break
         if (!hasConflict(cursor, duration, occupied)) {
           let blockCursor = placeAt(item, cursor)
-          // Try stitching children immediately after
           for (const child of children) {
             const childDur = child.endMinutes - child.startMinutes
             if (blockCursor + childDur <= 1440 && !hasConflict(blockCursor, childDur, occupied)) {

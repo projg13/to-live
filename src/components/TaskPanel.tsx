@@ -376,7 +376,6 @@ function TaskEditor({
                     <option value="">(default)</option>
                     <option value="continuous">continuous</option>
                     <option value="discontinuable">discontinuable</option>
-                    <option value="resumable">resumable</option>
                   </select>
                 )}
 

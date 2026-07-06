@@ -1,5 +1,5 @@
 export type LinkType = 'active' | 'passive'
-export type ContinuityRule = 'continuous' | 'discontinuable' | 'resumable'
+export type ContinuityRule = 'continuous' | 'discontinuable'
 
 // A link from this task to another task
 export interface TaskLink {
