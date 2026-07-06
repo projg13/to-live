@@ -316,7 +316,10 @@ function resolveDay(
             const taskIdeal = taskConfig.idealTime ?? anchorTime
             const expiryTime = taskIdeal + taskConfig.expiresAfterMinutes
             const nowMins = context.currentTimeMinutes !== undefined ? context.currentTimeMinutes : (new Date().getHours() * 60 + new Date().getMinutes())
-            if (dayIndex === 0 && nowMins >= expiryTime) {
+            // Protect current task: if it would be active now, don't expire it
+            const taskEnd = taskIdeal + task.durationMinutes
+            const isCurrent = dayIndex === 0 && taskIdeal <= nowMins && nowMins < taskEnd
+            if (dayIndex === 0 && nowMins >= expiryTime && !isCurrent) {
               if (debug) console.log(`      ⏰ ${task.title}: EXPIRED at collection (now=${nowMins} >= expiry@${expiryTime})`)
               continue
             }
@@ -724,7 +727,7 @@ function resolveDay(
   const overflowCutoff = 1440 // default midnight
 
   // Phase 2: Global weight merge — all items compete by weight
-  const { placed, overflow } = placeItems(items, context.tasks, context.blocks, overflowCutoff, debug)
+  const { placed, overflow } = placeItems(items, context.tasks, context.blocks, overflowCutoff, nowMinutes, debug)
 
   // Phase 3: Anchor recalculation — push only, never pull
   for (const ra of resolvedAnchors) {
@@ -770,6 +773,7 @@ function placeItems(
   tasks: Task[],
   blocks: Block[],
   cutoff: number,
+  nowMinutes: number,
   debug: boolean
 ): { placed: ScheduledItem[]; overflow: ScheduledItem[] } {
   const background = items.filter((i) => i.isBackground)
@@ -861,8 +865,9 @@ function placeItems(
       }
     }
 
-    // Check expiry before even trying
-    if (item.expiryTime !== undefined && start >= item.expiryTime) continue
+    // Check expiry before even trying — but protect current task
+    const wouldBeCurrent = start <= nowMinutes && nowMinutes < start + duration
+    if (item.expiryTime !== undefined && start >= item.expiryTime && !wouldBeCurrent) continue
 
     // Try ideal time
     if (start < cutoff && !hasConflict(start, duration, occupied)) {
@@ -879,7 +884,7 @@ function placeItems(
     let cursor = start
     let found = false
     while (cursor + duration <= cutoff) {
-      if (item.expiryTime !== undefined && cursor >= item.expiryTime) break
+      if (item.expiryTime !== undefined && cursor >= item.expiryTime && !(cursor <= nowMinutes && nowMinutes < cursor + duration)) break
       if (!hasConflict(cursor, duration, occupied)) {
         item.startMinutes = cursor
         item.endMinutes = cursor + duration
@@ -917,7 +922,8 @@ function placeItems(
   const expiredRoutineIds = new Set<string>()
   for (const item of placed) {
     if (item.source !== 'routine') continue
-    if (item.expiryTime !== undefined && item.startMinutes >= item.expiryTime) {
+    const isCurrentItem = item.startMinutes <= nowMinutes && nowMinutes < item.endMinutes
+    if (item.expiryTime !== undefined && item.startMinutes >= item.expiryTime && !isCurrentItem) {
       expiredRoutineIds.add(item.taskId)
       if (debug) console.log(`  ⏰ POST-PURGE: ${item.title} expired (start=${item.startMinutes} >= expiry=${item.expiryTime})`)
     }
