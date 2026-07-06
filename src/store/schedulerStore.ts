@@ -147,6 +147,12 @@ function resolveDay(
   // Get adhoc tasks for this day
   const dayAdhocs = adhocTasks.filter((a) => a.day === dayIndex)
 
+  // Current time in minutes from midnight (only relevant for today)
+  const now = new Date()
+  const nowMinutes = dayIndex === 0
+    ? (context.currentTimeMinutes !== undefined ? context.currentTimeMinutes : now.getHours() * 60 + now.getMinutes())
+    : 0
+
   // Collect all candidate tasks with their resolved weights
   const items: ScheduledItem[] = []
 
@@ -157,8 +163,8 @@ function resolveDay(
       taskId: adhoc.id,
       instanceKey: iKey,
       title: adhoc.title,
-      startMinutes: adhoc.startTime,
-      endMinutes: adhoc.startTime + adhoc.durationMinutes,
+      startMinutes: dayIndex === 0 ? Math.max(adhoc.startTime, nowMinutes) : adhoc.startTime,
+      endMinutes: (dayIndex === 0 ? Math.max(adhoc.startTime, nowMinutes) : adhoc.startTime) + adhoc.durationMinutes,
       isBackground: false,
       source: 'adhoc',
       weight: Math.max(1, adhoc.weight + (weightOffsets[iKey] ?? 0)),
@@ -193,11 +199,6 @@ function resolveDay(
   // Skip routine/block tasks if event suspends regular AND no weightOffset lets them through
   const allowRoutines = !suspendRegular || eventWeightOffset > 0
 
-  // Current time in minutes from midnight (only relevant for today)
-  const now = new Date()
-  const nowMinutes = dayIndex === 0
-    ? (context.currentTimeMinutes !== undefined ? context.currentTimeMinutes : now.getHours() * 60 + now.getMinutes())
-    : 0
 
   // DEBUG: trace resolve chain
   if (debug) {
