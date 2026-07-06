@@ -128,6 +128,7 @@ function Dashboard() {
 
   useEffect(() => {
     scheduler.resolve(buildContext())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     tasks,
     anchors,
@@ -145,7 +146,8 @@ function Dashboard() {
     scheduler.resolveVersion,
     scheduler.lastDoneAt,
     debugDateOverride,
-    virtualTime,
+    // NOTE: virtualTime intentionally excluded — resolve only on data changes
+    // or manual Recalculate (which bumps resolveVersion)
   ])
 
   const schedule = scheduler.schedule
