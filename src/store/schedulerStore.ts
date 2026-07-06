@@ -709,7 +709,7 @@ function resolveDay(
   const placed = placeItems(items, [], [], dayConfirmations, context.tasks)
 
   // Post-placement anchor adjustment: push anchors past any routine items that should be before them
-  // Only routine tasks push anchors — adhoc/obligation/recovery/event do not
+  // Only consider items whose anchor (resetAnchorId) is EARLIER than the anchor being evaluated
   const routinePlaced = placed.filter((i) => i.source === 'routine')
   const sortedAnchors = [...resolvedAnchors].sort((a, b) => a.actualTime - b.actualTime)
   for (const ra of sortedAnchors) {
@@ -718,10 +718,9 @@ function resolveDay(
     const earlierAnchorIds = new Set(sortedAnchors.slice(0, raIdx).map((a) => a.anchorId))
 
     for (const item of routinePlaced) {
-      if (item.startMinutes < ra.actualTime && item.endMinutes > maxEnd) {
-        maxEnd = item.endMinutes
-      }
-      if (item.resetAnchorId && earlierAnchorIds.has(item.resetAnchorId) && item.endMinutes > maxEnd) {
+      // Only items from earlier anchors can push this anchor
+      if (!item.resetAnchorId || !earlierAnchorIds.has(item.resetAnchorId)) continue
+      if (item.endMinutes > maxEnd) {
         maxEnd = item.endMinutes
       }
     }
