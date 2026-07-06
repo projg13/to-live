@@ -851,6 +851,22 @@ function placeItems(
     }
   }
 
+  // Align background children to their parent's actual placement
+  // Passive/background tasks run concurrently with parent, so start at parent's start
+  if (parentMap.size > 0) {
+    for (const bg of background) {
+      const pid = parentMap.get(bg.taskId)
+      if (!pid) continue
+      // Find parent in placed (active items)
+      const parentItem = placed.find((p) => p.taskId === pid)
+      if (parentItem && bg.startMinutes < parentItem.startMinutes) {
+        const dur = bg.endMinutes - bg.startMinutes
+        bg.startMinutes = parentItem.startMinutes
+        bg.endMinutes = parentItem.startMinutes + dur
+      }
+    }
+  }
+
   // Post-check: resumable chains — if any member wasn't placed, remove ALL
   if (parentMap.size > 0) {
     const collectResumableChain = (taskId: string): string[] => {
