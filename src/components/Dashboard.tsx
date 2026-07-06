@@ -966,7 +966,7 @@ function Dashboard() {
                 Overflow ({daySchedule.overflowItems.length} tasks can't fit today)
               </div>
               <div className="space-y-2">
-                {daySchedule.overflowItems.map((item, idx) => {
+              {daySchedule.overflowItems.map((item, idx) => {
                   const ofWeight = scheduler.weightOffsets[item.instanceKey] ?? 0
                   return (
                   <div key={`overflow-${idx}`} className="space-y-2">
@@ -1007,6 +1007,29 @@ function Dashboard() {
                         >
                           ⚖️{ofWeight !== 0 && <span>{ofWeight > 0 ? '+' : ''}{ofWeight}</span>}
                         </button>
+                        {item.source === 'adhoc' && (
+                          <>
+                            <button
+                              onClick={() => setEditingAdhocId(editingAdhocId === item.taskId ? null : item.taskId)}
+                              className={`p-1 rounded-xl transition-all cursor-pointer border ${
+                                editingAdhocId === item.taskId
+                                  ? 'bg-cyan-950/30 text-cyan-400 border-cyan-800/30'
+                                  : 'bg-slate-950/40 hover:bg-slate-900 text-slate-400 border-slate-850'
+                              }`}
+                              title="Edit ad-hoc task"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                                <path d="M13.488 2.513a1.75 1.75 0 0 0-2.475 0L3.22 10.303a.75.75 0 0 0-.178.311l-.883 3.12a.75.75 0 0 0 .926.926l3.12-.883a.75.75 0 0 0 .31-.178l7.794-7.79a1.75 1.75 0 0 0 0-2.476l-.82-.82ZM11.72 3.22a.25.25 0 0 1 .354 0l.82.82a.25.25 0 0 1 0 .353L5.66 11.627l-1.884.534.534-1.884 7.41-7.058Z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => scheduler.removeAdhocTask(item.taskId)}
+                              className="p-1 rounded-xl bg-rose-950/30 hover:bg-rose-900/30 text-rose-450 border border-rose-800/30 transition-all cursor-pointer"
+                            >
+                              <TrashIcon />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                     {showOffset === item.instanceKey && (
@@ -1062,6 +1085,62 @@ function Dashboard() {
                         </button>
                       </div>
                     )}
+                    {editingAdhocId === item.taskId && item.source === 'adhoc' && (() => {
+                      const adhocTask = scheduler.adhocTasks.find((t) => t.id === item.taskId)
+                      if (!adhocTask) return null
+                      return (
+                        <div className="ml-2 pl-4 border-l-2 border-cyan-400 bg-cyan-950/10 border border-cyan-900/20 p-3 rounded-xl space-y-3">
+                          <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">Edit Ad-hoc Task</div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="col-span-2">
+                              <label className="text-[10px] text-slate-500 font-bold uppercase block mb-0.5">Title</label>
+                              <input
+                                type="text"
+                                defaultValue={adhocTask.title}
+                                onBlur={(e) => scheduler.updateAdhocTask(item.taskId, { title: e.target.value })}
+                                className="text-sm px-2.5 py-1.5 w-full bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-1 focus:ring-cyan-500 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-slate-500 font-bold uppercase block mb-0.5">Start time</label>
+                              <input
+                                type="time"
+                                defaultValue={`${String(Math.floor(adhocTask.startTime / 60)).padStart(2, '0')}:${String(adhocTask.startTime % 60).padStart(2, '0')}`}
+                                onChange={(e) => {
+                                  const [h, m] = e.target.value.split(':').map(Number)
+                                  scheduler.updateAdhocTask(item.taskId, { startTime: (h || 0) * 60 + (m || 0) })
+                                }}
+                                className="text-xs px-2 py-1.5 w-full bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:ring-1 focus:ring-cyan-500 focus:outline-none cursor-pointer"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-slate-500 font-bold uppercase block mb-0.5">Duration (min)</label>
+                              <input
+                                type="number"
+                                defaultValue={adhocTask.durationMinutes}
+                                onBlur={(e) => scheduler.updateAdhocTask(item.taskId, { durationMinutes: Number(e.target.value) || 5 })}
+                                className="text-xs px-2 py-1.5 w-full bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:ring-1 focus:ring-cyan-500 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-slate-500 font-bold uppercase block mb-0.5">Weight</label>
+                              <input
+                                type="number"
+                                defaultValue={adhocTask.weight}
+                                onBlur={(e) => scheduler.updateAdhocTask(item.taskId, { weight: Number(e.target.value) || 100 })}
+                                className="text-xs px-2 py-1.5 w-full bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:ring-1 focus:ring-cyan-500 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setEditingAdhocId(null)}
+                            className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 cursor-pointer transition-colors"
+                          >
+                            ✓ Done editing
+                          </button>
+                        </div>
+                      )
+                    })()}
                   </div>
                   )
                 })}

@@ -725,9 +725,34 @@ function resolveDay(
     }
   }
 
-  // Compute overflow cutoff: next day's first anchor or midnight
-  // For day 0, check day 1's anchors. For others, use midnight.
-  const overflowCutoff = 1440 // default midnight
+  // Compute overflow cutoff: 1440 + next day's first anchor ideal time
+  // Tasks can spill past midnight as long as they start before the next day begins
+  let overflowCutoff = 1440
+  if (dayIndex < 6) {
+    const nextDateStr = getDateStr(dayIndex + 1, context.baseDate)
+    const nextDayOfWeek = getDayOfWeek(nextDateStr)
+    const nextEvent = context.calendarEvents.find((e) => {
+      if (e.date === nextDateStr) return true
+      if (e.endDate && nextDateStr >= e.date && nextDateStr <= e.endDate) return true
+      return false
+    })
+    let nextDayPlanId = ''
+    if (nextEvent?.dayPlanOverrides?.[nextDateStr]) {
+      nextDayPlanId = nextEvent.dayPlanOverrides[nextDateStr]
+    } else if (nextEvent?.dayPlanOverride) {
+      nextDayPlanId = nextEvent.dayPlanOverride
+    } else {
+      nextDayPlanId = context.weekPlan[nextDayOfWeek] ?? ''
+    }
+    const nextDayPlan = context.dayPlans.find((p) => p.id === nextDayPlanId)
+    const nextTemplate = nextDayPlan?.templateId
+      ? templates.find((t) => t.id === nextDayPlan.templateId)
+      : templates[0]
+    if (nextTemplate && nextTemplate.entries.length > 0) {
+      const nextFirstAnchor = Math.min(...nextTemplate.entries.map((e) => e.spikeTime))
+      overflowCutoff = 1440 + nextFirstAnchor
+    }
+  }
 
   // Phase 2: Global weight merge — all items compete by weight
   const { placed, overflow } = placeItems(items, context.tasks, context.blocks, overflowCutoff, nowMinutes, debug)
