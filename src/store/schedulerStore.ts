@@ -911,7 +911,7 @@ function placeItems(
     // Gap-fill: find next available slot
     let cursor = start
     let found = false
-    while (cursor + duration <= cutoff) {
+    while (cursor < cutoff) {
       if (item.expiryTime !== undefined && cursor >= item.expiryTime && !(cursor <= nowMinutes && nowMinutes < cursor + duration)) break
       if (!hasConflict(cursor, duration, occupied)) {
         item.startMinutes = cursor
