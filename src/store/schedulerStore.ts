@@ -805,9 +805,20 @@ function placeItems(
   const placedTaskIds = new Set<string>()
 
   // Place all items independently by weight order
+  const placedEndByTaskId = new Map<string, number>()
+
   for (const item of active) {
     const duration = item.endMinutes - item.startMinutes
     let start = item.startMinutes
+
+    // Child tasks always wait for their parent to finish
+    const pid = parentMap.get(item.taskId)
+    if (pid) {
+      const parentEnd = placedEndByTaskId.get(pid)
+      if (parentEnd !== undefined && start < parentEnd) {
+        start = parentEnd
+      }
+    }
 
     // Check expiry
     if (item.expiryTime !== undefined && start >= item.expiryTime) continue
@@ -819,6 +830,7 @@ function placeItems(
       occupied.push({ start, end: start + duration })
       placed.push(item)
       placedTaskIds.add(item.taskId)
+      placedEndByTaskId.set(item.taskId, start + duration)
       continue
     }
 
@@ -832,6 +844,7 @@ function placeItems(
         occupied.push({ start: cursor, end: cursor + duration })
         placed.push(item)
         placedTaskIds.add(item.taskId)
+        placedEndByTaskId.set(item.taskId, cursor + duration)
         break
       }
       cursor += 5
