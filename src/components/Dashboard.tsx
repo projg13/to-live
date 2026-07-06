@@ -954,27 +954,105 @@ function Dashboard() {
                 Overflow ({daySchedule.overflowItems.length} tasks can't fit today)
               </div>
               <div className="space-y-2">
-                {daySchedule.overflowItems.map((item, idx) => (
-                  <div
-                    key={`overflow-${idx}`}
-                    className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-amber-950/15 border border-amber-900/20 rounded-xl text-xs"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-amber-300">{item.title}</span>
-                      <span className="text-amber-500/60 font-mono text-[10px]">
-                        {item.endMinutes - item.startMinutes}m
-                      </span>
+                {daySchedule.overflowItems.map((item, idx) => {
+                  const ofWeight = scheduler.weightOffsets[item.instanceKey] ?? 0
+                  return (
+                  <div key={`overflow-${idx}`} className="space-y-2">
+                    <div
+                      className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-amber-950/15 border border-amber-900/20 rounded-xl text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-amber-300">{item.title}</span>
+                        <span className="text-amber-500/60 font-mono text-[10px]">
+                          {item.endMinutes - item.startMinutes}m
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-500/80 text-[10px] font-bold uppercase tracking-wider">
+                          {item.source}
+                        </span>
+                        <span className="text-amber-400/60 font-mono text-[10px]">
+                          w:{Math.round(item.weight)}
+                        </span>
+                        <button
+                          onClick={() => {
+                            if (showOffset === item.instanceKey) {
+                              setShowOffset(null)
+                            } else {
+                              setShowOffset(item.instanceKey)
+                              setOffsetSign(ofWeight < 0 ? '-' : '+')
+                              setOffsetValue(ofWeight !== 0 ? String(Math.abs(ofWeight)) : '')
+                            }
+                          }}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] font-semibold border transition-all active:scale-95 cursor-pointer ${
+                            ofWeight !== 0
+                              ? ofWeight > 0
+                                ? 'bg-emerald-950/30 text-emerald-400 border-emerald-800/30'
+                                : 'bg-rose-950/30 text-rose-400 border-rose-800/30'
+                              : 'bg-slate-950/60 text-slate-400 border-slate-850 hover:bg-slate-900'
+                          }`}
+                          title="Adjust weight offset"
+                        >
+                          ⚖️{ofWeight !== 0 && <span>{ofWeight > 0 ? '+' : ''}{ofWeight}</span>}
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-amber-500/80 text-[10px] font-bold uppercase tracking-wider">
-                        {item.source}
-                      </span>
-                      <span className="text-amber-400/60 font-mono text-[10px]">
-                        w:{Math.round(item.weight)}
-                      </span>
-                    </div>
+                    {showOffset === item.instanceKey && (
+                      <div className="ml-2 pl-4 border-l-2 border-indigo-400 flex flex-wrap gap-2 items-center bg-indigo-950/10 border border-indigo-900/20 p-3 rounded-xl">
+                        <span className="text-xs font-bold text-slate-400">Offset:</span>
+                        <button
+                          type="button"
+                          onClick={() => setOffsetSign(offsetSign === '+' ? '-' : '+')}
+                          className={`px-2.5 py-1 rounded-lg text-sm font-extrabold cursor-pointer transition-all ${
+                            offsetSign === '-' ? 'bg-rose-950/40 text-rose-400 border border-rose-800/30' : 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/30'
+                          }`}
+                        >
+                          {offsetSign}
+                        </button>
+                        <input
+                          type="number"
+                          min="0"
+                          value={offsetValue}
+                          placeholder="0"
+                          onChange={(e) => setOffsetValue(e.target.value)}
+                          className="w-16 text-xs px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-slate-300 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                        />
+                        <button
+                          onClick={() => {
+                            const val = parseInt(offsetValue, 10)
+                            if (!isNaN(val) && val > 0) {
+                              scheduler.setWeightOffset(item.instanceKey, val * (offsetSign === '-' ? -1 : 1))
+                            } else {
+                              scheduler.clearWeightOffset(item.instanceKey)
+                            }
+                            setShowOffset(null)
+                          }}
+                          className="px-2.5 py-1 text-xs font-bold bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-all cursor-pointer"
+                        >
+                          Apply
+                        </button>
+                        {ofWeight !== 0 && (
+                          <button
+                            onClick={() => {
+                              scheduler.clearWeightOffset(item.instanceKey)
+                              setShowOffset(null)
+                            }}
+                            className="px-2.5 py-1 text-xs font-semibold bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 rounded-lg transition-all cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setShowOffset(null)}
+                          className="px-2.5 py-1 text-xs font-semibold text-slate-450 hover:text-slate-200 transition-all cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
               <p className="text-[10px] text-amber-500/50 italic">
                 Adjust weights or remove tasks to fit these into today's schedule.

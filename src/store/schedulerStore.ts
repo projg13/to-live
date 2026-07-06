@@ -1292,7 +1292,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
       name: 'to-live-scheduler',
       partialize: (state) => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { weightOffsets, resolveVersion, ...rest } = state
+        const { resolveVersion, ...rest } = state
         return rest
       },
     }
