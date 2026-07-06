@@ -99,7 +99,14 @@ function Dashboard() {
 
   const showDebug = false
   const [showCompleted, setShowCompleted] = useState(false)
-  const [debugTimeOverride, setDebugTimeOverride] = useState<number | null>(null)
+  // Initialize time override from persisted commit or lastDoneAt
+  const [debugTimeOverride, setDebugTimeOverride] = useState<number | null>(() => {
+    const commitVals = Object.values(scheduler.committedTasks)
+    if (commitVals.length > 0) return commitVals[0]
+    const lastDone = scheduler.lastDoneAt[0] // day 0 = today
+    if (lastDone !== undefined) return lastDone
+    return null
+  })
   const [debugDateOverride, setDebugDateOverride] = useState<string | null>(null)
 
   // Live clock — auto-updates every 30 seconds
