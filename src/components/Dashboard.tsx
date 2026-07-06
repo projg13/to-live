@@ -643,6 +643,26 @@ function Dashboard() {
                             Undo
                           </button>
                         )}
+                        {/* Clone as ad-hoc */}
+                        {!isDone && (
+                          <button
+                            onClick={() => {
+                              const duration = item.endMinutes - item.startMinutes
+                              scheduler.addAdhocTask({
+                                id: `adhoc-clone-${Date.now()}`,
+                                title: `${item.title} (ad-hoc)`,
+                                durationMinutes: duration,
+                                startTime: virtualTime,
+                                day: selectedDay,
+                                weight: Math.round(item.weight),
+                              })
+                            }}
+                            className="p-1 px-1.5 rounded-xl bg-slate-950/40 hover:bg-slate-900 text-slate-400 border border-slate-850 transition-all active:scale-95 cursor-pointer"
+                            title="Clone as ad-hoc task"
+                          >
+                            📋
+                          </button>
+                        )}
                         {/* Weight offset toggle button */}
                         {!isDone && (
                           <button
