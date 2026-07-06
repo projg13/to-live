@@ -10,7 +10,7 @@ import EventPanel from './components/EventPanel'
 import RecoveryPanel from './components/RecoveryPanel'
 import RotPanel from './components/RotPanel'
 import SettingsPanel from './components/SettingsPanel'
-import { resetAllStores } from './stateIO'
+
 
 const managePanels = [
   'Tasks',
@@ -104,20 +104,6 @@ function App() {
           </div>
         )}
       </main>
-
-      {/* Factory reset */}
-      <footer className="mt-8 border-t border-slate-900/60 pt-6 text-center">
-        <button
-          onClick={() => {
-            if (confirm('Clear ALL data and reload? This cannot be undone.')) {
-              resetAllStores()
-            }
-          }}
-          className="px-5 py-2.5 rounded-2xl text-xs font-bold tracking-wider uppercase text-white bg-rose-600 hover:bg-rose-500 active:scale-95 shadow-md shadow-rose-950/30 border border-transparent transition-all cursor-pointer"
-        >
-          Factory Reset
-        </button>
-      </footer>
     </div>
   )
 }

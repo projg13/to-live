@@ -97,9 +97,8 @@ function Dashboard() {
   const [offsetSign, setOffsetSign] = useState<'+' | '-'>('+')
   const [offsetValue, setOffsetValue] = useState('')
 
-  // Debug mode state
-  const [showDebug, setShowDebug] = useState(false)
-  const [showCompleted, setShowCompleted] = useState(false)
+  const showDebug = false
+  const showCompleted = false
   const [debugTimeOverride, setDebugTimeOverride] = useState<number | null>(null)
   const [debugDateOverride, setDebugDateOverride] = useState<string | null>(null)
 
@@ -208,7 +207,7 @@ function Dashboard() {
     <div className="space-y-6">
       {/* Clock + Recalculate + Controls */}
       <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 shadow-lg shadow-indigo-950/10">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col items-center gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-slate-950 text-cyan-400 flex items-center justify-center border border-slate-800 shadow-inner">
               <ClockIcon className="w-5 h-5" />
@@ -230,7 +229,7 @@ function Dashboard() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => {
                 scheduler.recalibrateFrom(virtualTime, selectedDay)
@@ -246,48 +245,6 @@ function Dashboard() {
             >
               <UndoIcon />
               Undo
-            </button>
-            <button
-              onClick={() => scheduler.clearSchedule()}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-slate-950/65 hover:bg-slate-900 text-rose-400 transition-all border border-slate-850 active:scale-95 cursor-pointer"
-            >
-              <TrashIcon />
-              Reset
-            </button>
-            <button
-              onClick={() => scheduler.toggleDebug()}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all border active:scale-95 cursor-pointer ${
-                scheduler.debugMode
-                  ? 'bg-amber-950/30 text-amber-400 border-amber-800/40'
-                  : 'bg-slate-950/65 text-slate-500 border-slate-850 hover:bg-slate-900'
-              }`}
-            >
-              🔍 {scheduler.debugMode ? 'Debug ON' : 'Debug'}
-            </button>
-            <button
-              onClick={() => setShowCompleted(!showCompleted)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all border active:scale-95 cursor-pointer ${
-                showCompleted
-                  ? 'bg-emerald-950/30 text-emerald-400 border-emerald-800/40'
-                  : 'bg-slate-950/65 text-slate-500 border-slate-850 hover:bg-slate-900'
-              }`}
-            >
-              ✓ {showCompleted ? 'Hide Done' : 'Show Done'}
-              {dayDoneItems.length > 0 && (
-                <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                  showCompleted ? 'bg-emerald-800/40 text-emerald-300' : 'bg-slate-800 text-slate-400'
-                }`}>{dayDoneItems.length}</span>
-              )}
-            </button>
-            <button
-              onClick={() => setShowDebug(!showDebug)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border cursor-pointer active:scale-95 ${
-                showDebug
-                  ? 'bg-amber-500/20 text-amber-400 border-amber-700/40 shadow-md shadow-amber-950/20'
-                  : 'bg-slate-950/65 text-slate-500 border-slate-850 hover:text-slate-300'
-              }`}
-            >
-              ⚙ Debug
             </button>
           </div>
         </div>
