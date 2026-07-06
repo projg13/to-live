@@ -574,23 +574,20 @@ function resolveDay(
     if (debug) console.log(`    📝 Tasks: ${orderedTaskIds.length} total → ${validTasks.length} valid`)
 
 
-    let obCursor = obPlacement
 
     for (let idx = 0; idx < validTasks.length; idx++) {
       const tid = validTasks[idx]
       const task = context.tasks.find((t) => t.id === tid)!
 
-      // Evaluate the weight curve at THIS task's actual scheduled time
-      const curveWeight = getObligationWeight(bracket.timeCurve, obCursor)
+      // Evaluate the weight curve at the placement window start
+      const curveWeight = getObligationWeight(bracket.timeCurve, obPlacement)
       if (curveWeight <= 0) {
-        if (debug) console.log(`      ⚖️ ${task.title}: WEIGHT=0 at ${obCursor}min, skipping`)
-        obCursor += task.durationMinutes
+        if (debug) console.log(`      ⚖️ ${task.title}: WEIGHT=0 at ${obPlacement}min, skipping`)
         continue
       }
 
       if (eventWeightOffset > 0 && curveWeight - eventWeightOffset <= 0) {
         if (debug) console.log(`      ⚖️ ${task.title}: weight ${curveWeight} - eventOffset ${eventWeightOffset} <= 0, skipping`)
-        obCursor += task.durationMinutes
         continue
       }
 
@@ -598,15 +595,15 @@ function resolveDay(
       // Order bonus: first task gets +1, last gets +totalTasks
       const taskWeight = effectiveWeight + (idx + 1)
 
-      if (debug) console.log(`      ✓ ${task.title}: weight=${taskWeight} (curve=${curveWeight}) @${obCursor}`)
+      if (debug) console.log(`      ✓ ${task.title}: weight=${taskWeight} (curve=${curveWeight}) @${obPlacement}`)
 
       const obIKey = makeInstanceKey('obligation', ob.id, '', task.id)
       items.push({
         taskId: task.id,
         instanceKey: obIKey,
         title: task.title,
-        startMinutes: obCursor,
-        endMinutes: obCursor + task.durationMinutes,
+        startMinutes: obPlacement,
+        endMinutes: obPlacement + task.durationMinutes,
         isBackground: false,
         source: 'obligation',
         weight: taskWeight + (weightOffsets[obIKey] ?? 0),
@@ -614,7 +611,6 @@ function resolveDay(
         sourceId: ob.id,
         sourceName: ob.name,
       })
-      obCursor += task.durationMinutes
     }
   }
   if (debug) console.groupEnd()
@@ -672,17 +668,15 @@ function resolveDay(
     })
 
     const totalTasks = validTasks.length
-    let recoveryCursor = recPlacement
 
     for (let idx = 0; idx < validTasks.length; idx++) {
       const tid = validTasks[idx]
       const task = context.tasks.find((t) => t.id === tid)!
 
-      // Evaluate the piecewise curve at THIS task's actual start time
-      const curveWeight = getRecoveryWeight(plan, recoveryCursor, dateStr)
+      // Evaluate the piecewise curve at the window start time
+      const curveWeight = getRecoveryWeight(plan, recPlacement, dateStr)
       if (curveWeight <= 0) {
-        if (debug) console.log(`      ⚖️ [R] ${task.title}: WEIGHT=0 at ${recoveryCursor}min, skipping`)
-        recoveryCursor += task.durationMinutes
+        if (debug) console.log(`      ⚖️ [R] ${task.title}: WEIGHT=0 at ${recPlacement}min, skipping`)
         continue
       }
 
@@ -694,8 +688,8 @@ function resolveDay(
         taskId: task.id,
         instanceKey: recIKey,
         title: `[R] ${task.title}`,
-        startMinutes: recoveryCursor,
-        endMinutes: recoveryCursor + task.durationMinutes,
+        startMinutes: recPlacement,
+        endMinutes: recPlacement + task.durationMinutes,
         isBackground: false,
         source: 'recovery',
         weight: taskWeight + (weightOffsets[recIKey] ?? 0),
@@ -703,7 +697,6 @@ function resolveDay(
         sourceId: plan.id,
         sourceName: plan.name,
       })
-      recoveryCursor += task.durationMinutes
     }
   }
 
@@ -1050,8 +1043,11 @@ export const useSchedulerStore = create<SchedulerStore>()(
           ))
         }
 
-        // Prune orphaned weight offsets
-        const allInstanceKeys = new Set(days.flatMap((d) => d.items.map((i) => i.instanceKey)))
+        // Prune orphaned weight offsets (include overflow items too)
+        const allInstanceKeys = new Set(days.flatMap((d) => [
+          ...d.items.map((i) => i.instanceKey),
+          ...(d.overflowItems ?? []).map((i) => i.instanceKey),
+        ]))
         const prunedOffsets: Record<string, number> = {}
         for (const [key, val] of Object.entries(state.weightOffsets)) {
           if (allInstanceKeys.has(key)) prunedOffsets[key] = val
