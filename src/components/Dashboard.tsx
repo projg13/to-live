@@ -189,9 +189,11 @@ function Dashboard() {
     }
   }
 
-  // Sort by time, then: active before background, then by weight descending
+  // Sort by time, then: anchors first, active before background, then weight desc
   timelineItems.sort((a, b) => {
     if (a.time !== b.time) return a.time - b.time
+    // Anchors always before tasks at the same time
+    if (a.type !== b.type) return a.type === 'anchor' ? -1 : 1
     // For task items at the same time: non-background before background
     const aBg = a.type === 'task' && a.data.isBackground ? 1 : 0
     const bBg = b.type === 'task' && b.data.isBackground ? 1 : 0
