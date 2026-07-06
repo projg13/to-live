@@ -161,7 +161,7 @@ function resolveDay(
       endMinutes: adhoc.startTime + adhoc.durationMinutes,
       isBackground: false,
       source: 'adhoc',
-      weight: Math.max(0, adhoc.weight + (weightOffsets[iKey] ?? 0)),
+      weight: Math.max(1, adhoc.weight + (weightOffsets[iKey] ?? 0)),
       day: dayIndex,
       sourceId: adhoc.id,
       sourceName: 'Adhoc',
@@ -182,7 +182,7 @@ function resolveDay(
         endMinutes: task.durationMinutes,
         isBackground: false,
         source: 'event',
-        weight: Math.max(0, task.weight * 2 + (weightOffsets[iKey] ?? 0)),
+        weight: Math.max(1, task.weight * 2 + (weightOffsets[iKey] ?? 0)),
         day: dayIndex,
         sourceId: event.id,
         sourceName: event.name,
@@ -417,7 +417,7 @@ function resolveDay(
           : undefined
 
         const routineIKey = makeInstanceKey('routine', routine.id, cand.anchorId, cand.task.id)
-        const offsetWeight = Math.max(0, cand.weight + (weightOffsets[routineIKey] ?? 0))
+        const offsetWeight = Math.max(1, cand.weight + (weightOffsets[routineIKey] ?? 0))
 
         if (cand.entry.isBackground) {
            items.push({
@@ -606,7 +606,7 @@ function resolveDay(
         endMinutes: obPlacement + task.durationMinutes,
         isBackground: false,
         source: 'obligation',
-        weight: Math.max(0, taskWeight + (weightOffsets[obIKey] ?? 0)),
+        weight: Math.max(1, taskWeight + (weightOffsets[obIKey] ?? 0)),
         day: dayIndex,
         sourceId: ob.id,
         sourceName: ob.name,
@@ -692,7 +692,7 @@ function resolveDay(
         endMinutes: recPlacement + task.durationMinutes,
         isBackground: false,
         source: 'recovery',
-        weight: Math.max(0, taskWeight + (weightOffsets[recIKey] ?? 0)),
+        weight: Math.max(1, taskWeight + (weightOffsets[recIKey] ?? 0)),
         day: dayIndex,
         sourceId: plan.id,
         sourceName: plan.name,
