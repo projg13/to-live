@@ -98,7 +98,7 @@ function Dashboard() {
   const [customRecalcTime, setCustomRecalcTime] = useState('')
 
   const showDebug = false
-  const showCompleted = false
+  const [showCompleted, setShowCompleted] = useState(false)
   const [debugTimeOverride, setDebugTimeOverride] = useState<number | null>(null)
   const [debugDateOverride, setDebugDateOverride] = useState<string | null>(null)
 
@@ -292,6 +292,22 @@ function Dashboard() {
               </button>
             </div>
           </div>
+          {/* Show completed toggle */}
+          <button
+            onClick={() => setShowCompleted(!showCompleted)}
+            className={`self-center px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border active:scale-95 cursor-pointer ${
+              showCompleted
+                ? 'bg-emerald-950/30 text-emerald-400 border-emerald-800/40'
+                : 'bg-slate-950/65 text-slate-500 border-slate-850 hover:bg-slate-900'
+            }`}
+          >
+            ✓ {showCompleted ? 'Hide Done' : 'Show Done'}
+            {dayDoneItems.length > 0 && (
+              <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                showCompleted ? 'bg-emerald-800/40 text-emerald-300' : 'bg-slate-800 text-slate-400'
+              }`}>{dayDoneItems.length}</span>
+            )}
+          </button>
         </div>
 
         {/* Collapsible Debug Panel */}
