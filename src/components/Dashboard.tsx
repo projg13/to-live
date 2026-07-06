@@ -95,6 +95,7 @@ function Dashboard() {
   const [showOffset, setShowOffset] = useState<string | null>(null)
   const [offsetSign, setOffsetSign] = useState<'+' | '-'>('+')
   const [offsetValue, setOffsetValue] = useState('')
+  const [customRecalcTime, setCustomRecalcTime] = useState('')
 
   const showDebug = false
   const showCompleted = false
@@ -260,6 +261,30 @@ function Dashboard() {
               <UndoIcon />
               Undo
             </button>
+            {/* Custom time recalc */}
+            <div className="flex items-center gap-1.5">
+              <input
+                type="time"
+                value={customRecalcTime}
+                onChange={(e) => setCustomRecalcTime(e.target.value)}
+                className="px-2 py-1.5 rounded-lg text-xs font-mono bg-slate-950 border border-slate-800 text-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none w-24"
+              />
+              <button
+                onClick={() => {
+                  if (!customRecalcTime) return
+                  const [h, m] = customRecalcTime.split(':').map(Number)
+                  scheduler.recalibrateFrom(h * 60 + m, selectedDay)
+                }}
+                disabled={!customRecalcTime}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer border ${
+                  customRecalcTime
+                    ? 'bg-indigo-950/30 hover:bg-indigo-900/30 text-indigo-400 border-indigo-800/30'
+                    : 'bg-slate-950/40 text-slate-600 border-slate-850 cursor-not-allowed'
+                }`}
+              >
+                ⏱ Go
+              </button>
+            </div>
           </div>
         </div>
 

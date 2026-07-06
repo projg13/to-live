@@ -1276,6 +1276,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
       recalibrateFrom: (minutes, day) =>
         set((state) => ({
           lastDoneAt: { ...state.lastDoneAt, [day]: minutes },
+          resolveVersion: state.resolveVersion + 1,
         })),
 
       undo: () =>
