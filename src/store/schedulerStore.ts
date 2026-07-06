@@ -805,21 +805,29 @@ function placeItems(
 
   // Build child map: parentTaskId → [continuous child items]
   // Only continuous children get stitched; discontinuable ones are placed independently
-  const continuousChildrenOf = new Map<string, ScheduledItem[]>()
+  // Build continuous chain: recursively collect all continuous descendants
+  // e.g. A→B(continuous)→C(continuous) = chain [A, B, C]
   const isContinuousChild = new Set<string>()
-  if (parentMap.size > 0) {
+
+  const collectContinuousChain = (taskId: string): ScheduledItem[] => {
+    const directKids: ScheduledItem[] = []
     for (const item of active) {
       const pid = parentMap.get(item.taskId)
-      if (pid) {
+      if (pid === taskId) {
         const rule = continuityOf.get(item.taskId) ?? 'continuous'
         if (rule === 'continuous') {
           isContinuousChild.add(item.taskId)
-          const kids = continuousChildrenOf.get(pid) ?? []
-          kids.push(item)
-          continuousChildrenOf.set(pid, kids)
+          directKids.push(item)
         }
       }
     }
+    // Recurse: each continuous child may have its own continuous children
+    const chain: ScheduledItem[] = []
+    for (const kid of directKids) {
+      chain.push(kid)
+      chain.push(...collectContinuousChain(kid.taskId))
+    }
+    return chain
   }
 
   // Helper to place a single item at a given start
@@ -833,24 +841,25 @@ function placeItems(
   }
 
   for (const item of active) {
-    // Skip continuous children — they get placed when their parent is placed
+    // Skip continuous children — they get placed with their chain root
     if (isContinuousChild.has(item.taskId)) continue
 
     const duration = item.endMinutes - item.startMinutes
-    const children = continuousChildrenOf.get(item.taskId) ?? []
-    const childDuration = children.reduce((sum, c) => sum + (c.endMinutes - c.startMinutes), 0)
-    const totalDuration = duration + childDuration
+
+    // Build the continuous chain for this item (if it's a root/parent)
+    const chain = collectContinuousChain(item.taskId)
+    const chainDuration = chain.reduce((sum, c) => sum + (c.endMinutes - c.startMinutes), 0)
+    const totalDuration = duration + chainDuration
+    const hasContinuousChildren = chain.length > 0
 
     let start = item.startMinutes
 
     // Discontinuable children: ensure they start after parent's end
-    if (parentMap.size > 0 && !isContinuousChild.has(item.taskId)) {
-      const pid = parentMap.get(item.taskId)
-      if (pid) {
-        const parentItem = placed.find((p) => p.taskId === pid)
-        if (parentItem && start < parentItem.endMinutes) {
-          start = parentItem.endMinutes
-        }
+    const pid = parentMap.get(item.taskId)
+    if (pid) {
+      const parentItem = placed.find((p) => p.taskId === pid)
+      if (parentItem && start < parentItem.endMinutes) {
+        start = parentItem.endMinutes
       }
     }
 
@@ -859,10 +868,10 @@ function placeItems(
       continue
     }
 
-    // Try placing the entire block (parent + continuous children) at ideal time
+    // Try placing the entire block (item + continuous chain) at ideal time
     if (!hasConflict(start, totalDuration, occupied)) {
       let cursor = placeAt(item, start)
-      for (const child of children) cursor = placeAt(child, cursor)
+      for (const child of chain) cursor = placeAt(child, cursor)
       continue
     }
 
@@ -874,31 +883,27 @@ function placeItems(
       if (item.expiryTime !== undefined && cursor >= item.expiryTime) break
       if (!hasConflict(cursor, totalDuration, occupied)) {
         let blockCursor = placeAt(item, cursor)
-        for (const child of children) blockCursor = placeAt(child, blockCursor)
+        for (const child of chain) blockCursor = placeAt(child, blockCursor)
         placed_ok = true
         break
       }
       cursor += 5
     }
 
-    // If block doesn't fit, try placing parent alone (children may still fit later)
-    if (!placed_ok) {
+    // Continuous: all-or-nothing — if the block doesn't fit, entire chain is dropped
+    // Discontinuable or no children: place item alone
+    if (!placed_ok && !hasContinuousChildren) {
       cursor = start
       while (cursor + duration <= 1440) {
         if (item.expiryTime !== undefined && cursor >= item.expiryTime) break
         if (!hasConflict(cursor, duration, occupied)) {
-          let blockCursor = placeAt(item, cursor)
-          for (const child of children) {
-            const childDur = child.endMinutes - child.startMinutes
-            if (blockCursor + childDur <= 1440 && !hasConflict(blockCursor, childDur, occupied)) {
-              blockCursor = placeAt(child, blockCursor)
-            }
-          }
+          placeAt(item, cursor)
           break
         }
         cursor += 5
       }
     }
+    // If hasContinuousChildren and block didn't fit → parent + chain all dropped
   }
 
   return placed.sort((a, b) => a.startMinutes - b.startMinutes)
