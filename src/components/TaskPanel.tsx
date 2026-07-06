@@ -374,8 +374,8 @@ function TaskEditor({
                     className="text-xs px-2 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-205 focus:outline-none cursor-pointer"
                   >
                     <option value="">(default)</option>
-                    <option value="continuous">continuous</option>
-                    <option value="discontinuable">discontinuable</option>
+                    <option value="resumable">resumable</option>
+                    <option value="breakable">breakable</option>
                   </select>
                 )}
 

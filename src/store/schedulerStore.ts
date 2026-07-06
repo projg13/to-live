@@ -744,6 +744,8 @@ function resolveDay(
 
 // Place items: sort all by weight, place highest weight first at their ideal time.
 // Lower weight items that conflict get pushed to next available gap.
+// Resumable chains: if any member can't be placed, entire chain is removed.
+// Breakable chains: parent can stay even if child was dropped.
 function placeItems(
   items: ScheduledItem[],
   _slots: { startTime: number; endTime: number; anchorName: string }[],
@@ -757,7 +759,7 @@ function placeItems(
   // Sort by weight descending — highest weight gets first pick of time
   active.sort((a, b) => b.weight - a.weight)
 
-  // Build parent map for ordering + placement constraints
+  // Build parent map for ordering
   const parentMap = new Map<string, string>()
   if (tasks) {
     for (const t of tasks) {
@@ -766,14 +768,12 @@ function placeItems(
   }
 
   // Build link continuity map: childTaskId → continuity rule
-  // Check the parent's links[] to find the continuity for each child
   const continuityOf = new Map<string, string>()
   if (tasks) {
     for (const t of tasks) {
       if (t.links) {
         for (const link of t.links) {
-          // Default continuity is 'continuous' if not specified
-          continuityOf.set(link.linkedTaskId, link.continuity ?? 'continuous')
+          continuityOf.set(link.linkedTaskId, link.continuity ?? 'resumable')
         }
       }
     }
@@ -802,108 +802,89 @@ function placeItems(
 
   const occupied: { start: number; end: number }[] = []
   const placed: ScheduledItem[] = [...background]
+  const placedTaskIds = new Set<string>()
 
-  // Build child map: parentTaskId → [continuous child items]
-  // Only continuous children get stitched; discontinuable ones are placed independently
-  // Build continuous chain: recursively collect all continuous descendants
-  // e.g. A→B(continuous)→C(continuous) = chain [A, B, C]
-  const isContinuousChild = new Set<string>()
-
-  const collectContinuousChain = (taskId: string): ScheduledItem[] => {
-    const directKids: ScheduledItem[] = []
-    for (const item of active) {
-      const pid = parentMap.get(item.taskId)
-      if (pid === taskId) {
-        const rule = continuityOf.get(item.taskId) ?? 'continuous'
-        if (rule === 'continuous') {
-          isContinuousChild.add(item.taskId)
-          directKids.push(item)
-        }
-      }
-    }
-    // Recurse: each continuous child may have its own continuous children
-    const chain: ScheduledItem[] = []
-    for (const kid of directKids) {
-      chain.push(kid)
-      chain.push(...collectContinuousChain(kid.taskId))
-    }
-    return chain
-  }
-
-  // Helper to place a single item at a given start
-  const placeAt = (item: ScheduledItem, start: number) => {
-    const dur = item.endMinutes - item.startMinutes
-    item.startMinutes = start
-    item.endMinutes = start + dur
-    occupied.push({ start, end: start + dur })
-    placed.push(item)
-    return start + dur
-  }
-
+  // Place all items independently by weight order
   for (const item of active) {
-    // Skip continuous children — they get placed with their chain root
-    if (isContinuousChild.has(item.taskId)) continue
-
     const duration = item.endMinutes - item.startMinutes
-
-    // Build the continuous chain for this item (if it's a root/parent)
-    const chain = collectContinuousChain(item.taskId)
-    const chainDuration = chain.reduce((sum, c) => sum + (c.endMinutes - c.startMinutes), 0)
-    const totalDuration = duration + chainDuration
-    const hasContinuousChildren = chain.length > 0
-
     let start = item.startMinutes
 
-    // Discontinuable children: ensure they start after parent's end
-    const pid = parentMap.get(item.taskId)
-    if (pid) {
-      const parentItem = placed.find((p) => p.taskId === pid)
-      if (parentItem && start < parentItem.endMinutes) {
-        start = parentItem.endMinutes
-      }
-    }
+    // Check expiry
+    if (item.expiryTime !== undefined && start >= item.expiryTime) continue
 
-    // Check expiry at ideal position
-    if (item.expiryTime !== undefined && start >= item.expiryTime) {
+    // Try ideal time
+    if (!hasConflict(start, duration, occupied)) {
+      item.startMinutes = start
+      item.endMinutes = start + duration
+      occupied.push({ start, end: start + duration })
+      placed.push(item)
+      placedTaskIds.add(item.taskId)
       continue
     }
 
-    // Try placing the entire block (item + continuous chain) at ideal time
-    if (!hasConflict(start, totalDuration, occupied)) {
-      let cursor = placeAt(item, start)
-      for (const child of chain) cursor = placeAt(child, cursor)
-      continue
-    }
-
-    // Conflict — find gap that fits the entire block
+    // Gap-fill: find next available slot
     let cursor = start
-    let placed_ok = false
-
-    while (cursor + totalDuration <= 1440) {
+    while (cursor + duration <= 1440) {
       if (item.expiryTime !== undefined && cursor >= item.expiryTime) break
-      if (!hasConflict(cursor, totalDuration, occupied)) {
-        let blockCursor = placeAt(item, cursor)
-        for (const child of chain) blockCursor = placeAt(child, blockCursor)
-        placed_ok = true
+      if (!hasConflict(cursor, duration, occupied)) {
+        item.startMinutes = cursor
+        item.endMinutes = cursor + duration
+        occupied.push({ start: cursor, end: cursor + duration })
+        placed.push(item)
+        placedTaskIds.add(item.taskId)
         break
       }
       cursor += 5
     }
+  }
 
-    // Continuous: all-or-nothing — if the block doesn't fit, entire chain is dropped
-    // Discontinuable or no children: place item alone
-    if (!placed_ok && !hasContinuousChildren) {
-      cursor = start
-      while (cursor + duration <= 1440) {
-        if (item.expiryTime !== undefined && cursor >= item.expiryTime) break
-        if (!hasConflict(cursor, duration, occupied)) {
-          placeAt(item, cursor)
-          break
+  // Post-check: resumable chains — if any member wasn't placed, remove ALL
+  if (parentMap.size > 0) {
+    const collectResumableChain = (taskId: string): string[] => {
+      const descendants: string[] = []
+      for (const [childId, pid] of parentMap) {
+        if (pid === taskId) {
+          const rule = continuityOf.get(childId) ?? 'resumable'
+          if (rule === 'resumable') {
+            descendants.push(childId)
+            descendants.push(...collectResumableChain(childId))
+          }
         }
-        cursor += 5
+      }
+      return descendants
+    }
+
+    // Find resumable chain roots
+    const resumableRoots = new Set<string>()
+    for (const [childId] of parentMap) {
+      const rule = continuityOf.get(childId) ?? 'resumable'
+      if (rule === 'resumable') {
+        let root = parentMap.get(childId)!
+        while (parentMap.has(root) && (continuityOf.get(root) ?? 'resumable') === 'resumable') {
+          root = parentMap.get(root)!
+        }
+        resumableRoots.add(root)
       }
     }
-    // If hasContinuousChildren and block didn't fit → parent + chain all dropped
+
+    // For each root, check if all chain members were placed
+    for (const root of resumableRoots) {
+      const chain = [root, ...collectResumableChain(root)]
+      const activeInChain = chain.filter((id) => active.some((a) => a.taskId === id))
+      const allPlaced = activeInChain.every((id) => placedTaskIds.has(id))
+      if (!allPlaced) {
+        // Remove all chain members from placed
+        for (const id of chain) {
+          const idx = placed.findIndex((p) => p.taskId === id)
+          if (idx >= 0) {
+            const item = placed[idx]
+            placed.splice(idx, 1)
+            const occIdx = occupied.findIndex((o) => o.start === item.startMinutes && o.end === item.endMinutes)
+            if (occIdx >= 0) occupied.splice(occIdx, 1)
+          }
+        }
+      }
+    }
   }
 
   return placed.sort((a, b) => a.startMinutes - b.startMinutes)
