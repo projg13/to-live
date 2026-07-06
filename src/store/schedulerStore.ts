@@ -41,7 +41,7 @@ interface SchedulerStore {
   setWeightOffset: (instanceKey: string, offset: number) => void
   clearWeightOffset: (instanceKey: string) => void
   clearRecoveryDone: (planId: string) => void
-  insertTask: (taskId: string, startTime: number, day: number) => void
+
   recalibrateFrom: (minutes: number, day: number) => void
   toggleDebug: () => void
   undo: () => void
@@ -705,28 +705,49 @@ function resolveDay(
 
   } // end dayIndex === 0 guard for obligations + recovery
 
-  // Sort by weight descending, then place sequentially into available time
-  const placed = placeItems(items, [], [], dayConfirmations, context.tasks)
+  // Track which routine tasks were placed before each anchor (for Phase 3 recalculation)
+  const preAnchorRoutineTasks = new Map<string, string[]>()
+  const sortedAnchorIds = resolvedAnchors
+    .sort((a, b) => a.actualTime - b.actualTime)
+    .map((a) => a.anchorId)
+  for (const item of items) {
+    if (item.source !== 'routine' || !item.resetAnchorId) continue
+    const anchorIdx = sortedAnchorIds.indexOf(item.resetAnchorId)
+    // This item belongs to its anchor; record it as "before" all later anchors
+    for (let ai = anchorIdx + 1; ai < sortedAnchorIds.length; ai++) {
+      const laterAnchorId = sortedAnchorIds[ai]
+      if (!preAnchorRoutineTasks.has(laterAnchorId)) preAnchorRoutineTasks.set(laterAnchorId, [])
+      preAnchorRoutineTasks.get(laterAnchorId)!.push(item.taskId)
+    }
+  }
 
-  // Post-placement anchor adjustment: push anchors past any routine items that should be before them
-  // Only consider items whose anchor (resetAnchorId) is EARLIER than the anchor being evaluated
-  const routinePlaced = placed.filter((i) => i.source === 'routine')
-  const sortedAnchors = [...resolvedAnchors].sort((a, b) => a.actualTime - b.actualTime)
-  for (const ra of sortedAnchors) {
+  // Compute overflow cutoff: next day's first anchor or midnight
+  // For day 0, check day 1's anchors. For others, use midnight.
+  const overflowCutoff = 1440 // default midnight
+
+  // Phase 2: Global weight merge — all items compete by weight
+  const { placed, overflow } = placeItems(items, context.tasks, overflowCutoff, debug)
+
+  // Phase 3: Anchor recalculation — push only, never pull
+  for (const ra of resolvedAnchors) {
+    const preAnchorIds = preAnchorRoutineTasks.get(ra.anchorId) ?? []
+    if (preAnchorIds.length === 0) continue
+    // Find the latest end time of surviving pre-anchor routine tasks
     let maxEnd = 0
-    const raIdx = sortedAnchors.indexOf(ra)
-    const earlierAnchorIds = new Set(sortedAnchors.slice(0, raIdx).map((a) => a.anchorId))
-
-    for (const item of routinePlaced) {
-      // Only items from earlier anchors can push this anchor
-      if (!item.resetAnchorId || !earlierAnchorIds.has(item.resetAnchorId)) continue
-      if (item.endMinutes > maxEnd) {
+    for (const tid of preAnchorIds) {
+      const item = placed.find((p) => p.taskId === tid)
+      if (item && item.endMinutes > maxEnd) {
         maxEnd = item.endMinutes
       }
     }
+    // Push only: anchor can move forward, never pull back from idealTime
     if (maxEnd > ra.actualTime) {
-      if (debug) console.log(`  🔀 POST-PLACE ANCHOR PUSH: "${ra.anchorName}" ${ra.actualTime} → ${maxEnd}`)
+      if (debug) console.log(`  🔀 ANCHOR RECALC: "${ra.anchorName}" ${ra.actualTime} → ${maxEnd}`)
       ra.actualTime = maxEnd
+    }
+    // Ensure anchor never goes below idealTime
+    if (ra.actualTime < ra.idealTime) {
+      ra.actualTime = ra.idealTime
     }
   }
 
@@ -737,41 +758,49 @@ function resolveDay(
     confirmedAnchors: dayConfirmations,
     resolvedAnchors,
     items: placed,
+    overflowItems: overflow,
     adhocTasks: dayAdhocs,
   }
 }
 
-// Place items: sort all by weight, place highest weight first at their ideal time.
-// Lower weight items that conflict get pushed to next available gap.
-// Resumable chains: if any member can't be placed, entire chain is removed.
-// Breakable chains: parent can stay even if child was dropped.
+// Phase 2: Global weight-based placement
+// All items (routine + obligation + recovery + adhoc + event) compete by weight.
+// Highest weight gets first pick of time. Lower weight items gap-fill forward.
+// Post-placement: routine items checked for expiry violations, resumable chains enforced.
 function placeItems(
   items: ScheduledItem[],
-  _slots: { startTime: number; endTime: number; anchorName: string }[],
-  _anchors: Anchor[],
-  _confirmations: AnchorConfirmation[],
-  tasks?: Task[]
-): ScheduledItem[] {
+  tasks: Task[],
+  cutoff: number,
+  debug: boolean
+): { placed: ScheduledItem[]; overflow: ScheduledItem[] } {
   const background = items.filter((i) => i.isBackground)
   const active = items.filter((i) => !i.isBackground)
 
   // Sort by weight descending — highest weight gets first pick of time
   active.sort((a, b) => b.weight - a.weight)
 
-  // Build parent map for ordering
+  // Build parent map for ordering (only for tasks in the same block)
   const parentMap = new Map<string, string>()
-  if (tasks) {
-    for (const t of tasks) {
-      if (t.parentId) parentMap.set(t.id, t.parentId)
+  const taskBlockMap = new Map<string, string | undefined>()
+  for (const t of tasks) {
+    taskBlockMap.set(t.id, t.blockId)
+    if (t.parentId) {
+      // Only enforce parent-child if both are in the same block
+      const parentBlock = tasks.find((p) => p.id === t.parentId)?.blockId
+      if (t.blockId && t.blockId === parentBlock) {
+        parentMap.set(t.id, t.parentId)
+      }
     }
   }
 
-  // Build link continuity map: childTaskId → continuity rule
+  // Build link continuity map: childTaskId → continuity rule (same-block only)
   const continuityOf = new Map<string, string>()
-  if (tasks) {
-    for (const t of tasks) {
-      if (t.links) {
-        for (const link of t.links) {
+  for (const t of tasks) {
+    if (t.links) {
+      for (const link of t.links) {
+        // Only evaluate links within same block
+        const childTask = tasks.find((ct) => ct.id === link.linkedTaskId)
+        if (childTask?.blockId && childTask.blockId === t.blockId) {
           continuityOf.set(link.linkedTaskId, link.continuity ?? 'resumable')
         }
       }
@@ -801,6 +830,7 @@ function placeItems(
 
   const occupied: { start: number; end: number }[] = []
   const placed: ScheduledItem[] = [...background]
+  const overflow: ScheduledItem[] = []
   const placedTaskIds = new Set<string>()
 
   // Place all items independently by weight order
@@ -810,7 +840,7 @@ function placeItems(
     const duration = item.endMinutes - item.startMinutes
     let start = item.startMinutes
 
-    // Child tasks always wait for their parent to finish
+    // Child tasks always wait for their parent to finish (same-block only)
     const pid = parentMap.get(item.taskId)
     if (pid) {
       const parentEnd = placedEndByTaskId.get(pid)
@@ -819,11 +849,11 @@ function placeItems(
       }
     }
 
-    // Check expiry
+    // Check expiry before even trying
     if (item.expiryTime !== undefined && start >= item.expiryTime) continue
 
     // Try ideal time
-    if (!hasConflict(start, duration, occupied)) {
+    if (start < cutoff && !hasConflict(start, duration, occupied)) {
       item.startMinutes = start
       item.endMinutes = start + duration
       occupied.push({ start, end: start + duration })
@@ -835,7 +865,8 @@ function placeItems(
 
     // Gap-fill: find next available slot
     let cursor = start
-    while (cursor + duration <= 1440) {
+    let found = false
+    while (cursor + duration <= cutoff) {
       if (item.expiryTime !== undefined && cursor >= item.expiryTime) break
       if (!hasConflict(cursor, duration, occupied)) {
         item.startMinutes = cursor
@@ -844,19 +875,23 @@ function placeItems(
         placed.push(item)
         placedTaskIds.add(item.taskId)
         placedEndByTaskId.set(item.taskId, cursor + duration)
+        found = true
         break
       }
       cursor += 5
     }
+
+    // If can't fit before cutoff → overflow
+    if (!found) {
+      overflow.push(item)
+    }
   }
 
   // Align background children to their parent's actual placement
-  // Passive/background tasks run concurrently with parent, so start at parent's start
   if (parentMap.size > 0) {
     for (const bg of background) {
       const pid = parentMap.get(bg.taskId)
       if (!pid) continue
-      // Find parent in placed (active items)
       const parentItem = placed.find((p) => p.taskId === pid)
       if (parentItem && bg.startMinutes < parentItem.startMinutes) {
         const dur = bg.endMinutes - bg.startMinutes
@@ -866,7 +901,28 @@ function placeItems(
     }
   }
 
-  // Post-check: resumable chains — if any member wasn't placed, remove ALL
+  // Post-check: routine items pushed past their expiry → purge
+  const expiredRoutineIds = new Set<string>()
+  for (const item of placed) {
+    if (item.source !== 'routine') continue
+    if (item.expiryTime !== undefined && item.startMinutes >= item.expiryTime) {
+      expiredRoutineIds.add(item.taskId)
+      if (debug) console.log(`  ⏰ POST-PURGE: ${item.title} expired (start=${item.startMinutes} >= expiry=${item.expiryTime})`)
+    }
+  }
+  // Remove expired items
+  for (const id of expiredRoutineIds) {
+    const idx = placed.findIndex((p) => p.taskId === id)
+    if (idx >= 0) {
+      const item = placed[idx]
+      placed.splice(idx, 1)
+      const occIdx = occupied.findIndex((o) => o.start === item.startMinutes && o.end === item.endMinutes)
+      if (occIdx >= 0) occupied.splice(occIdx, 1)
+      placedTaskIds.delete(id)
+    }
+  }
+
+  // Post-check: resumable chains — if any member wasn't placed, remove ALL (same-block only)
   if (parentMap.size > 0) {
     const collectResumableChain = (taskId: string): string[] => {
       const descendants: string[] = []
@@ -901,6 +957,7 @@ function placeItems(
       const activeInChain = chain.filter((id) => active.some((a) => a.taskId === id))
       const allPlaced = activeInChain.every((id) => placedTaskIds.has(id))
       if (!allPlaced) {
+        if (debug) console.log(`  🔗 CHAIN DROP: [${chain.join(', ')}] — not all members placed`)
         // Remove all chain members from placed
         for (const id of chain) {
           const idx = placed.findIndex((p) => p.taskId === id)
@@ -915,7 +972,10 @@ function placeItems(
     }
   }
 
-  return placed.sort((a, b) => a.startMinutes - b.startMinutes)
+  return {
+    placed: placed.sort((a, b) => a.startMinutes - b.startMinutes),
+    overflow
+  }
 }
 
 function hasConflict(start: number, duration: number, occupied: { start: number; end: number }[]): boolean {
@@ -1176,24 +1236,6 @@ export const useSchedulerStore = create<SchedulerStore>()(
           resolveVersion: state.resolveVersion + 1,
         })),
 
-      insertTask: (taskId, startTime, day) => {
-        // Find actual task to get title and duration from context
-        const allTasks = JSON.parse(localStorage.getItem('to-live-tasks') ?? '{}')?.state?.tasks ?? []
-        const task = allTasks.find((t: any) => t.id === taskId)
-        const title = task?.title ?? taskId
-        const duration = task?.durationMinutes ?? 30
-
-        set((state) => ({
-          adhocTasks: [...state.adhocTasks, {
-            id: `insert-${taskId}-${Date.now()}`,
-            title,
-            durationMinutes: duration,
-            startTime,
-            day,
-            weight: 500,
-          }],
-        }))
-      },
 
       recalibrateFrom: (minutes, day) =>
         set((state) => ({

@@ -6,18 +6,16 @@ export interface TaskLink {
   continuity?: ContinuityRule // resumable = all-or-nothing, breakable = parent can exist without child
 }
 
-// Piecewise weight: weight varies over absolute datetime
+// Piecewise weight: weight varies over time of day (24h circular)
 export interface WeightPoint {
-  datetime: string            // ISO datetime
+  time: number                // minutes from midnight (0–1439)
   value: number
 }
 
 export interface TaskKnobs {
-  scheduled: boolean       // enables start/end
   isMother: boolean        // enables links[]
   hasWeightCurve: boolean  // enables weightCurve[]
   hasExpiry: boolean       // enables expiresAt
-  hasStickiness: boolean   // enables stickiness
 }
 
 // Task: a quantum of time consumption
@@ -28,21 +26,14 @@ export interface Task {
   weight: number
   durationMinutes: number         // the measure — always required
 
-  // Knobbed: scheduled
-  start?: string
-  end?: string
-
   // Knobbed: isMother (links to other tasks)
   links?: TaskLink[]
 
-  // Knobbed: hasWeightCurve (piecewise weight over absolute datetime)
+  // Knobbed: hasWeightCurve (24h circular weight over time of day)
   weightCurve?: WeightPoint[]
 
   // Knobbed: hasExpiry
   expiresAt?: string              // ISO datetime — when this task gets killed
-
-  // Knobbed: hasStickiness
-  stickiness?: number             // how resistant this task is to being displaced
 
   // Runtime tracking
   spawnedIds?: string[]           // which links have fired

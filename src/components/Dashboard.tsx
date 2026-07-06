@@ -57,17 +57,7 @@ const CheckIcon = () => (
 
 
 
-const ArrowUpIcon = () => (
-  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-  </svg>
-)
 
-const ArrowDownIcon = () => (
-  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-  </svg>
-)
 
 const TrashIcon = () => (
   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -97,12 +87,10 @@ function Dashboard() {
 
   const [selectedDay, setSelectedDay] = useState(0)
   const [showAdhocForm, setShowAdhocForm] = useState(false)
-  const [showInsertForm, setShowInsertForm] = useState(false)
   const [showRecovery, setShowRecovery] = useState(false)
 
   const [showDoneAt, setShowDoneAt] = useState<string | null>(null)
   const [doneAtTime, setDoneAtTime] = useState('')
-  const [showInsertAt, setShowInsertAt] = useState<{ taskId: string; position: 'above' | 'below' } | null>(null)
   const [showInfo, setShowInfo] = useState<string | null>(null)
   const [editingAdhocId, setEditingAdhocId] = useState<string | null>(null)
   const [showOffset, setShowOffset] = useState<string | null>(null)
@@ -441,7 +429,6 @@ function Dashboard() {
               <button
                 onClick={() => {
                   setShowAdhocForm(!showAdhocForm)
-                  setShowInsertForm(false)
                   setShowRecovery(false)
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold tracking-wide transition-all border cursor-pointer ${
@@ -455,24 +442,8 @@ function Dashboard() {
               </button>
               <button
                 onClick={() => {
-                  setShowInsertForm(!showInsertForm)
-                  setShowAdhocForm(false)
-                  setShowRecovery(false)
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold tracking-wide transition-all border cursor-pointer ${
-                  showInsertForm
-                    ? 'bg-cyan-500 border-transparent text-slate-950 shadow-md shadow-cyan-950/40'
-                    : 'bg-cyan-950/20 text-cyan-400 hover:bg-cyan-950/40 border-cyan-800/30'
-                }`}
-              >
-                <PlusIcon />
-                Insert
-              </button>
-              <button
-                onClick={() => {
                   setShowRecovery(!showRecovery)
                   setShowAdhocForm(false)
-                  setShowInsertForm(false)
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold tracking-wide transition-all border cursor-pointer ${
                   showRecovery
@@ -496,19 +467,6 @@ function Dashboard() {
                   setShowAdhocForm(false)
                 }}
                 onCancel={() => setShowAdhocForm(false)}
-              />
-            </div>
-          )}
-
-          {showInsertForm && (
-            <div className="bg-slate-950/30 border border-slate-850 rounded-2xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
-              <InsertTaskForm
-                tasks={tasks}
-                onInsert={(taskId, startTime) => {
-                  scheduler.insertTask(taskId, startTime, selectedDay)
-                  setShowInsertForm(false)
-                }}
-                onCancel={() => setShowInsertForm(false)}
               />
             </div>
           )}
@@ -732,22 +690,6 @@ function Dashboard() {
                             </button>
                           </>
                         )}
-                        <button
-                          onClick={() => setShowInsertAt({ taskId: item.taskId, position: 'above' })}
-                          className="p-1 px-1.5 rounded-xl bg-slate-950/40 hover:bg-slate-900 text-slate-400 transition-all flex items-center gap-0.5 border border-slate-850 cursor-pointer"
-                          title="Insert above"
-                        >
-                          <ArrowUpIcon />
-                          <span className="text-[9px]">above</span>
-                        </button>
-                        <button
-                          onClick={() => setShowInsertAt({ taskId: item.taskId, position: 'below' })}
-                          className="p-1 px-1.5 rounded-xl bg-slate-950/40 hover:bg-slate-900 text-slate-400 transition-all flex items-center gap-0.5 border border-slate-850 cursor-pointer"
-                          title="Insert below"
-                        >
-                          <ArrowDownIcon />
-                          <span className="text-[9px]">below</span>
-                        </button>
                       </div>
                     </div>
 
@@ -946,25 +888,6 @@ function Dashboard() {
                       </div>
                     )}
 
-                    {/* Conditional: Insert above/below */}
-                    {showInsertAt?.taskId === item.taskId && (
-                      <div className="mt-3 bg-slate-950 border border-slate-850 rounded-xl p-3">
-                        <InlineInsertForm
-                          tasks={tasks}
-                          targetTime={showInsertAt.position === 'above' ? item.startMinutes : item.endMinutes}
-                          label={
-                            showInsertAt.position === 'above'
-                              ? `Insert above (@ ${formatTime(item.startMinutes)})`
-                              : `Insert below (@ ${formatTime(item.endMinutes)})`
-                          }
-                          onInsert={(taskId, startTime) => {
-                            scheduler.insertTask(taskId, startTime, selectedDay)
-                            setShowInsertAt(null)
-                          }}
-                          onCancel={() => setShowInsertAt(null)}
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
               )
@@ -1060,157 +983,6 @@ function AdhocTaskForm({
           Add Task
         </button>
       </div>
-    </div>
-  )
-}
-
-function InlineInsertForm({
-  tasks,
-  targetTime,
-  onInsert,
-  onCancel,
-  label,
-}: {
-  tasks: { id: string; title: string; durationMinutes: number }[]
-  targetTime: number
-  label: string
-  onInsert: (taskId: string, startTime: number) => void
-  onCancel: () => void
-}) {
-  const [search, setSearch] = useState('')
-  const filtered = tasks.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()))
-
-  return (
-    <div className="space-y-3">
-      <span className="text-xs font-bold text-slate-400">{label}</span>
-      <div className="relative">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search registered tasks to insert..."
-          className="w-full text-xs px-3.5 py-2.5 bg-slate-955 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none placeholder-slate-500"
-        />
-        {search && filtered.length > 0 && (
-          <div className="absolute z-20 w-full mt-1.5 max-h-40 overflow-y-auto bg-slate-900 border border-slate-800 rounded-xl shadow-lg p-1.5 divide-y divide-slate-850">
-            {filtered.slice(0, 8).map((t) => (
-              <div
-                key={t.id}
-                onClick={() => onInsert(t.id, targetTime)}
-                className="px-3 py-2 text-xs text-slate-300 hover:text-cyan-400 hover:bg-slate-850/50 cursor-pointer rounded-lg font-bold transition-all"
-              >
-                {t.title} <span className="text-slate-500 font-normal text-[10px] ml-1.5">({t.durationMinutes} min)</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="flex justify-end">
-        <button
-          onClick={onCancel}
-          className="px-3.5 py-1.5 text-[11px] font-semibold text-slate-450 hover:text-slate-200 rounded-lg hover:bg-slate-900 transition-all cursor-pointer"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function InsertTaskForm({
-  tasks,
-  onInsert,
-  onCancel,
-}: {
-  tasks: { id: string; title: string; durationMinutes: number }[]
-  onInsert: (taskId: string, startTime: number) => void
-  onCancel: () => void
-}) {
-  const [search, setSearch] = useState('')
-  const [selectedTaskId, setSelectedTaskId] = useState('')
-  const [startTime, setStartTime] = useState('')
-
-  const filtered = tasks.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()))
-
-  return (
-    <div className="space-y-4">
-      <h3 className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
-        <PlusIcon /> Insert Task
-      </h3>
-      
-      {!selectedTaskId ? (
-        <div className="space-y-3">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search registered tasks..."
-            className="w-full text-sm px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none"
-          />
-          {search && filtered.length > 0 && (
-            <div className="max-h-40 overflow-y-auto bg-slate-950 border border-slate-800 rounded-xl p-1.5 shadow-inner divide-y divide-slate-850">
-              {filtered.slice(0, 10).map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => {
-                    setSelectedTaskId(t.id)
-                    setSearch(t.title)
-                  }}
-                  className="px-3 py-2 text-xs font-semibold text-slate-350 hover:text-cyan-400 hover:bg-slate-900 cursor-pointer rounded-lg transition-all"
-                >
-                  {t.title} <span className="text-slate-500 font-normal ml-1">({t.durationMinutes}min)</span>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex justify-end">
-            <button
-              onClick={onCancel}
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-955 hover:bg-slate-900 text-slate-400 border border-slate-800 transition-all cursor-pointer"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950 p-3.5 border border-slate-850 rounded-xl">
-          <div className="text-sm font-semibold text-slate-300">
-            Selected: <span className="text-cyan-400 font-bold">{search}</span>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl px-3 text-xs">
-              <span className="text-slate-450 font-semibold mr-1.5">Start at:</span>
-              <input
-                type="time"
-                defaultValue={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="bg-transparent border-none text-slate-200 focus:outline-none py-1.5 cursor-pointer"
-              />
-            </div>
-            <button
-              onClick={() => {
-                if (startTime) {
-                  const [h, m] = startTime.split(':').map(Number)
-                  onInsert(selectedTaskId, (h || 0) * 60 + (m || 0))
-                }
-              }}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-950 shadow-md shadow-cyan-950/40 transition-all active:scale-95 cursor-pointer"
-            >
-              Insert
-            </button>
-            <button
-              onClick={() => {
-                setSelectedTaskId('')
-                setSearch('')
-                setStartTime('')
-              }}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-450 hover:text-slate-250 hover:bg-slate-900 border border-slate-850 transition-all cursor-pointer"
-            >
-              Back
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

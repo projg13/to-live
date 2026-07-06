@@ -53,5 +53,6 @@ export interface DaySchedule {
   confirmedAnchors: AnchorConfirmation[]
   resolvedAnchors: ResolvedAnchor[]  // actual anchor positions after overflow
   items: ScheduledItem[]     // resolved task placements, sorted by startMinutes
+  overflowItems: ScheduledItem[]  // tasks that couldn't fit before cutoff
   adhocTasks: AdhocTask[]    // user-added on-the-fly tasks
 }

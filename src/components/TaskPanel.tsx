@@ -107,11 +107,6 @@ function TaskPanel() {
                 </div>
 
                 <div className="flex flex-wrap gap-1.5 mt-3">
-                  {task.knobs.scheduled && task.start && (
-                    <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-cyan-955/35 text-cyan-400 border border-cyan-900/30">
-                      Scheduled
-                    </span>
-                  )}
                   {task.knobs.isMother && task.links && task.links.length > 0 && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-teal-955/35 text-teal-400 border border-teal-905/30">
                       <LinkIcon /> Links: {task.links.length}
@@ -162,29 +157,20 @@ function TaskEditor({
   const [duration, setDuration] = useState(initial?.durationMinutes ?? 30)
 
   // Knobs
-  const [scheduled, setScheduled] = useState(initial?.knobs.scheduled ?? false)
   const [isMother, setIsMother] = useState(initial?.knobs.isMother ?? false)
   const [hasWeightCurve, setHasWeightCurve] = useState(initial?.knobs.hasWeightCurve ?? false)
   const [hasExpiry, setHasExpiry] = useState(initial?.knobs.hasExpiry ?? false)
-  const [hasStickiness, setHasStickiness] = useState(initial?.knobs.hasStickiness ?? false)
-
-  // Scheduled fields
-  const [start, setStart] = useState(initial?.start ?? '')
-  const [end, setEnd] = useState(initial?.end ?? '')
 
   // Links
   const [links, setLinks] = useState<TaskLink[]>(initial?.links ?? [])
 
-  // Weight curve
-  const [weightCurve, setWeightCurve] = useState<{ datetime: string; value: number }[]>(
+  // Weight curve (24h circular, time-of-day)
+  const [weightCurve, setWeightCurve] = useState<{ time: number; value: number }[]>(
     initial?.weightCurve ?? []
   )
 
   // Expiry
   const [expiresAt, setExpiresAt] = useState(initial?.expiresAt ?? '')
-
-  // Stickiness
-  const [stickiness, setStickiness] = useState(initial?.stickiness ?? 0)
 
   const handleSave = () => {
     if (!title.trim() || duration <= 0) return
@@ -193,15 +179,12 @@ function TaskEditor({
       title: title.trim(),
       weight,
       durationMinutes: duration,
-      start: scheduled ? start : undefined,
-      end: scheduled ? end : undefined,
       links: isMother ? links : undefined,
       weightCurve: hasWeightCurve ? weightCurve : undefined,
       expiresAt: hasExpiry ? expiresAt : undefined,
-      stickiness: hasStickiness ? stickiness : undefined,
       spawnedIds: initial?.spawnedIds,
       parentId: initial?.parentId,
-      knobs: { scheduled, isMother, hasWeightCurve, hasExpiry, hasStickiness },
+      knobs: { isMother, hasWeightCurve, hasExpiry },
     })
   }
 
@@ -254,11 +237,9 @@ function TaskEditor({
         </label>
         <div className="flex flex-wrap gap-2">
           {[
-            { id: 'scheduled', label: 'Scheduled', checked: scheduled, set: setScheduled },
             { id: 'isMother', label: 'Mother Task', checked: isMother, set: setIsMother },
             { id: 'hasWeightCurve', label: 'Weight Curve', checked: hasWeightCurve, set: setHasWeightCurve },
             { id: 'hasExpiry', label: 'Expiry Date', checked: hasExpiry, set: setHasExpiry },
-            { id: 'hasStickiness', label: 'Stickiness', checked: hasStickiness, set: setHasStickiness },
           ].map((k) => (
             <label
               key={k.id}
@@ -279,39 +260,6 @@ function TaskEditor({
           ))}
         </div>
       </div>
-
-      {/* Scheduled Configuration */}
-      {scheduled && (
-        <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-            Target Timebounds
-          </span>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">
-                Start DateTime
-              </label>
-              <input
-                type="datetime-local"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-                className="text-xs px-2.5 py-1.5 w-full bg-slate-955 border border-slate-800 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider block mb-1">
-                End DateTime
-              </label>
-              <input
-                type="datetime-local"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-                className="text-xs px-2.5 py-1.5 w-full bg-slate-955 border border-slate-800 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Link chains */}
       {isMother && (
@@ -392,11 +340,12 @@ function TaskEditor({
             {weightCurve.map((wp, i) => (
               <div key={i} className="flex items-center gap-2 text-xs flex-wrap bg-slate-955 border border-slate-850 p-2 rounded-xl">
                 <input
-                  type="datetime-local"
-                  value={wp.datetime}
+                  type="time"
+                  value={`${String(Math.floor(wp.time / 60)).padStart(2, '0')}:${String(wp.time % 60).padStart(2, '0')}`}
                   onChange={(e) => {
+                    const [h, m] = e.target.value.split(':').map(Number)
                     const updated = [...weightCurve]
-                    updated[i] = { ...updated[i], datetime: e.target.value }
+                    updated[i] = { ...updated[i], time: (h || 0) * 60 + (m || 0) }
                     setWeightCurve(updated)
                   }}
                   className="text-xs px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded text-slate-305 cursor-pointer focus:outline-none"
@@ -424,7 +373,7 @@ function TaskEditor({
           </div>
 
           <button
-            onClick={() => setWeightCurve([...weightCurve, { datetime: '', value: weight }])}
+            onClick={() => setWeightCurve([...weightCurve, { time: 540, value: weight }])}
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-955 hover:bg-slate-900 text-slate-350 border border-slate-850 transition-all cursor-pointer"
           >
             <PlusIcon /> Add Point
@@ -447,20 +396,7 @@ function TaskEditor({
         </div>
       )}
 
-      {/* Stickiness parameter */}
-      {hasStickiness && (
-        <div className="space-y-2 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-            Stickiness Weight Boost
-          </label>
-          <input
-            type="number"
-            value={stickiness}
-            onChange={(e) => setStickiness(Number(e.target.value) || 0)}
-            className="text-xs px-2.5 py-1.5 w-32 bg-slate-955 border border-slate-800 rounded-lg text-slate-300 focus:outline-none"
-          />
-        </div>
-      )}
+
 
       {/* Save / Discard Actions */}
       <div className="flex items-center justify-between border-t border-slate-800 pt-4 mt-4">
