@@ -27,6 +27,11 @@ function migrateContinuityRule() {
           link.continuity = 'breakable'
           changed = true
         }
+        // Remove deprecated linkType field
+        if ('linkType' in link) {
+          delete link.linkType
+          changed = true
+        }
       }
     }
 

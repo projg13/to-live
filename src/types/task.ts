@@ -1,11 +1,9 @@
-export type LinkType = 'active' | 'passive'
 export type ContinuityRule = 'resumable' | 'breakable'
 
 // A link from this task to another task
 export interface TaskLink {
   linkedTaskId: string        // the task being linked to
-  linkType: LinkType          // active = foreground, passive = background
-  continuity?: ContinuityRule // only meaningful for passive links
+  continuity?: ContinuityRule // resumable = all-or-nothing, breakable = parent can exist without child
 }
 
 // Piecewise weight: weight varies over absolute datetime

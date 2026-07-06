@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTaskStore } from '../store/taskStore'
-import type { Task, TaskLink, LinkType, ContinuityRule } from '../types/task'
+import type { Task, TaskLink, ContinuityRule } from '../types/task'
 
 // Icons
 const PlusIcon = () => (
@@ -327,21 +327,6 @@ function TaskEditor({
                 className="flex flex-wrap items-center gap-2 bg-slate-950/60 border border-slate-850 p-2 rounded-xl"
               >
                 <select
-                  value={link.linkType}
-                  onChange={(e) => {
-                    const updated = [...links]
-                    updated[i] = { ...updated[i], linkType: e.target.value as LinkType }
-                    setLinks(updated)
-                  }}
-                  className="text-xs px-2 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-205 focus:outline-none cursor-pointer"
-                >
-                  <option value="active">active</option>
-                  <option value="passive">passive</option>
-                </select>
-
-                <span className="text-slate-500 text-xs">→</span>
-
-                <select
                   value={link.linkedTaskId}
                   onChange={(e) => {
                     const updated = [...links]
@@ -360,24 +345,22 @@ function TaskEditor({
                     ))}
                 </select>
 
-                {link.linkType === 'passive' && (
-                  <select
-                    value={link.continuity ?? ''}
-                    onChange={(e) => {
-                      const updated = [...links]
-                      updated[i] = {
-                        ...updated[i],
-                        continuity: (e.target.value || undefined) as ContinuityRule | undefined,
-                      }
-                      setLinks(updated)
-                    }}
-                    className="text-xs px-2 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-205 focus:outline-none cursor-pointer"
-                  >
-                    <option value="">(default)</option>
-                    <option value="resumable">resumable</option>
-                    <option value="breakable">breakable</option>
-                  </select>
-                )}
+                <select
+                  value={link.continuity ?? ''}
+                  onChange={(e) => {
+                    const updated = [...links]
+                    updated[i] = {
+                      ...updated[i],
+                      continuity: (e.target.value || undefined) as ContinuityRule | undefined,
+                    }
+                    setLinks(updated)
+                  }}
+                  className="text-xs px-2 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-205 focus:outline-none cursor-pointer"
+                >
+                  <option value="">(default)</option>
+                  <option value="resumable">resumable</option>
+                  <option value="breakable">breakable</option>
+                </select>
 
                 <button
                   onClick={() => setLinks(links.filter((_, j) => j !== i))}
@@ -390,7 +373,7 @@ function TaskEditor({
           </div>
 
           <button
-            onClick={() => setLinks([...links, { linkedTaskId: '', linkType: 'active' }])}
+            onClick={() => setLinks([...links, { linkedTaskId: '' }])}
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-955 hover:bg-slate-900 text-slate-350 border border-slate-850 transition-all cursor-pointer"
           >
             <PlusIcon /> Add Link

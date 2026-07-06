@@ -183,7 +183,7 @@ function BlockEditor({
         newEntries.push({
           taskId: linked.id,
           order: insertOrder++,
-          isBackground: link.linkType === 'passive',
+          isBackground: false,
         })
         // Set parentId for ancestor-skip propagation
         if (linked.parentId !== current.id) {
