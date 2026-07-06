@@ -791,60 +791,89 @@ function placeItems(
 
   const occupied: { start: number; end: number }[] = []
   const placed: ScheduledItem[] = [...background]
-  // Track where each task was actually placed, so children can't start before parent ends
-  const placedEndByTaskId = new Map<string, number>()
 
-  for (const item of active) {
-    const duration = item.endMinutes - item.startMinutes
-
-    // Try placing at ideal startMinutes first
-    let start = item.startMinutes
-
-    // If this task has a parent, it can't start before the parent's end
-    if (parentMap.size > 0) {
+  // Build child map: parentTaskId → [child items in order]
+  const childrenOf = new Map<string, ScheduledItem[]>()
+  const isChild = new Set<string>()
+  if (parentMap.size > 0) {
+    for (const item of active) {
       const pid = parentMap.get(item.taskId)
       if (pid) {
-        const parentEnd = placedEndByTaskId.get(pid)
-        if (parentEnd !== undefined && start < parentEnd) {
-          start = parentEnd
-        }
+        isChild.add(item.taskId)
+        const kids = childrenOf.get(pid) ?? []
+        kids.push(item)
+        childrenOf.set(pid, kids)
       }
     }
+  }
+
+  // Helper to place a single item at a given start
+  const placeAt = (item: ScheduledItem, start: number) => {
+    const dur = item.endMinutes - item.startMinutes
+    item.startMinutes = start
+    item.endMinutes = start + dur
+    occupied.push({ start, end: start + dur })
+    placed.push(item)
+    return start + dur
+  }
+
+  for (const item of active) {
+    // Skip children — they get placed when their parent is placed
+    if (isChild.has(item.taskId)) continue
+
+    const duration = item.endMinutes - item.startMinutes
+    const children = childrenOf.get(item.taskId) ?? []
+    const childDuration = children.reduce((sum, c) => sum + (c.endMinutes - c.startMinutes), 0)
+    const totalDuration = duration + childDuration
+
+    let start = item.startMinutes
 
     // Check expiry at ideal position
     if (item.expiryTime !== undefined && start >= item.expiryTime) {
-      continue // already past expiry, drop
-    }
-
-    if (!hasConflict(start, duration, occupied)) {
-      item.startMinutes = start
-      item.endMinutes = start + duration
-      occupied.push({ start, end: start + duration })
-      placed.push(item)
-      placedEndByTaskId.set(item.taskId, start + duration)
       continue
     }
 
-    // Conflict at ideal time — find next available gap from ideal start
-    let cursor = start
+    // Try placing the entire block (parent + children) at ideal time
+    if (!hasConflict(start, totalDuration, occupied)) {
+      let cursor = placeAt(item, start)
+      for (const child of children) cursor = placeAt(child, cursor)
+      continue
+    }
 
-    while (cursor + duration <= 1440) {
-      // If scanning past expiry, drop the task
-      if (item.expiryTime !== undefined && cursor >= item.expiryTime) {
-        break
-      }
-      if (!hasConflict(cursor, duration, occupied)) {
-        item.startMinutes = cursor
-        item.endMinutes = cursor + duration
-        occupied.push({ start: cursor, end: cursor + duration })
-        placed.push(item)
-        placedEndByTaskId.set(item.taskId, cursor + duration)
+    // Conflict — find gap that fits the entire block
+    let cursor = start
+    let placed_ok = false
+
+    while (cursor + totalDuration <= 1440) {
+      if (item.expiryTime !== undefined && cursor >= item.expiryTime) break
+      if (!hasConflict(cursor, totalDuration, occupied)) {
+        let blockCursor = placeAt(item, cursor)
+        for (const child of children) blockCursor = placeAt(child, blockCursor)
+        placed_ok = true
         break
       }
       cursor += 5
     }
 
-    // If no space before expiry or end of day, task is dropped
+    // If block doesn't fit, try placing parent alone (children may still fit later)
+    if (!placed_ok) {
+      cursor = start
+      while (cursor + duration <= 1440) {
+        if (item.expiryTime !== undefined && cursor >= item.expiryTime) break
+        if (!hasConflict(cursor, duration, occupied)) {
+          let blockCursor = placeAt(item, cursor)
+          // Try stitching children immediately after
+          for (const child of children) {
+            const childDur = child.endMinutes - child.startMinutes
+            if (blockCursor + childDur <= 1440 && !hasConflict(blockCursor, childDur, occupied)) {
+              blockCursor = placeAt(child, blockCursor)
+            }
+          }
+          break
+        }
+        cursor += 5
+      }
+    }
   }
 
   return placed.sort((a, b) => a.startMinutes - b.startMinutes)
