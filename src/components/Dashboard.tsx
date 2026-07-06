@@ -8,7 +8,6 @@ import { useObligationStore } from '../store/obligationStore'
 import { useRecoveryStore } from '../store/recoveryStore'
 import { usePlannerStore } from '../store/plannerStore'
 import { formatTime } from '../types/anchor'
-import { exportFullState, importFullState, downloadJSON, loadJSONFile, resetAllStores } from '../stateIO'
 import type { AdhocTask, ScheduledItem } from '../types/scheduler'
 import type { ResolveContext } from '../store/schedulerStore'
 
@@ -307,58 +306,6 @@ function Dashboard() {
             </div>
           </div>
         )}
-      </div>
-
-      {/* State Management */}
-      <div className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mr-2">State</span>
-          <button
-            onClick={() => {
-              const snapshot = exportFullState()
-              const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-              downloadJSON(snapshot, `to-live-state-${ts}.json`)
-            }}
-            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-slate-950/65 hover:bg-slate-900 text-emerald-400 border border-slate-850 transition-all active:scale-95 cursor-pointer"
-          >
-            ↓ Export State
-          </button>
-          <button
-            onClick={async () => {
-              try {
-                const data = await loadJSONFile()
-                if (confirm('This will replace ALL app state and reload. Continue?')) {
-                  importFullState(data)
-                }
-              } catch (e: any) {
-                if (e?.message !== 'No file selected') alert(e?.message ?? 'Import failed')
-              }
-            }}
-            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-slate-950/65 hover:bg-slate-900 text-cyan-400 border border-slate-850 transition-all active:scale-95 cursor-pointer"
-          >
-            ↑ Import State
-          </button>
-          <button
-            onClick={() => {
-              const snapshot = exportFullState()
-              snapshot._meta.type = 'defaults'
-              downloadJSON(snapshot, 'to-live-defaults.json')
-            }}
-            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-slate-950/65 hover:bg-slate-900 text-indigo-400 border border-slate-850 transition-all active:scale-95 cursor-pointer"
-          >
-            ⬡ Save as Defaults
-          </button>
-          <button
-            onClick={() => {
-              if (confirm('Reset ALL stores to factory defaults? This cannot be undone.')) {
-                resetAllStores()
-              }
-            }}
-            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-slate-950/65 hover:bg-slate-900 text-rose-400 border border-slate-850 transition-all active:scale-95 cursor-pointer"
-          >
-            ✕ Reset Defaults
-          </button>
-        </div>
       </div>
 
       {/* Week tabs */}
