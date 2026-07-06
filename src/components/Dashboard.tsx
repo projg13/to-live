@@ -589,10 +589,17 @@ function Dashboard() {
                           w:{Math.round(item.weight)}
                         </span>
 
-                        {/* Read-only: expected end + expiry remaining */}
-                        <span className="text-[10px] font-mono text-slate-500 tracking-wide">
-                          ends {formatTime(item.endMinutes)}
-                        </span>
+                        {/* Read-only: time remaining + expiry remaining */}
+                        {!isDone && item.endMinutes > virtualTime && (
+                          <span className="text-[10px] font-mono text-slate-450 tracking-wide">
+                            {(() => {
+                              const rem = item.endMinutes - virtualTime
+                              const h = Math.floor(rem / 60)
+                              const m = rem % 60
+                              return h > 0 ? `${h}h ${m}m left` : `${m}m left`
+                            })()}
+                          </span>
+                        )}
                         {item.expiryTime !== undefined && (
                           <span className={`text-[10px] font-mono font-bold tracking-wide px-1.5 py-0.5 rounded-md border ${
                             item.expiryTime - virtualTime <= 15
