@@ -764,6 +764,7 @@ function Dashboard() {
                             } else {
                               scheduler.markDone(item.instanceKey)
                             }
+                            setDebugTimeOverride(null) // Return to live clock
                             setShowDoneAt(null)
                             setDoneAtTime('')
                           }}
@@ -774,6 +775,7 @@ function Dashboard() {
                         <button
                           onClick={() => {
                             scheduler.markDone(item.instanceKey)
+                            setDebugTimeOverride(null) // Return to live clock
                             setShowDoneAt(null)
                             setDoneAtTime('')
                           }}

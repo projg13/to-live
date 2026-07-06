@@ -1165,9 +1165,12 @@ export const useSchedulerStore = create<SchedulerStore>()(
             ? [...state.doneItems.filter((i) => i.instanceKey !== instanceKey), item]
             : state.doneItems
 
+          const { [instanceKey]: _dropCommit, ...remainingCommits } = state.committedTasks
+
           const result: Partial<SchedulerStore> = {
             doneTasks: [...state.doneTasks.filter((id) => id !== completionKey), completionKey],
             doneItems: newDoneItems,
+            committedTasks: remainingCommits,
             resolveVersion: state.resolveVersion + 1,
           }
 
@@ -1228,9 +1231,12 @@ export const useSchedulerStore = create<SchedulerStore>()(
             newDoneItems.push(item)
           }
 
+          const { [instanceKey]: _dropCommit, ...remainingCommits } = state.committedTasks
+
           return {
             doneTasks: allDoneIds,
             doneItems: newDoneItems,
+            committedTasks: remainingCommits,
             lastDoneAt: { ...state.lastDoneAt, [day]: doneAtMinutes },
             resolveVersion: state.resolveVersion + 1,
           }
