@@ -189,8 +189,18 @@ function Dashboard() {
     }
   }
 
-  // Sort by time
-  timelineItems.sort((a, b) => a.time - b.time)
+  // Sort by time, then: active before background, then by weight descending
+  timelineItems.sort((a, b) => {
+    if (a.time !== b.time) return a.time - b.time
+    // For task items at the same time: non-background before background
+    const aBg = a.type === 'task' && a.data.isBackground ? 1 : 0
+    const bBg = b.type === 'task' && b.data.isBackground ? 1 : 0
+    if (aBg !== bBg) return aBg - bBg
+    // Then by weight descending (heavier = more important = first)
+    const aW = a.type === 'task' ? (a.data.weight ?? 0) : 0
+    const bW = b.type === 'task' ? (b.data.weight ?? 0) : 0
+    return bW - aW
+  })
 
   return (
     <div className="space-y-6">
