@@ -28,7 +28,7 @@ const managePanels = [
 type ManagePanel = (typeof managePanels)[number]
 
 function App() {
-  const [tab, setTab] = useState<'dashboard' | 'manage'>('manage')
+  const [tab, setTab] = useState<'dashboard' | 'manage'>('dashboard')
   const [activePanel, setActivePanel] = useState<ManagePanel>('Anchors')
 
   return (
