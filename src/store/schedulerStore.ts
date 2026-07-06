@@ -723,7 +723,7 @@ function resolveDay(
   const overflowCutoff = 1440 // default midnight
 
   // Phase 2: Global weight merge — all items compete by weight
-  const { placed, overflow } = placeItems(items, context.tasks, overflowCutoff, debug)
+  const { placed, overflow } = placeItems(items, context.tasks, context.blocks, overflowCutoff, debug)
 
   // Phase 3: Anchor recalculation — push only, never pull
   for (const ra of resolvedAnchors) {
@@ -767,6 +767,7 @@ function resolveDay(
 function placeItems(
   items: ScheduledItem[],
   tasks: Task[],
+  blocks: Block[],
   cutoff: number,
   debug: boolean
 ): { placed: ScheduledItem[]; overflow: ScheduledItem[] } {
@@ -776,15 +777,22 @@ function placeItems(
   // Sort by weight descending — highest weight gets first pick of time
   active.sort((a, b) => b.weight - a.weight)
 
+  // Build taskId → blockId map from actual Block entries (not task.blockId which may be unset)
+  const taskBlockMap = new Map<string, string>()
+  for (const block of blocks) {
+    for (const entry of block.entries) {
+      taskBlockMap.set(entry.taskId, block.id)
+    }
+  }
+
   // Build parent map for ordering (only for tasks in the same block)
   const parentMap = new Map<string, string>()
-  const taskBlockMap = new Map<string, string | undefined>()
   for (const t of tasks) {
-    taskBlockMap.set(t.id, t.blockId)
     if (t.parentId) {
       // Only enforce parent-child if both are in the same block
-      const parentBlock = tasks.find((p) => p.id === t.parentId)?.blockId
-      if (t.blockId && t.blockId === parentBlock) {
+      const childBlock = taskBlockMap.get(t.id)
+      const parentBlock = taskBlockMap.get(t.parentId)
+      if (childBlock && childBlock === parentBlock) {
         parentMap.set(t.id, t.parentId)
       }
     }
@@ -797,8 +805,9 @@ function placeItems(
     if (t.links) {
       for (const link of t.links) {
         // Only evaluate links within same block
-        const childTask = tasks.find((ct) => ct.id === link.linkedTaskId)
-        if (childTask?.blockId && childTask.blockId === t.blockId) {
+        const motherBlock = taskBlockMap.get(t.id)
+        const childBlock = taskBlockMap.get(link.linkedTaskId)
+        if (motherBlock && motherBlock === childBlock) {
           continuityOf.set(link.linkedTaskId, link.continuity ?? 'resumable')
           // Register in parentMap so placeItems enforces ordering
           if (!parentMap.has(link.linkedTaskId)) {
