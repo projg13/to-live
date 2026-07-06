@@ -337,6 +337,10 @@ function resolveDay(
               weight = fallback
             }
             if (debug) console.log(`      🎚 ${task.title}: slotWeight resolved to ${weight} (fallback=${fallback})`)
+          } else if (task.knobs.hasWeightCurve && task.weightCurve && task.weightCurve.length > 0) {
+            // 24h circular weight curve on the task itself
+            weight = getObligationWeight(task.weightCurve, anchorTime)
+            if (debug) console.log(`      🎚 ${task.title}: taskWeightCurve resolved to ${weight} @${anchorTime}`)
           }
 
           // Apply event weight offset

@@ -893,6 +893,44 @@ function Dashboard() {
               )
             })}
           </div>
+
+          {/* Overflow: tasks that couldn't fit before cutoff */}
+          {daySchedule.overflowItems && daySchedule.overflowItems.length > 0 && (
+            <div className="mt-6 border border-amber-900/30 bg-amber-950/10 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-2 text-amber-400 text-sm font-bold">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                Overflow ({daySchedule.overflowItems.length} tasks can't fit today)
+              </div>
+              <div className="space-y-2">
+                {daySchedule.overflowItems.map((item, idx) => (
+                  <div
+                    key={`overflow-${idx}`}
+                    className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-amber-950/15 border border-amber-900/20 rounded-xl text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-amber-300">{item.title}</span>
+                      <span className="text-amber-500/60 font-mono text-[10px]">
+                        {item.endMinutes - item.startMinutes}m
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-500/80 text-[10px] font-bold uppercase tracking-wider">
+                        {item.source}
+                      </span>
+                      <span className="text-amber-400/60 font-mono text-[10px]">
+                        w:{Math.round(item.weight)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-amber-500/50 italic">
+                Adjust weights or remove tasks to fit these into today's schedule.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
