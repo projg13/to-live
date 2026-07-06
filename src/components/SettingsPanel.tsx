@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSettingsStore } from '../store/settingsStore'
 import { useSchedulerStore } from '../store/schedulerStore'
-import { resetAllStores } from '../stateIO'
+import { resetAllStores, exportFullState, exportDefaults, importFullState, downloadJSON, loadJSONFile } from '../stateIO'
 import { snapshotToGitHub, listSnapshots, restoreFromSnapshot, restoreFromGitHub, startHourlyBackup, type SnapshotEntry } from '../backup'
 
 function SettingsPanel() {
@@ -112,6 +112,64 @@ function SettingsPanel() {
             }`}
           >
             🔍 {scheduler.debugMode ? 'Debug ON' : 'Debug OFF'}
+          </button>
+        </div>
+      </div>
+
+      {/* State Management */}
+      <div className="space-y-4">
+        <div className="border-b border-slate-800 pb-2">
+          <h3 className="text-lg font-black tracking-wide text-slate-100">State Management</h3>
+          <p className="text-xs text-slate-400">Export, import, or reset your app configuration.</p>
+        </div>
+        <div className="flex flex-wrap gap-3 bg-slate-950/20 p-5 border border-slate-800/80 rounded-2xl">
+          <button
+            onClick={() => {
+              const snapshot = exportFullState()
+              const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+              downloadJSON(snapshot, `to-live-state-${ts}.json`)
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-cyan-950/30 hover:bg-cyan-900/30 text-cyan-400 border border-cyan-800/30 transition-all active:scale-95 cursor-pointer"
+          >
+            📤 Export State
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                const snapshot = await loadJSONFile()
+                importFullState(snapshot)
+              } catch (err: any) {
+                alert(`Import failed: ${err.message}`)
+              }
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-950/30 hover:bg-indigo-900/30 text-indigo-400 border border-indigo-800/30 transition-all active:scale-95 cursor-pointer"
+          >
+            📥 Import State
+          </button>
+          <button
+            onClick={() => {
+              const snapshot = exportDefaults()
+              downloadJSON(snapshot, 'to-live-defaults.json')
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-slate-950/65 hover:bg-slate-900 text-slate-400 border border-slate-850 transition-all active:scale-95 cursor-pointer"
+          >
+            💾 Save Defaults
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                const snapshot = await loadJSONFile()
+                if (snapshot._meta?.type !== 'defaults') {
+                  if (!confirm('This file is not labeled as defaults. Import anyway?')) return
+                }
+                importFullState(snapshot)
+              } catch (err: any) {
+                alert(`Load defaults failed: ${err.message}`)
+              }
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-slate-950/65 hover:bg-slate-900 text-slate-400 border border-slate-850 transition-all active:scale-95 cursor-pointer"
+          >
+            📂 Load Defaults
           </button>
         </div>
       </div>
