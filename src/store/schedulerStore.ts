@@ -791,6 +791,7 @@ function placeItems(
   }
 
   // Build link continuity map: childTaskId → continuity rule (same-block only)
+  // AND register links in parentMap so children wait for mother during placement
   const continuityOf = new Map<string, string>()
   for (const t of tasks) {
     if (t.links) {
@@ -799,6 +800,10 @@ function placeItems(
         const childTask = tasks.find((ct) => ct.id === link.linkedTaskId)
         if (childTask?.blockId && childTask.blockId === t.blockId) {
           continuityOf.set(link.linkedTaskId, link.continuity ?? 'resumable')
+          // Register in parentMap so placeItems enforces ordering
+          if (!parentMap.has(link.linkedTaskId)) {
+            parentMap.set(link.linkedTaskId, t.id)
+          }
         }
       }
     }
