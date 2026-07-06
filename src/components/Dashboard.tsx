@@ -631,6 +631,24 @@ function Dashboard() {
                         <span className="text-[10px] text-slate-500 font-bold tracking-wide">
                           w:{Math.round(item.weight)}
                         </span>
+
+                        {/* Read-only: expected end + expiry remaining */}
+                        <span className="text-[10px] font-mono text-slate-500 tracking-wide">
+                          ends {formatTime(item.endMinutes)}
+                        </span>
+                        {item.expiryTime !== undefined && (
+                          <span className={`text-[10px] font-mono font-bold tracking-wide px-1.5 py-0.5 rounded-md border ${
+                            item.expiryTime - virtualTime <= 15
+                              ? 'text-rose-400 bg-rose-950/20 border-rose-900/30'
+                              : item.expiryTime - virtualTime <= 60
+                                ? 'text-amber-400 bg-amber-950/20 border-amber-900/30'
+                                : 'text-slate-450 bg-slate-950/40 border-slate-850'
+                          }`}>
+                            ⏳ {item.expiryTime - virtualTime <= 0
+                              ? 'expired'
+                              : `${item.expiryTime - virtualTime}m left`}
+                          </span>
+                        )}
                       </div>
 
                       {/* Right: Actions */}
