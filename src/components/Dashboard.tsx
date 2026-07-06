@@ -590,16 +590,27 @@ function Dashboard() {
                         </span>
 
                         {/* Read-only: time remaining + expiry remaining */}
-                        {!isDone && item.endMinutes > virtualTime && (
-                          <span className="text-[10px] font-mono text-slate-450 tracking-wide">
-                            {(() => {
-                              const rem = item.endMinutes - virtualTime
-                              const h = Math.floor(rem / 60)
-                              const m = rem % 60
-                              return h > 0 ? `${h}h ${m}m left` : `${m}m left`
-                            })()}
-                          </span>
-                        )}
+                        {(() => {
+                          const commitTime = scheduler.committedTasks[item.instanceKey]
+                          const duration = item.endMinutes - item.startMinutes
+                          // If committed, remaining = commitTime + duration - now
+                          // If not committed, remaining = endMinutes - now (drifts with resolves)
+                          const expectedEnd = commitTime !== undefined
+                            ? commitTime + duration
+                            : item.endMinutes
+                          const rem = expectedEnd - virtualTime
+                          if (isDone || rem <= 0) return null
+                          const h = Math.floor(rem / 60)
+                          const m = rem % 60
+                          return (
+                            <span className={`text-[10px] font-mono tracking-wide ${
+                              commitTime !== undefined ? 'text-emerald-400 font-bold' : 'text-slate-450'
+                            }`}>
+                              {commitTime !== undefined ? '🔒 ' : ''}
+                              {h > 0 ? `${h}h ${m}m left` : `${m}m left`}
+                            </span>
+                          )
+                        })()}
                         {item.expiryTime !== undefined && (
                           <span className={`text-[10px] font-mono font-bold tracking-wide px-1.5 py-0.5 rounded-md border ${
                             item.expiryTime - virtualTime <= 15
@@ -627,6 +638,25 @@ function Dashboard() {
                           >
                             <CheckIcon />
                             Done
+                          </button>
+                        )}
+                        {/* Commit / Uncommit */}
+                        {!isDone && !scheduler.committedTasks[item.instanceKey] && (
+                          <button
+                            onClick={() => scheduler.commitTask(item.instanceKey, virtualTime)}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-indigo-950/30 hover:bg-indigo-900/30 text-indigo-400 border border-indigo-800/30 transition-all active:scale-95 cursor-pointer"
+                            title="Lock start time for accurate time remaining"
+                          >
+                            ▶ Commit
+                          </button>
+                        )}
+                        {!isDone && scheduler.committedTasks[item.instanceKey] !== undefined && (
+                          <button
+                            onClick={() => scheduler.uncommitTask(item.instanceKey)}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-amber-950/30 hover:bg-amber-900/30 text-amber-400 border border-amber-800/30 transition-all active:scale-95 cursor-pointer"
+                            title="Remove locked start time"
+                          >
+                            ⏹ Uncommit
                           </button>
                         )}
                         {isDone && (

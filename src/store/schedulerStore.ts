@@ -23,7 +23,8 @@ interface SchedulerStore {
   doneItems: ScheduledItem[]           // stored positions of done tasks for display
   postponedTasks: string[]
   lastDoneAt: Record<number, number>   // day → minutes from midnight (latest done-at time)
-  weightOffsets: Record<string, number> // instanceKey → weight offset (session-only, not persisted)
+  weightOffsets: Record<string, number> // instanceKey → weight offset
+  committedTasks: Record<string, number> // instanceKey → commit time (minutes from midnight)
   resolveVersion: number               // bumped to trigger re-resolve from actions
   debugMode: boolean                   // persisted debug toggle
 
@@ -40,6 +41,8 @@ interface SchedulerStore {
   unmarkTask: (instanceKey: string) => void
   setWeightOffset: (instanceKey: string, offset: number) => void
   clearWeightOffset: (instanceKey: string) => void
+  commitTask: (instanceKey: string, atMinutes: number) => void
+  uncommitTask: (instanceKey: string) => void
   clearRecoveryDone: (planId: string) => void
 
   recalibrateFrom: (minutes: number, day: number) => void
@@ -1011,6 +1014,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
       doneItems: [],
       postponedTasks: [],
       weightOffsets: {},
+      committedTasks: {},
       resolveVersion: 0,
       debugMode: false,
       lastDoneAt: {},
@@ -1257,6 +1261,17 @@ export const useSchedulerStore = create<SchedulerStore>()(
           resolveVersion: state.resolveVersion + 1,
         })),
 
+      commitTask: (instanceKey, atMinutes) =>
+        set((state) => ({
+          committedTasks: { ...state.committedTasks, [instanceKey]: atMinutes },
+        })),
+
+      uncommitTask: (instanceKey) =>
+        set((state) => {
+          const { [instanceKey]: _, ...rest } = state.committedTasks
+          return { committedTasks: rest }
+        }),
+
 
       recalibrateFrom: (minutes, day) =>
         set((state) => ({
@@ -1292,7 +1307,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
       },
 
       clearSchedule: () =>
-        set({ schedule: null, confirmedAnchors: [], adhocTasks: [], skippedTaskIds: [], doneTasks: [], doneItems: [], postponedTasks: [], weightOffsets: {}, lastDoneAt: {} }),
+        set({ schedule: null, confirmedAnchors: [], adhocTasks: [], skippedTaskIds: [], doneTasks: [], doneItems: [], postponedTasks: [], weightOffsets: {}, committedTasks: {}, lastDoneAt: {} }),
     }),
     {
       name: 'to-live-scheduler',
