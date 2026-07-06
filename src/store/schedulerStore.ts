@@ -889,16 +889,16 @@ function placeItems(
     }
   }
 
-  // Align background children to their parent's actual placement
+  // Align background children to start AFTER their parent finishes
   if (parentMap.size > 0) {
     for (const bg of background) {
       const pid = parentMap.get(bg.taskId)
       if (!pid) continue
       const parentItem = placed.find((p) => p.taskId === pid)
-      if (parentItem && bg.startMinutes < parentItem.startMinutes) {
+      if (parentItem) {
         const dur = bg.endMinutes - bg.startMinutes
-        bg.startMinutes = parentItem.startMinutes
-        bg.endMinutes = parentItem.startMinutes + dur
+        bg.startMinutes = parentItem.endMinutes
+        bg.endMinutes = parentItem.endMinutes + dur
       }
     }
   }
