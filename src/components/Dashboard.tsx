@@ -234,6 +234,7 @@ function Dashboard() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
+                setDebugTimeOverride(null) // Reset to live clock
                 scheduler.recalibrateFrom(virtualTime, selectedDay)
               }}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-950 shadow-md shadow-cyan-950/30 transition-all active:scale-95 cursor-pointer"
@@ -246,7 +247,10 @@ function Dashboard() {
               const commitTime = Object.values(scheduler.committedTasks)[0]
               return (
                 <button
-                  onClick={() => scheduler.recalibrateFrom(commitTime, selectedDay)}
+                  onClick={() => {
+                    setDebugTimeOverride(commitTime)
+                    scheduler.recalibrateFrom(commitTime, selectedDay)
+                  }}
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-emerald-950/30 hover:bg-emerald-900/30 text-emerald-400 border border-emerald-800/30 transition-all active:scale-95 cursor-pointer"
                   title={`Recalculate from commit time (${formatTime(commitTime)})`}
                 >
@@ -273,7 +277,9 @@ function Dashboard() {
                 onClick={() => {
                   if (!customRecalcTime) return
                   const [h, m] = customRecalcTime.split(':').map(Number)
-                  scheduler.recalibrateFrom(h * 60 + m, selectedDay)
+                  const mins = h * 60 + m
+                  setDebugTimeOverride(mins)
+                  scheduler.recalibrateFrom(mins, selectedDay)
                 }}
                 disabled={!customRecalcTime}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer border ${
