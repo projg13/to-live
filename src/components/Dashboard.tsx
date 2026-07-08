@@ -679,7 +679,7 @@ function Dashboard() {
                             ⏹ Uncommit
                           </button>
                         )}
-                        {isDone && (
+                        {isDone && item.source !== 'obligation' && (
                           <button
                             onClick={() => scheduler.unmarkTask(item.instanceKey)}
                             className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-cyan-950/30 hover:bg-cyan-900/30 text-cyan-400 border border-cyan-800/30 transition-all active:scale-95 cursor-pointer"

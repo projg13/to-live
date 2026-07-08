@@ -1071,6 +1071,29 @@ export const useSchedulerStore = create<SchedulerStore>()(
           return suffix === today || suffix === yesterday || suffix === currentMonth
         })
 
+        // Purge stale obligation done keys from obligation store
+        // Keep only keys whose period suffix matches a current active deadline
+        const obStore = useObligationStore.getState()
+        if (obStore.doneTasks.length > 0) {
+          const activeDeadlines = new Set<string>()
+          for (const ob of context.obligations) {
+            if (!ob.enabled) continue
+            const dl = resolveObligationDeadline(ob, today)
+            if (dl) activeDeadlines.add(dl)
+          }
+          activeDeadlines.add(today)
+          activeDeadlines.add(yesterday)
+          const freshObDone = obStore.doneTasks.filter((key) => {
+            const lastColon = key.lastIndexOf(':')
+            if (lastColon === -1) return false
+            const suffix = key.slice(lastColon + 1)
+            return activeDeadlines.has(suffix)
+          })
+          if (freshObDone.length !== obStore.doneTasks.length) {
+            useObligationStore.setState({ doneTasks: freshObDone })
+          }
+        }
+
         const days: DaySchedule[] = []
         for (let i = 0; i < 7; i++) {
           const dateStr = getDateStr(i, context.baseDate)
@@ -1184,9 +1207,11 @@ export const useSchedulerStore = create<SchedulerStore>()(
           }
 
           const isObligation = item?.source === 'obligation'
-          const newDoneItems = item
-            ? [...state.doneItems.filter((i) => i.instanceKey !== instanceKey), item]
-            : state.doneItems
+          const newDoneItems = isObligation
+            ? state.doneItems  // obligations managed in ObligationPanel
+            : (item
+              ? [...state.doneItems.filter((i) => i.instanceKey !== instanceKey), item]
+              : state.doneItems)
 
           const { [instanceKey]: _dropCommit, ...remainingCommits } = state.committedTasks
 
@@ -1263,9 +1288,9 @@ export const useSchedulerStore = create<SchedulerStore>()(
             ? state.doneTasks
             : [...new Set([...state.doneTasks, completionKey])]
 
-          // Save position of the done task for display
+          // Save position of the done task for display (skip obligations — managed in ObligationPanel)
           const newDoneItems = [...state.doneItems]
-          if (item && !newDoneItems.find((d) => d.instanceKey === instanceKey)) {
+          if (item && !isObligation && !newDoneItems.find((d) => d.instanceKey === instanceKey)) {
             newDoneItems.push(item)
           }
 
