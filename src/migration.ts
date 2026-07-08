@@ -10,6 +10,8 @@ export function runSeedMigration() {
   migrateTaskFields()
   // Clean up scheduler store (remove insert-generated adhoc tasks)
   migrateSchedulerStore()
+  // Move obligation done entries from scheduler → obligation store
+  migrateObligationDone()
 }
 
 function migrateContinuityRule() {
@@ -121,6 +123,44 @@ function migrateSchedulerStore() {
     if (changed) {
       localStorage.setItem('to-live-scheduler', JSON.stringify(data))
     }
+  } catch {
+    // ignore parse errors
+  }
+}
+
+// Move obligation:* done entries from scheduler store to obligation store
+function migrateObligationDone() {
+  try {
+    const schedRaw = localStorage.getItem('to-live-scheduler')
+    if (!schedRaw) return
+    const schedData = JSON.parse(schedRaw)
+    const schedState = schedData?.state
+    if (!schedState || !Array.isArray(schedState.doneTasks)) return
+
+    const obKeys = schedState.doneTasks.filter((k: string) => k.startsWith('obligation:'))
+    if (obKeys.length === 0) return
+
+    // Remove from scheduler
+    schedState.doneTasks = schedState.doneTasks.filter((k: string) => !k.startsWith('obligation:'))
+    localStorage.setItem('to-live-scheduler', JSON.stringify(schedData))
+
+    // Add to obligation store
+    const obRaw = localStorage.getItem('to-live-obligations')
+    if (!obRaw) return
+    const obData = JSON.parse(obRaw)
+    const obState = obData?.state
+    if (!obState) return
+
+    if (!Array.isArray(obState.doneTasks)) {
+      obState.doneTasks = []
+    }
+    const existing = new Set(obState.doneTasks)
+    for (const key of obKeys) {
+      if (!existing.has(key)) {
+        obState.doneTasks.push(key)
+      }
+    }
+    localStorage.setItem('to-live-obligations', JSON.stringify(obData))
   } catch {
     // ignore parse errors
   }

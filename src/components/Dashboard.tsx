@@ -80,7 +80,7 @@ function Dashboard() {
   const { anchors, templates } = useAnchorStore()
   const { blocks } = useBlockStore()
   const { routines } = useRoutineStore()
-  const { obligations } = useObligationStore()
+  const { obligations, doneTasks: obligationDoneTasks } = useObligationStore()
   const { plans: recoveryPlans } = useRecoveryStore()
   const { dayPlans, weekPlan, calendarEvents } = usePlannerStore()
 
@@ -190,7 +190,9 @@ function Dashboard() {
   // Add active scheduled tasks (exclude done ones)
   if (daySchedule) {
     for (const item of daySchedule.items) {
-      const itemIsDone = scheduler.doneTasks.some((dk) => dk.startsWith(item.instanceKey + ':'))
+      const itemIsDone = item.source === 'obligation'
+            ? obligationDoneTasks.some((dk) => dk.startsWith(item.instanceKey + ':'))
+            : scheduler.doneTasks.some((dk) => dk.startsWith(item.instanceKey + ':'))
       if (!itemIsDone) {
         timelineItems.push({ type: 'task', time: item.startMinutes, data: item })
       }
@@ -525,7 +527,9 @@ function Dashboard() {
 
               // Task item
               const item: ScheduledItem = entry.data
-              const isDone = scheduler.doneTasks.some((dk) => dk.startsWith(item.instanceKey + ':'))
+              const isDone = item.source === 'obligation'
+                ? obligationDoneTasks.some((dk) => dk.startsWith(item.instanceKey + ':'))
+                : scheduler.doneTasks.some((dk) => dk.startsWith(item.instanceKey + ':'))
               const isCurrent = virtualTime >= item.startMinutes && virtualTime < item.endMinutes
               const weightPct = Math.round((item.weight / maxWeight) * 100)
               const weightOffset = scheduler.weightOffsets[item.instanceKey] ?? 0

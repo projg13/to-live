@@ -566,12 +566,14 @@ function resolveDay(
 
     // Filter to valid, non-done, non-skipped tasks
     // Done key uses obPeriodKey (deadline-scoped) so tasks from old periods are automatically undone
+    // Obligation done keys live in obligationStore, not scheduler doneTasks
+    const obDoneTasks = useObligationStore.getState().doneTasks
     const validTasks = orderedTaskIds.filter((tid) => {
       if (skippedTaskIds.includes(tid)) return false
       const obIKey = makeInstanceKey('obligation', ob.id, '', tid)
       const periodDoneKey = `${obIKey}:${obPeriodKey}`
       const dailyKey = `${obIKey}:${dateStr}`
-      const isDone = doneTasks.includes(periodDoneKey) || doneTasks.includes(dailyKey)
+      const isDone = obDoneTasks.includes(periodDoneKey) || obDoneTasks.includes(dailyKey)
       if (debug) console.log(`      📝 ${tid}: periodDoneKey=${periodDoneKey} dailyKey=${dailyKey} isDone=${isDone}`)
       if (isDone) return false
       if (!context.tasks.find((t) => t.id === tid)) return false
@@ -1049,18 +1051,11 @@ export const useSchedulerStore = create<SchedulerStore>()(
         const today = getDateStr(0, context.baseDate)
         const currentMonth = today.slice(0, 7) // YYYY-MM
 
-        // Purge stale doneTasks — keep today, yesterday, current obligation deadlines,
+        // Purge stale doneTasks — keep today, yesterday,
         // AND all recovery-sourced done entries (they persist until plan is resolved)
+        // NOTE: obligation done keys now live in obligationStore, not here
         const yesterday = getDateStr(-1, context.baseDate)
         const triggeredRecoveryIds = new Set(context.recoveryPlans.filter((p) => p.triggered).map((p) => p.id))
-        // Collect all active obligation deadline periods to keep their done keys
-        const activeObDeadlines = new Set<string>()
-        for (const ob of context.obligations) {
-          if (!ob.enabled) continue
-          const dl = resolveObligationDeadline(ob, today)
-          if (dl && ob.recurrence !== 'one-time') activeObDeadlines.add(dl)
-        }
-        activeObDeadlines.add(currentMonth) // backward compat
         const freshDoneTasks = state.doneTasks.filter((key) => {
           const colonIdx = key.lastIndexOf(':')
           if (colonIdx === -1) return false // bare IDs from old format — drop
@@ -1071,8 +1066,8 @@ export const useSchedulerStore = create<SchedulerStore>()(
             const planId = parts[1]
             if (triggeredRecoveryIds.has(planId)) return true
           }
-          // Keep obligation done entries for current deadline periods
-          if (key.startsWith('obligation:') && activeObDeadlines.has(suffix)) return true
+          // Skip any leftover obligation entries (migrated to obligationStore)
+          if (key.startsWith('obligation:')) return false
           return suffix === today || suffix === yesterday || suffix === currentMonth
         })
 
@@ -1174,7 +1169,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
           // Use instanceKey:date as the completion key
           let completionKey = `${instanceKey}:${dateStr}`
 
-          // Obligations with recurrence: key by resolved deadline period
+          // Obligations: route done key to obligation store
           if (item && item.source === 'obligation' && item.sourceId) {
             const obligations = useObligationStore.getState().obligations
             const matchingOb = obligations.find((o) => o.id === item.sourceId)
@@ -1184,8 +1179,11 @@ export const useSchedulerStore = create<SchedulerStore>()(
                 completionKey = `${instanceKey}:${resolvedDeadline}`
               }
             }
+            // Store in obligation store, not scheduler
+            useObligationStore.getState().markObligationDone(completionKey)
           }
 
+          const isObligation = item?.source === 'obligation'
           const newDoneItems = item
             ? [...state.doneItems.filter((i) => i.instanceKey !== instanceKey), item]
             : state.doneItems
@@ -1193,7 +1191,10 @@ export const useSchedulerStore = create<SchedulerStore>()(
           const { [instanceKey]: _dropCommit, ...remainingCommits } = state.committedTasks
 
           const result: Partial<SchedulerStore> = {
-            doneTasks: [...state.doneTasks.filter((id) => id !== completionKey), completionKey],
+            // Only add to scheduler doneTasks if NOT an obligation
+            doneTasks: isObligation
+              ? state.doneTasks
+              : [...state.doneTasks.filter((id) => id !== completionKey), completionKey],
             doneItems: newDoneItems,
             committedTasks: remainingCommits,
             resolveVersion: state.resolveVersion + 1,
@@ -1244,7 +1245,8 @@ export const useSchedulerStore = create<SchedulerStore>()(
 
           // Build completion key using instanceKey
           let completionKey = `${instanceKey}:${dateStr}`
-          if (item && item.source === 'obligation' && item.sourceId) {
+          const isObligation = item?.source === 'obligation'
+          if (item && isObligation && item.sourceId) {
             const obligations = useObligationStore.getState().obligations
             const matchingOb = obligations.find((o) => o.id === item.sourceId)
             if (matchingOb && matchingOb.recurrence !== 'one-time') {
@@ -1253,9 +1255,13 @@ export const useSchedulerStore = create<SchedulerStore>()(
                 completionKey = `${instanceKey}:${resolvedDeadline}`
               }
             }
+            // Store in obligation store, not scheduler
+            useObligationStore.getState().markObligationDone(completionKey)
           }
 
-          const allDoneIds = [...new Set([...state.doneTasks, completionKey])]
+          const allDoneIds = isObligation
+            ? state.doneTasks
+            : [...new Set([...state.doneTasks, completionKey])]
 
           // Save position of the done task for display
           const newDoneItems = [...state.doneItems]
@@ -1275,11 +1281,17 @@ export const useSchedulerStore = create<SchedulerStore>()(
         }),
 
       unmarkTask: (instanceKey) =>
-        set((state) => ({
-          doneTasks: state.doneTasks.filter((id) => !id.startsWith(instanceKey + ':')),
-          doneItems: state.doneItems.filter((i) => i.instanceKey !== instanceKey),
-          resolveVersion: state.resolveVersion + 1,
-        })),
+        set((state) => {
+          // Route obligation unmark to obligation store
+          if (instanceKey.startsWith('obligation:')) {
+            useObligationStore.getState().unmarkObligationDone(instanceKey)
+          }
+          return {
+            doneTasks: state.doneTasks.filter((id) => !id.startsWith(instanceKey + ':')),
+            doneItems: state.doneItems.filter((i) => i.instanceKey !== instanceKey),
+            resolveVersion: state.resolveVersion + 1,
+          }
+        }),
 
       setWeightOffset: (instanceKey, offset) =>
         set((state) => ({
