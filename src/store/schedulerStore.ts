@@ -1081,8 +1081,6 @@ export const useSchedulerStore = create<SchedulerStore>()(
             const dl = resolveObligationDeadline(ob, today)
             if (dl) activeDeadlines.add(dl)
           }
-          activeDeadlines.add(today)
-          activeDeadlines.add(yesterday)
           const freshObDone = obStore.doneTasks.filter((key) => {
             const lastColon = key.lastIndexOf(':')
             if (lastColon === -1) return false
