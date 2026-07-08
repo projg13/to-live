@@ -509,6 +509,10 @@ function resolveDay(
       if (debug) console.log(`  ⏭ "${ob.name}": disabled`)
       continue
     }
+    if (ob.deadline && ob.recurrence !== 'one-time' && dateStr > ob.deadline) {
+      if (debug) console.log(`  ⏭ "${ob.name}": past deadline ${ob.deadline}`)
+      continue
+    }
     const resolvedDeadline = resolveObligationDeadline(ob, dateStr)
     const daysRemaining = resolvedDeadline
       ? Math.max(0, Math.ceil((new Date(resolvedDeadline).getTime() - new Date(dateStr).getTime()) / 86400000))
