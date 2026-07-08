@@ -31,7 +31,8 @@ const XIcon = () => (
 )
 
 function ObligationPanel() {
-  const { obligations, addObligation, updateObligation, deleteObligation, toggleEnabled } = useObligationStore()
+  const { obligations, addObligation, updateObligation, deleteObligation, toggleEnabled, doneTasks: obligationDoneTasks, unmarkObligationDone, clearObligationDone } = useObligationStore()
+  const { tasks } = useTaskStore()
   const [editing, setEditing] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
 
@@ -152,6 +153,48 @@ function ObligationPanel() {
                     )}
                   </div>
                 )}
+
+                {/* Done tasks history */}
+                {(() => {
+                  const obDoneKeys = obligationDoneTasks.filter((k) => k.startsWith(`obligation:${ob.id}:`))
+                  if (obDoneKeys.length === 0) return null
+                  // Parse taskId from key format: obligation:obId::taskId:periodKey
+                  const doneEntries = obDoneKeys.map((key) => {
+                    const parts = key.split(':')
+                    const taskId = parts[3] // obligation:obId::taskId → parts[3]
+                    const periodKey = parts[4] ?? ''
+                    const task = tasks.find((t) => t.id === taskId)
+                    const instanceKey = parts.slice(0, 4).join(':')
+                    return { key, taskId, taskName: task?.title ?? taskId.slice(0, 8), periodKey, instanceKey }
+                  })
+                  return (
+                    <div className="mt-2 pt-2 border-t border-slate-850">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500">✓ Done ({doneEntries.length})</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); clearObligationDone(ob.id) }}
+                          className="text-[10px] font-bold text-rose-400 hover:text-rose-300 px-1.5 py-0.5 rounded bg-rose-950/20 hover:bg-rose-950/40 border border-rose-900/20 transition-all cursor-pointer"
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {doneEntries.map((d) => (
+                          <span key={d.key} className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400/80 bg-emerald-950/20 border border-emerald-900/20 px-2 py-0.5 rounded-lg">
+                            {d.taskName}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); unmarkObligationDone(d.instanceKey) }}
+                              className="text-slate-500 hover:text-cyan-400 transition-colors cursor-pointer ml-0.5"
+                              title="Undo done"
+                            >
+                              ↩
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Toggle Switch */}
