@@ -648,7 +648,7 @@ function Dashboard() {
                           <button
                             onClick={() => {
                               setShowDoneAt(showDoneAt === item.instanceKey ? null : item.instanceKey)
-                              setDoneAtTime(toTimeStr(virtualTime))
+                              setDoneAtTime(toTimeStr(currentTime))
                             }}
                             className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-emerald-950/30 hover:bg-emerald-900/30 text-emerald-400 border border-emerald-800/30 transition-all active:scale-95 cursor-pointer"
                           >

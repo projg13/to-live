@@ -1199,6 +1199,13 @@ export const useSchedulerStore = create<SchedulerStore>()(
             resolveVersion: state.resolveVersion + 1,
           }
 
+          // Update lastDoneAt so remaining tasks recompact from current time on re-resolve
+          if (item) {
+            const now = new Date()
+            const nowMinutes = now.getHours() * 60 + now.getMinutes()
+            result.lastDoneAt = { ...state.lastDoneAt, [dayIdx]: nowMinutes }
+          }
+
           // Recovery auto-resolve: check if all tasks in this recovery plan are now done
           if (item && item.source === 'recovery' && item.sourceId) {
             const allDone = [...state.doneTasks, completionKey]
