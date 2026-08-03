@@ -1173,6 +1173,7 @@ function AdhocTaskForm({
 }) {
   const [title, setTitle] = useState('')
   const [startTime, setStartTime] = useState('')
+  const [endTime, setEndTime] = useState('')
   const [duration, setDuration] = useState(30)
   const [weight, setWeight] = useState(100)
 
@@ -1181,13 +1182,13 @@ function AdhocTaskForm({
       <h3 className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
         <PlusIcon /> Add Ad-hoc Task
       </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Task title..."
-          className="text-sm px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none"
+          className="text-sm px-3.5 py-2 bg-slate-955 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none"
         />
         <div className="flex items-center gap-1.5 bg-slate-955 border border-slate-800 rounded-xl px-3 text-sm">
           <span className="text-slate-450 font-semibold">Starts:</span>
@@ -1195,6 +1196,15 @@ function AdhocTaskForm({
             type="time"
             defaultValue={startTime}
             onChange={(e) => setStartTime(e.target.value)}
+            className="w-full bg-transparent border-none text-slate-200 focus:outline-none p-1 cursor-pointer"
+          />
+        </div>
+        <div className="flex items-center gap-1.5 bg-slate-955 border border-slate-800 rounded-xl px-3 text-sm">
+          <span className="text-slate-450 font-semibold">Ends:</span>
+          <input
+            type="time"
+            defaultValue={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
             className="w-full bg-transparent border-none text-slate-200 focus:outline-none p-1 cursor-pointer"
           />
         </div>
@@ -1229,11 +1239,17 @@ function AdhocTaskForm({
           onClick={() => {
             if (title && startTime) {
               const [h, m] = startTime.split(':').map(Number)
+              let fixedEnd: number | undefined = undefined
+              if (endTime) {
+                const [eh, em] = endTime.split(':').map(Number)
+                fixedEnd = (eh || 0) * 60 + (em || 0)
+              }
               onAdd({
                 id: crypto.randomUUID(),
                 title,
                 durationMinutes: duration,
                 startTime: (h || 0) * 60 + (m || 0),
+                fixedEndTime: fixedEnd,
                 day,
                 weight,
               })

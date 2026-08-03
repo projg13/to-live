@@ -174,6 +174,7 @@ function resolveDay(
       day: dayIndex,
       sourceId: adhoc.id,
       sourceName: 'Adhoc',
+      idealEndTime: adhoc.fixedEndTime,
     })
   }
 
@@ -426,6 +427,8 @@ function resolveDay(
         const routineIKey = makeInstanceKey('routine', routine.id, cand.anchorId, cand.task.id)
         const offsetWeight = Math.max(1, cand.weight + (weightOffsets[routineIKey] ?? 0))
 
+        const itemIdealEndTime = taskConfig?.idealEndTime ?? (cand.task.knobs?.hasFixedEndTime ? cand.task.fixedEndTime : undefined)
+
         if (cand.entry.isBackground) {
            items.push({
             taskId: cand.task.id,
@@ -441,6 +444,7 @@ function resolveDay(
             sourceName: routine.name,
             resetAnchorId: cand.anchorId,
             idealTime: taskIdealTime,
+            idealEndTime: itemIdealEndTime,
             expiryTime: itemExpiryTime,
           })
         } else {
@@ -458,6 +462,7 @@ function resolveDay(
             sourceName: routine.name,
             resetAnchorId: cand.anchorId,
             idealTime: taskIdealTime,
+            idealEndTime: itemIdealEndTime,
             expiryTime: itemExpiryTime,
           })
           cursor = idealStart + cand.task.durationMinutes
@@ -903,8 +908,10 @@ function placeItems(
     const wouldBeCurrent = start <= nowMinutes && nowMinutes < start + duration
     if (item.expiryTime !== undefined && start >= item.expiryTime && !wouldBeCurrent) continue
 
+    const fitsIdealEnd = item.idealEndTime === undefined || (start + duration <= item.idealEndTime)
+
     // Try ideal time
-    if (start < cutoff && !hasConflict(start, duration, occupied)) {
+    if (start < cutoff && fitsIdealEnd && !hasConflict(start, duration, occupied)) {
       item.startMinutes = start
       item.endMinutes = start + duration
       occupied.push({ start, end: start + duration })
@@ -919,6 +926,7 @@ function placeItems(
     let found = false
     while (cursor < cutoff) {
       if (item.expiryTime !== undefined && cursor >= item.expiryTime && !(cursor <= nowMinutes && nowMinutes < cursor + duration)) break
+      if (item.idealEndTime !== undefined && cursor + duration > item.idealEndTime) break
       if (!hasConflict(cursor, duration, occupied)) {
         item.startMinutes = cursor
         item.endMinutes = cursor + duration

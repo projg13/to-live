@@ -10,7 +10,8 @@ export interface RoutineTaskConfig {
   slotWeights?: Record<string, SlotWeightPoint[]>  // slotId → piecewise weight curve relative to slot start
   fallbackWeight?: number                            // weight for slots NOT in slotWeights map (default: 0)
   expiresAfterMinutes?: number                       // task dies after this many minutes from its ANCHOR start
-  idealTime?: number                                 // minutes from midnight — ideal time for this task
+  idealTime?: number                                 // minutes from midnight — ideal start time for this task
+  idealEndTime?: number                              // minutes from midnight — hard ideal end boundary for this task
 }
 
 // Per-block scheduling within a routine — just maps a block to an anchor

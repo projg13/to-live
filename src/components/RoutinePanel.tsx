@@ -446,8 +446,8 @@ function RoutineEditor({
                     </button>
                   </div>
 
-                  {/* Ideal time & expiry offset */}
-                  <div className="grid grid-cols-2 gap-3 flex-wrap">
+                  {/* Ideal time, Ideal end time & expiry offset */}
+                  <div className="grid grid-cols-3 gap-3 flex-wrap">
                     <div>
                       <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">
                         Ideal Time
@@ -461,6 +461,17 @@ function RoutineEditor({
                     </div>
                     <div>
                       <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">
+                        Ideal End Time
+                      </label>
+                      <input
+                        type="time"
+                        value={config?.idealEndTime !== undefined ? toTimeStr(config.idealEndTime) : ''}
+                        onChange={(e) => setTaskConfig(taskId, { idealEndTime: e.target.value ? fromTimeStr(e.target.value) : undefined })}
+                        className="text-xs px-2.5 py-1 bg-slate-950 border border-slate-850 rounded-lg text-slate-300 focus:outline-none cursor-pointer w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">
                         Expires Offset (min)
                       </label>
                       <input
@@ -468,7 +479,7 @@ function RoutineEditor({
                         value={config?.expiresAfterMinutes ?? ''}
                         onChange={(e) => setTaskConfig(taskId, { expiresAfterMinutes: Number(e.target.value) || undefined })}
                         placeholder="expires"
-                        className="text-xs px-2 py-1 bg-slate-950 border border-slate-850 rounded-lg text-slate-300 text-center w-full focus:outline-none"
+                        className="text-xs px-2.5 py-1 bg-slate-950 border border-slate-850 rounded-lg text-slate-300 focus:outline-none w-full font-mono"
                       />
                     </div>
                   </div>

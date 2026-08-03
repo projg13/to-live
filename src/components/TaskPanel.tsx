@@ -160,6 +160,7 @@ function TaskEditor({
   const [isMother, setIsMother] = useState(initial?.knobs.isMother ?? false)
   const [hasWeightCurve, setHasWeightCurve] = useState(initial?.knobs.hasWeightCurve ?? false)
   const [hasExpiry, setHasExpiry] = useState(initial?.knobs.hasExpiry ?? false)
+  const [hasFixedEndTime, setHasFixedEndTime] = useState(initial?.knobs.hasFixedEndTime ?? false)
 
   // Links
   const [links, setLinks] = useState<TaskLink[]>(initial?.links ?? [])
@@ -172,6 +173,9 @@ function TaskEditor({
   // Expiry
   const [expiresAt, setExpiresAt] = useState(initial?.expiresAt ?? '')
 
+  // Fixed End Time
+  const [fixedEndTime, setFixedEndTime] = useState<number | undefined>(initial?.fixedEndTime)
+
   const handleSave = () => {
     if (!title.trim() || duration <= 0) return
     onSave({
@@ -182,9 +186,10 @@ function TaskEditor({
       links: isMother ? links : undefined,
       weightCurve: hasWeightCurve ? weightCurve : undefined,
       expiresAt: hasExpiry ? expiresAt : undefined,
+      fixedEndTime: hasFixedEndTime ? fixedEndTime : undefined,
       spawnedIds: initial?.spawnedIds,
       parentId: initial?.parentId,
-      knobs: { isMother, hasWeightCurve, hasExpiry },
+      knobs: { isMother, hasWeightCurve, hasExpiry, hasFixedEndTime },
     })
   }
 
@@ -240,6 +245,7 @@ function TaskEditor({
             { id: 'isMother', label: 'Mother Task', checked: isMother, set: setIsMother },
             { id: 'hasWeightCurve', label: 'Weight Curve', checked: hasWeightCurve, set: setHasWeightCurve },
             { id: 'hasExpiry', label: 'Expiry Date', checked: hasExpiry, set: setHasExpiry },
+            { id: 'hasFixedEndTime', label: 'Fixed End Time', checked: hasFixedEndTime, set: setHasFixedEndTime },
           ].map((k) => (
             <label
               key={k.id}
@@ -391,6 +397,28 @@ function TaskEditor({
             type="datetime-local"
             value={expiresAt}
             onChange={(e) => setExpiresAt(e.target.value)}
+            className="text-xs px-2.5 py-1.5 bg-slate-955 border border-slate-800 rounded-lg text-slate-300 cursor-pointer focus:outline-none"
+          />
+        </div>
+      )}
+
+      {/* Fixed End Time setting */}
+      {hasFixedEndTime && (
+        <div className="space-y-2 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+            Fixed End Time
+          </label>
+          <input
+            type="time"
+            value={fixedEndTime !== undefined ? `${String(Math.floor(fixedEndTime / 60)).padStart(2, '0')}:${String(fixedEndTime % 60).padStart(2, '0')}` : ''}
+            onChange={(e) => {
+              if (e.target.value) {
+                const [h, m] = e.target.value.split(':').map(Number)
+                setFixedEndTime(h * 60 + m)
+              } else {
+                setFixedEndTime(undefined)
+              }
+            }}
             className="text-xs px-2.5 py-1.5 bg-slate-955 border border-slate-800 rounded-lg text-slate-300 cursor-pointer focus:outline-none"
           />
         </div>

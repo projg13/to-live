@@ -16,6 +16,7 @@ export interface TaskKnobs {
   isMother: boolean        // enables links[]
   hasWeightCurve: boolean  // enables weightCurve[]
   hasExpiry: boolean       // enables expiresAt
+  hasFixedEndTime?: boolean // enables fixedEndTime
 }
 
 // Task: a quantum of time consumption
@@ -34,6 +35,9 @@ export interface Task {
 
   // Knobbed: hasExpiry
   expiresAt?: string              // ISO datetime — when this task gets killed
+
+  // Knobbed: hasFixedEndTime
+  fixedEndTime?: number           // minutes from midnight (0–1439)
 
   // Runtime tracking
   spawnedIds?: string[]           // which links have fired

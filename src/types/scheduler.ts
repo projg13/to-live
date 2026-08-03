@@ -13,6 +13,7 @@ export interface ScheduledItem {
   sourceName?: string        // e.g. Name of the routine, obligation, recovery, or event
   resetAnchorId?: string     // if set, done-key is scoped to this anchor (resets per anchor cycle)
   idealTime?: number         // the ideal start time (from anchor or task config)
+  idealEndTime?: number      // hard end boundary (from task config or adhoc task)
   expiryTime?: number        // idealTime + expiresAfterMinutes (when the task drops)
 }
 
@@ -29,6 +30,7 @@ export interface AdhocTask {
   title: string
   durationMinutes: number
   startTime: number          // minutes from midnight (user specified)
+  fixedEndTime?: number      // minutes from midnight (optional hard end boundary)
   day: number                // which day
   weight: number
 }
