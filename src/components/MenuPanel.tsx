@@ -35,7 +35,7 @@ const FireIcon = () => (
 )
 
 export default function MenuPanel() {
-  const [subTab, setSubTab] = useState<'planner' | 'recipes' | 'ingredients' | 'preprep' | 'slots'>('planner')
+  const [subTab, setSubTab] = useState<'planner' | 'templates' | 'recipes' | 'ingredients' | 'preprep' | 'slots'>('planner')
 
   return (
     <div className="space-y-6">
@@ -46,7 +46,7 @@ export default function MenuPanel() {
             🥗 Menu & Recipe Manager
           </h2>
           <p className="text-xs text-slate-400">
-            Plan meals with multiple dishes per slot, track daily calories, catalog recipes & aggregate groceries.
+            Plan meals, save reusable day templates, track calories, catalog recipes & aggregate groceries.
           </p>
         </div>
 
@@ -54,7 +54,8 @@ export default function MenuPanel() {
         <div className="flex flex-wrap gap-1 bg-slate-950 p-1 rounded-2xl border border-slate-850 shadow-inner">
           {[
             { id: 'planner', label: '📅 Day Planner' },
-            { id: 'recipes', label: '🍲 Recipes Catalog' },
+            { id: 'templates', label: '🗂️ Day Templates' },
+            { id: 'recipes', label: '🍲 Recipes' },
             { id: 'ingredients', label: '🥬 Ingredients' },
             { id: 'preprep', label: '🔪 Pre-Prep' },
             { id: 'slots', label: '⚙️ Eating Slots' },
@@ -76,6 +77,7 @@ export default function MenuPanel() {
 
       {/* Render Sub View */}
       {subTab === 'planner' && <WeeklyPlannerView />}
+      {subTab === 'templates' && <DayTemplatesView />}
       {subTab === 'recipes' && <RecipesView />}
       {subTab === 'ingredients' && <IngredientsView />}
       {subTab === 'preprep' && <PrePrepView />}
@@ -88,9 +90,11 @@ export default function MenuPanel() {
    1. DAY PLANNER VIEW, MULTI-RECIPE SLOTS & CALORIES
    ========================================================================= */
 function WeeklyPlannerView() {
-  const { weekPlan, recipes, ingredients, prePrepItems, eatingSlots, addSlotRecipe, removeSlotRecipe, randomizeWeekPlan, clearWeekPlan } =
+  const { weekPlan, recipes, ingredients, prePrepItems, eatingSlots, dayMenuTemplates, addSlotRecipe, removeSlotRecipe, saveDayAsTemplate, applyTemplateToDay, randomizeWeekPlan, clearWeekPlan } =
     useMenuStore()
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0) // Default: Monday (0)
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [templateNameInput, setTemplateNameInput] = useState('')
 
   const activeSlots = eatingSlots && eatingSlots.length > 0 ? eatingSlots : DEFAULT_EATING_SLOTS
   const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -176,7 +180,7 @@ function WeeklyPlannerView() {
           <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
             📅 Day Menu Planner: <span className="text-cyan-400 font-extrabold">{DAY_NAMES[selectedDayIndex]}</span>
           </h3>
-          <p className="text-xs text-slate-400">Assign multiple recipes per eating slot, track target schedules & daily calories.</p>
+          <p className="text-xs text-slate-400">Assign multiple recipes per eating slot, save reusable day templates & track daily calories.</p>
         </div>
 
         {/* Daily Calorie Banner & Actions */}
@@ -193,7 +197,38 @@ function WeeklyPlannerView() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Apply Template Dropdown */}
+            {dayMenuTemplates && dayMenuTemplates.length > 0 && (
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    applyTemplateToDay(selectedDayIndex, e.target.value)
+                  }
+                }}
+                className="text-xs px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-cyan-400 font-bold focus:outline-none cursor-pointer"
+              >
+                <option value="">📋 Apply Template…</option>
+                {dayMenuTemplates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    Load "{t.name}"
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Save Day as Template Button */}
+            <button
+              onClick={() => {
+                setTemplateNameInput(`${DAY_NAMES[selectedDayIndex]} Menu`)
+                setShowSaveModal(true)
+              }}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-950 hover:bg-slate-900 text-cyan-400 border border-cyan-800/40 transition-all cursor-pointer active:scale-95 flex items-center gap-1.5"
+            >
+              💾 Save Day as Template
+            </button>
+
             <button
               onClick={() => randomizeWeekPlan()}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white shadow-md shadow-indigo-950/40 transition-all active:scale-95 cursor-pointer"
@@ -209,6 +244,55 @@ function WeeklyPlannerView() {
           </div>
         </div>
       </div>
+
+      {/* Save Day Template Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 bg-slate-955/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 md:p-6 max-w-md w-full space-y-4 shadow-2xl">
+            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+              💾 Save {DAY_NAMES[selectedDayIndex]}'s Menu as Template
+            </h3>
+            <p className="text-xs text-slate-400">
+              Save all assigned recipes for {DAY_NAMES[selectedDayIndex]} so you can quickly apply it to any day of the week anytime!
+            </p>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-450 uppercase block mb-1">
+                Template Name
+              </label>
+              <input
+                type="text"
+                value={templateNameInput}
+                onChange={(e) => setTemplateNameInput(e.target.value)}
+                placeholder="e.g. High Protein Workout Day, Keto Weekend"
+                className="text-xs px-3.5 py-2 w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowSaveModal(false)}
+                className="px-4 py-1.5 text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (templateNameInput.trim()) {
+                    saveDayAsTemplate(selectedDayIndex, templateNameInput.trim())
+                    setShowSaveModal(false)
+                  }
+                }}
+                className="px-5 py-1.5 text-xs font-bold bg-cyan-500 text-slate-955 rounded-xl shadow-md active:scale-95 cursor-pointer"
+              >
+                Save Template
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sleek Day Selector Tab Bar */}
       <div className="flex items-center justify-between bg-slate-950/80 p-1.5 rounded-2xl border border-slate-850 overflow-x-auto gap-1">
@@ -1426,6 +1510,123 @@ function EatingSlotEditor({
         >
           Save Slot
         </button>
+      </div>
+    </div>
+  )
+}
+
+/* =========================================================================
+   6. REUSABLE DAY MENU TEMPLATES VIEW
+   ========================================================================= */
+function DayTemplatesView() {
+  const { dayMenuTemplates, recipes, eatingSlots, applyTemplateToDay, deleteDayMenuTemplate } = useMenuStore()
+  const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  const activeSlots = eatingSlots && eatingSlots.length > 0 ? eatingSlots : DEFAULT_EATING_SLOTS
+
+  return (
+    <div className="space-y-4 animate-in fade-in duration-200">
+      <div className="flex items-center justify-between bg-slate-900/60 p-4 border border-slate-800 rounded-2xl">
+        <div>
+          <h3 className="text-sm font-bold text-cyan-300">🗂️ Reusable Day Menu Templates</h3>
+          <p className="text-xs text-slate-400">Save full-day meal configurations and apply them to any day of the week with 1 click.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {(dayMenuTemplates || []).map((template) => {
+          // Compute total template calories
+          let templateCalories = 0
+          activeSlots.forEach((slot) => {
+            const slotData = template.slots?.[slot.id]
+            const rIds = getSlotRecipeIds(slotData)
+            rIds.forEach((rid) => {
+              const r = recipes.find((rec) => rec.id === rid)
+              if (r?.calories) templateCalories += r.calories
+            })
+          })
+
+          return (
+            <div key={template.id} className="bg-slate-900/40 border border-slate-800 p-4 rounded-3xl space-y-3.5 shadow-lg flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-850 pb-2">
+                  <h4 className="text-base font-extrabold text-slate-100 flex items-center gap-2">
+                    <span>🗂️</span>
+                    <span>{template.name}</span>
+                  </h4>
+
+                  {templateCalories > 0 && (
+                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-amber-955/60 border border-amber-900/40 text-amber-400 font-bold flex items-center gap-1">
+                      <FireIcon /> {templateCalories} kcal
+                    </span>
+                  )}
+                </div>
+
+                {/* Eating Slots Breakdown */}
+                <div className="space-y-2 text-xs">
+                  {activeSlots.map((slot) => {
+                    const slotData = template.slots?.[slot.id]
+                    const rIds = getSlotRecipeIds(slotData)
+                    const slotRecipes = rIds.map((id) => recipes.find((r) => r.id === id)).filter(Boolean) as Recipe[]
+
+                    if (slotRecipes.length === 0) return null
+
+                    return (
+                      <div key={slot.id} className="bg-slate-950/80 p-2.5 rounded-2xl border border-slate-850 space-y-1">
+                        <span className="text-[10px] font-bold uppercase text-slate-450 flex items-center gap-1">
+                          <span>{slot.icon || '🍱'}</span>
+                          <span>{slot.name}</span>
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {slotRecipes.map((r) => (
+                            <span key={r.id} className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-200">
+                              {r.title} {r.calories ? `(${r.calories} kcal)` : ''}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Action Bar */}
+              <div className="flex items-center justify-between pt-3 border-t border-slate-850 gap-2">
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value !== '') {
+                      applyTemplateToDay(Number(e.target.value), template.id)
+                    }
+                  }}
+                  className="text-xs px-3 py-1.5 bg-slate-950 border border-cyan-800/40 rounded-xl text-cyan-400 font-bold focus:outline-none cursor-pointer"
+                >
+                  <option value="">Apply to Day…</option>
+                  {DAY_NAMES.map((dayName, idx) => (
+                    <option key={idx} value={idx}>
+                      Apply to {dayName}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  onClick={() => deleteDayMenuTemplate(template.id)}
+                  className="text-xs px-3 py-1 rounded-xl bg-rose-955/40 hover:bg-rose-950 text-rose-300 border border-rose-900/40 cursor-pointer"
+                >
+                  Delete Template
+                </button>
+              </div>
+            </div>
+          )
+        })}
+
+        {(!dayMenuTemplates || dayMenuTemplates.length === 0) && (
+          <div className="col-span-full bg-slate-900/20 border border-dashed border-slate-800 p-8 rounded-2xl text-center">
+            <p className="text-sm text-slate-400">No day menu templates saved yet.</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Go to the 📅 Day Planner tab and click "💾 Save Day as Template" to save your custom daily menus!
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )

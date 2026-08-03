@@ -69,6 +69,13 @@ export function getSlotRecipeIds(slot?: DayMealSlot): string[] {
   return []
 }
 
+// Reusable Day Menu Template
+export interface DayMenuTemplate {
+  id: string
+  name: string                         // e.g. "High Protein Workout Day", "Keto Weekend"
+  slots: Record<string, DayMealSlot>   // Key: slotId -> DayMealSlot
+}
+
 // Single day menu plan across eating slots
 export interface DayMenuPlan {
   dayIndex: number           // 0 = Monday, 1 = Tuesday ... 6 = Sunday

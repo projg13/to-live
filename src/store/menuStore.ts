@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Ingredient, PrePrepItem, Recipe, WeekMenuPlan, EatingSlot, DayMealSlot } from '../types/menu'
+import type { Ingredient, PrePrepItem, Recipe, WeekMenuPlan, EatingSlot, DayMealSlot, DayMenuTemplate } from '../types/menu'
 import { getSlotRecipeIds } from '../types/menu'
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -37,7 +37,13 @@ interface MenuStore {
   prePrepItems: PrePrepItem[]
   recipes: Recipe[]
   eatingSlots: EatingSlot[]
+  dayMenuTemplates: DayMenuTemplate[]
   weekPlan: WeekMenuPlan
+
+  // Day Menu Template Actions
+  saveDayAsTemplate: (dayIndex: number, templateName: string) => void
+  applyTemplateToDay: (dayIndex: number, templateId: string) => void
+  deleteDayMenuTemplate: (templateId: string) => void
 
   // Eating Slots CRUD
   addEatingSlot: (slot: EatingSlot) => void
@@ -76,7 +82,80 @@ export const useMenuStore = create<MenuStore>()(
       prePrepItems: [],
       recipes: [],
       eatingSlots: DEFAULT_EATING_SLOTS,
+      dayMenuTemplates: [],
       weekPlan: createEmptyWeekPlan(),
+
+      saveDayAsTemplate: (dayIndex, templateName) =>
+        set((state) => {
+          const dayPlan = state.weekPlan[dayIndex]
+          if (!dayPlan || !templateName.trim()) return state
+
+          // Deep copy slots map
+          const slotsCopy: Record<string, DayMealSlot> = {}
+          const activeSlots = dayPlan.slots || {}
+          Object.keys(activeSlots).forEach((slotId) => {
+            const slot = activeSlots[slotId]
+            const rIds = getSlotRecipeIds(slot)
+            slotsCopy[slotId] = {
+              recipeId: rIds[0],
+              recipeIds: [...rIds],
+              customName: slot?.customName,
+            }
+          })
+
+          const newTemplate: DayMenuTemplate = {
+            id: crypto.randomUUID(),
+            name: templateName.trim(),
+            slots: slotsCopy,
+          }
+
+          return {
+            dayMenuTemplates: [...(state.dayMenuTemplates || []), newTemplate],
+          }
+        }),
+
+      applyTemplateToDay: (dayIndex, templateId) =>
+        set((state) => {
+          const template = (state.dayMenuTemplates || []).find((t) => t.id === templateId)
+          if (!template) return state
+
+          const currentDay = state.weekPlan[dayIndex] || {
+            dayIndex,
+            dayName: DAY_NAMES[dayIndex] || `Day ${dayIndex + 1}`,
+            slots: {},
+          }
+
+          // Deep copy template slots into day plan
+          const appliedSlots: Record<string, DayMealSlot> = {}
+          Object.keys(template.slots).forEach((slotId) => {
+            const slot = template.slots[slotId]
+            const rIds = getSlotRecipeIds(slot)
+            appliedSlots[slotId] = {
+              recipeId: rIds[0],
+              recipeIds: [...rIds],
+              customName: slot?.customName,
+            }
+          })
+
+          return {
+            weekPlan: {
+              ...state.weekPlan,
+              [dayIndex]: {
+                ...currentDay,
+                slots: appliedSlots,
+                breakfast: appliedSlots['breakfast'],
+                lunch: appliedSlots['lunch'],
+                dinner: appliedSlots['dinner'],
+                snack: appliedSlots['snack'],
+              },
+            },
+          }
+        }),
+
+      deleteDayMenuTemplate: (templateId) =>
+        set((state) => ({
+          dayMenuTemplates: (state.dayMenuTemplates || []).filter((t) => t.id !== templateId),
+        })),
 
       addEatingSlot: (slot) =>
         set((state) => ({ eatingSlots: [...state.eatingSlots, slot] })),
@@ -312,6 +391,9 @@ export const useMenuStore = create<MenuStore>()(
         if (!persistedState.eatingSlots || persistedState.eatingSlots.length === 0) {
           persistedState.eatingSlots = DEFAULT_EATING_SLOTS
         }
+        if (!persistedState.dayMenuTemplates) {
+          persistedState.dayMenuTemplates = []
+        }
         if (persistedState.weekPlan) {
           Object.values(persistedState.weekPlan).forEach((dayPlan: any) => {
             if (!dayPlan.slots) {
@@ -322,13 +404,12 @@ export const useMenuStore = create<MenuStore>()(
                 snack: dayPlan.snack || {},
               }
             }
-            // Ensure recipeIds array exists on all slots
             Object.values(dayPlan.slots).forEach((s: any) => {
               if (s && !s.recipeIds && s.recipeId) {
                 s.recipeIds = [s.recipeId]
               }
             })
-          });
+          })
         }
         return persistedState
       },
