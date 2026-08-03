@@ -150,9 +150,10 @@ function ObligationPanel() {
                 </div>
 
                 {/* Read-only deadline + weight info for recurring obligations */}
-                {ob.recurrence !== 'one-time' && resolvedDeadline && (
+                {(ob.recurrence !== 'one-time' && resolvedDeadline || ob.startDate) && (
                   <div className="flex flex-wrap gap-2 text-[10px] font-mono text-slate-500">
-                    <span>📅 Next: {resolvedDeadline}</span>
+                    {ob.startDate && <span>🚀 Starts: {ob.startDate}</span>}
+                    {ob.recurrence !== 'one-time' && resolvedDeadline && <span>📅 Next: {resolvedDeadline}</span>}
                     {activeBracket && (
                       <span>⚖️ Bracket: ≤{activeBracket.maxDaysRemaining}d → peak {Math.max(...activeBracket.timeCurve.map(p => p.value))}w</span>
                     )}
@@ -243,6 +244,7 @@ function ObligationEditor({
   const { tasks: allTasks } = useTaskStore()
 
   const [name, setName] = useState(initial?.name ?? '')
+  const [startDate, setStartDate] = useState(initial?.startDate ?? '')
   const [deadline, setDeadline] = useState(initial?.deadline ?? '')
   const [recurrence, setRecurrence] = useState<ObligationRecurrence>(initial?.recurrence ?? 'one-time')
   const [recurrenceMonth, setRecurrenceMonth] = useState(initial?.recurrenceMonth ?? 0)
@@ -260,6 +262,7 @@ function ObligationEditor({
       id: initial?.id ?? crypto.randomUUID(),
       name: name.trim(),
       tasks,
+      startDate: startDate || undefined,
       deadline: deadline || undefined,
       weightBrackets: brackets,
       recurrence,
@@ -288,8 +291,19 @@ function ObligationEditor({
         />
       </div>
 
-      {/* Deadline, Recurrence & Enabled Checkbox */}
+      {/* Start Date, Deadline, Recurrence & Enabled Checkbox */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-900/30 p-3.5 rounded-xl border border-slate-800 flex-wrap">
+        <div>
+          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">
+            Start Date (Optional)
+          </label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="text-xs px-2.5 py-1.5 w-full bg-slate-955 border border-slate-800 rounded-lg text-slate-300 focus:outline-none cursor-pointer"
+          />
+        </div>
         <div>
           <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">
             Deadline Date

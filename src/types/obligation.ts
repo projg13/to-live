@@ -47,6 +47,7 @@ export interface Obligation {
 
   // Deadline (optional — if absent, no escalation, uses the first bracket always)
   deadline?: string               // ISO date
+  startDate?: string              // ISO date (optional — if date < startDate, obligation is inactive)
 
   // Date-range based weight curves
   // Sorted ascending by maxDaysRemaining. Resolver picks first bracket where daysRemaining <= max.
@@ -66,6 +67,10 @@ export interface Obligation {
 
 // Dynamically resolve target deadline for recurring obligations for any given date
 export function resolveObligationDeadline(ob: Obligation, dateStr: string): string | undefined {
+  if (ob.startDate && dateStr < ob.startDate) {
+    return undefined
+  }
+
   if (ob.recurrence === 'one-time') {
     return ob.deadline
   }
