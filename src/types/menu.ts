@@ -1,4 +1,12 @@
-export type MealGroup = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+export type MealGroup = 'breakfast' | 'lunch' | 'dinner' | 'snack' | string
+
+// Configurable & Adjustable Eating Slot (e.g. Breakfast, Post-Workout, Lunch, Dinner, Evening Tea)
+export interface EatingSlot {
+  id: string              // Unique slot key (e.g. 'breakfast', 'post_workout', 'lunch', 'dinner')
+  name: string            // Display name (e.g. "Early Morning Tea", "Breakfast", "Post-Workout Shake")
+  scheduledTime?: string  // Target HH:MM schedule time (e.g. "08:00", "13:30", "20:00")
+  icon?: string           // Visual emoji / icon (e.g. "🌅", "⚡", "☀️", "🍿", "🌙")
+}
 
 // Ingredient Object
 export interface Ingredient {
@@ -34,27 +42,31 @@ export interface RecipePrePrep {
 export interface Recipe {
   id: string
   title: string
-  mealGroup: MealGroup       // 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  mealGroup: MealGroup       // 'breakfast' | 'lunch' | 'dinner' | 'snack' or custom slot ID
   ingredients: RecipeIngredient[]
   prePrepItems: RecipePrePrep[]
   notes?: string             // Instructions / recipe notes
   prepTimeMinutes?: number
+  calories?: number          // Calorie count (kcal per serving)
 }
 
-// Meal slot on a specific day
+// Meal slot assignment on a specific day
 export interface DayMealSlot {
   recipeId?: string
   customName?: string
 }
 
-// Single day menu plan across 4 meal groups
+// Single day menu plan across eating slots
 export interface DayMenuPlan {
   dayIndex: number           // 0 = Monday, 1 = Tuesday ... 6 = Sunday
   dayName: string            // "Monday", "Tuesday", etc.
-  breakfast: DayMealSlot
-  lunch: DayMealSlot
-  dinner: DayMealSlot
-  snack: DayMealSlot
+  slots: Record<string, DayMealSlot> // Key: slotId -> DayMealSlot
+
+  // Backward compatibility fields
+  breakfast?: DayMealSlot
+  lunch?: DayMealSlot
+  dinner?: DayMealSlot
+  snack?: DayMealSlot
 }
 
 // Weekly Menu Plan (Key: 0..6)
