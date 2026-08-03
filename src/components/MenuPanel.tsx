@@ -87,6 +87,17 @@ export default function MenuPanel() {
 function WeeklyPlannerView() {
   const { weekPlan, recipes, ingredients, prePrepItems, setSlotRecipe, randomizeWeekPlan, clearWeekPlan } =
     useMenuStore()
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0) // Default: Monday (0)
+
+  const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  const selectedDayPlan = weekPlan[selectedDayIndex] || {
+    dayIndex: selectedDayIndex,
+    dayName: DAY_NAMES[selectedDayIndex],
+    breakfast: {},
+    lunch: {},
+    dinner: {},
+    snack: {},
+  }
 
   // Calculate aggregated Grocery / Raw Ingredients requirement for the week
   const getAggregatedIngredients = () => {
@@ -133,16 +144,18 @@ function WeeklyPlannerView() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      {/* Control Actions */}
+      {/* Top Header & Actions */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-4 border border-slate-800 rounded-2xl">
         <div>
-          <h3 className="text-sm font-bold text-slate-200">Weekly Meal Schedule</h3>
-          <p className="text-xs text-slate-400">Assign recipes to breakfast, lunch, dinner, & snacks per day.</p>
+          <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+            📅 Day Menu Planner: <span className="text-cyan-400 font-extrabold">{DAY_NAMES[selectedDayIndex]}</span>
+          </h3>
+          <p className="text-xs text-slate-400">Focus on individual day menus or randomize the full week.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => randomizeWeekPlan()}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white shadow-md shadow-indigo-950/40 transition-all active:scale-95 cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white shadow-md shadow-indigo-950/40 transition-all active:scale-95 cursor-pointer"
           >
             <ShuffleIcon /> 🎲 Randomize Week Menu
           </button>
@@ -155,56 +168,140 @@ function WeeklyPlannerView() {
         </div>
       </div>
 
-      {/* 7-Day Matrix */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3">
-        {Object.values(weekPlan).map((dayPlan) => (
-          <div
-            key={dayPlan.dayIndex}
-            className="bg-slate-900/40 border border-slate-850 p-3 rounded-2xl space-y-3 flex flex-col justify-between"
-          >
-            <div className="border-b border-slate-800 pb-1.5">
-              <h4 className="font-bold text-cyan-400 text-xs tracking-wider uppercase text-center">
-                {dayPlan.dayName}
-              </h4>
-            </div>
+      {/* Sleek Day Selector Tab Bar */}
+      <div className="flex items-center justify-between bg-slate-950/80 p-1.5 rounded-2xl border border-slate-850 overflow-x-auto gap-1">
+        {DAY_NAMES.map((dayName, idx) => {
+          const isSelected = selectedDayIndex === idx
+          // Check if day has any assigned recipe
+          const dPlan = weekPlan[idx]
+          const hasAssigned = dPlan && (dPlan.breakfast?.recipeId || dPlan.lunch?.recipeId || dPlan.dinner?.recipeId || dPlan.snack?.recipeId)
 
-            <div className="space-y-2.5 flex-1">
-              {(['breakfast', 'lunch', 'dinner', 'snack'] as MealGroup[]).map((mealGroup) => {
-                const slot = dayPlan[mealGroup]
-                const groupRecipes = recipes.filter((r) => r.mealGroup === mealGroup)
+          return (
+            <button
+              key={idx}
+              onClick={() => setSelectedDayIndex(idx)}
+              className={`flex-1 min-w-[95px] py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer text-center relative active:scale-95 ${
+                isSelected
+                  ? 'bg-slate-900 text-cyan-400 border border-slate-800 shadow-md shadow-cyan-950/40'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/40'
+              }`}
+            >
+              <span>{dayName}</span>
+              {hasAssigned && (
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 absolute top-1.5 right-2" title="Meals Planned" />
+              )}
+            </button>
+          )
+        })}
+      </div>
 
-                return (
-                  <div key={mealGroup} className="space-y-1">
-                    <label className="text-[9px] font-bold uppercase tracking-wider text-slate-450 block">
-                      {mealGroup === 'breakfast' && '🌅 Breakfast'}
-                      {mealGroup === 'lunch' && '☀️ Lunch'}
-                      {mealGroup === 'dinner' && '🌙 Dinner'}
-                      {mealGroup === 'snack' && '🍿 Snack'}
-                    </label>
+      {/* Focused Single-Day Meal Cards Panel */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {(
+          [
+            { key: 'breakfast', title: '🌅 Breakfast', color: 'from-amber-500/10 to-orange-500/10 border-amber-500/20 text-amber-400' },
+            { key: 'lunch', title: '☀️ Lunch', color: 'from-cyan-500/10 to-blue-500/10 border-cyan-500/20 text-cyan-400' },
+            { key: 'dinner', title: '🌙 Dinner', color: 'from-indigo-500/10 to-purple-500/10 border-indigo-500/20 text-indigo-400' },
+            { key: 'snack', title: '🍿 Snacks', color: 'from-pink-500/10 to-rose-500/10 border-pink-500/20 text-pink-400' },
+          ] as const
+        ).map((slotInfo) => {
+          const slot = selectedDayPlan[slotInfo.key]
+          const selectedRecipe = recipes.find((r) => r.id === slot?.recipeId)
+          const groupRecipes = recipes.filter((r) => r.mealGroup === slotInfo.key)
 
-                    <select
-                      value={slot?.recipeId ?? ''}
-                      onChange={(e) => setSlotRecipe(dayPlan.dayIndex, mealGroup, e.target.value || undefined)}
-                      className="text-xs px-2 py-1.5 w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-1 focus:ring-cyan-500 focus:outline-none cursor-pointer"
-                    >
-                      <option value="">-- None --</option>
-                      {groupRecipes.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.title}
-                        </option>
-                      ))}
-                      {groupRecipes.length === 0 && recipes.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.title} ({r.mealGroup})
-                        </option>
-                      ))}
-                    </select>
+          return (
+            <div
+              key={slotInfo.key}
+              className={`bg-gradient-to-br ${slotInfo.color} border p-4 rounded-3xl space-y-3.5 shadow-lg flex flex-col justify-between`}
+            >
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                <h4 className={`text-sm font-extrabold tracking-wide ${slotInfo.color.split(' ').pop()}`}>
+                  {slotInfo.title}
+                </h4>
+                {selectedRecipe?.prepTimeMinutes && (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-950/80 border border-slate-800 text-slate-300">
+                    ⏱️ {selectedRecipe.prepTimeMinutes} mins prep
+                  </span>
+                )}
+              </div>
+
+              {/* Recipe Selector */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-450 block">
+                  Select Meal Recipe:
+                </label>
+                <select
+                  value={slot?.recipeId ?? ''}
+                  onChange={(e) => setSlotRecipe(selectedDayIndex, slotInfo.key, e.target.value || undefined)}
+                  className="text-xs px-3 py-2 w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- No Recipe Assigned --</option>
+                  {groupRecipes.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.title}
+                    </option>
+                  ))}
+                  {groupRecipes.length === 0 &&
+                    recipes.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.title} ({r.mealGroup})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              {/* Recipe Details Preview */}
+              {selectedRecipe ? (
+                <div className="bg-slate-950/80 border border-slate-850 p-3 rounded-2xl space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-200">{selectedRecipe.title}</span>
+                    <span className="text-[10px] uppercase font-bold text-cyan-400 bg-cyan-955/50 border border-cyan-900/30 px-2 py-0.5 rounded">
+                      {selectedRecipe.mealGroup}
+                    </span>
                   </div>
-                )
-              })}
+
+                  {/* Raw Ingredients breakdown */}
+                  {selectedRecipe.ingredients.length > 0 && (
+                    <div className="pt-1.5 border-t border-slate-850/80">
+                      <span className="text-[10px] font-bold uppercase text-slate-450 block mb-1">Raw Groceries Needed:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedRecipe.ingredients.map((ingRef, idx) => {
+                          const ing = ingredients.find((i) => i.id === ingRef.ingredientId)
+                          return (
+                            <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                              {ing?.name ?? 'Item'}: {ingRef.quantity} {ing?.unit ?? ''}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pre-Prep breakdown */}
+                  {selectedRecipe.prePrepItems && selectedRecipe.prePrepItems.length > 0 && (
+                    <div className="pt-1.5 border-t border-slate-850/80">
+                      <span className="text-[10px] font-bold uppercase text-purple-400 block mb-1">Batch Pre-Prep:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedRecipe.prePrepItems.map((ppRef, idx) => {
+                          const pp = prePrepItems.find((p) => p.id === ppRef.prePrepId)
+                          return (
+                            <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-955/40 border border-purple-900/30 text-purple-300">
+                              🔪 {pp?.name ?? 'Prep'}: {ppRef.quantity} {pp?.unit ?? ''}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-slate-950/40 border border-dashed border-slate-850 p-4 rounded-2xl text-center">
+                  <p className="text-xs text-slate-500 italic">No meal planned for {slotInfo.title.split(' ')[1]}.</p>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* DUAL AGGREGATORS: Grocery Requirements & Pre-Prep Batch Requirements */}
