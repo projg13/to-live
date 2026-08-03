@@ -12,11 +12,21 @@ export interface WeightPoint {
   value: number
 }
 
+// Task Alter-Ego preset (Mode / Variant)
+export interface TaskAlterEgo {
+  id: string
+  name: string                  // e.g. "Express", "Full", "Extended"
+  titleOverride?: string        // e.g. "Quick Dinner" (defaults to base title if empty)
+  durationMinutes: number       // duration override (e.g. 15, 30, 60)
+  triggerDelayMinutes?: number  // auto-trigger if start delay >= X mins from ideal
+}
+
 export interface TaskKnobs {
   isMother: boolean        // enables links[]
   hasWeightCurve: boolean  // enables weightCurve[]
   hasExpiry: boolean       // enables expiresAt
   hasFixedEndTime?: boolean // enables fixedEndTime
+  hasAlterEgos?: boolean   // enables alterEgos[]
 }
 
 // Task: a quantum of time consumption
@@ -38,6 +48,9 @@ export interface Task {
 
   // Knobbed: hasFixedEndTime
   fixedEndTime?: number           // minutes from midnight (0–1439)
+
+  // Knobbed: hasAlterEgos
+  alterEgos?: TaskAlterEgo[]
 
   // Runtime tracking
   spawnedIds?: string[]           // which links have fired

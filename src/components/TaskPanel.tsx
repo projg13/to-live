@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTaskStore } from '../store/taskStore'
-import type { Task, TaskLink, ContinuityRule } from '../types/task'
+import type { Task, TaskLink, TaskAlterEgo, ContinuityRule } from '../types/task'
 
 // Icons
 const PlusIcon = () => (
@@ -28,7 +28,7 @@ const XIcon = () => (
 )
 
 const LinkIcon = () => (
-  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
   </svg>
 )
@@ -42,13 +42,13 @@ function TaskPanel() {
     <div className="space-y-6">
       <div className="border-b border-slate-800 pb-2 flex justify-between items-center">
         <div>
-          <h3 className="text-lg font-black tracking-wide text-slate-100">Tasks Directory</h3>
-          <p className="text-xs text-slate-400">Manage all registered tasks, priorities, and dependency rules.</p>
+          <h3 className="text-lg font-black tracking-wide text-slate-100">Task Catalog</h3>
+          <p className="text-xs text-slate-400">Atomic duration quanta and structural mother-child chains.</p>
         </div>
-        {!creating && (
+        {!creating && !editing && (
           <button
             onClick={() => setCreating(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-955 shadow-md shadow-cyan-950/20 transition-all active:scale-95 cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-slate-955 shadow-md shadow-cyan-950/20 transition-all cursor-pointer"
           >
             <PlusIcon /> New Task
           </button>
@@ -56,11 +56,10 @@ function TaskPanel() {
       </div>
 
       {creating && (
-        <div className="bg-slate-955 border border-slate-800 rounded-2xl p-4">
+        <div className="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl">
           <TaskEditor
-            allTasks={tasks}
-            onSave={(task) => {
-              addTask(task)
+            onSave={(newTask) => {
+              addTask(newTask)
               setCreating(false)
             }}
             onCancel={() => setCreating(false)}
@@ -68,90 +67,98 @@ function TaskPanel() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {tasks.map((task) => {
-          if (editing === task.id) {
-            return (
-              <div key={task.id} className="bg-slate-955 border border-slate-800 rounded-2xl p-4 md:col-span-2">
-                <TaskEditor
-                  initial={task}
-                  allTasks={tasks}
-                  onSave={(updated) => {
-                    updateTask(task.id, updated)
-                    setEditing(null)
-                  }}
-                  onCancel={() => setEditing(null)}
-                  onDelete={() => {
-                    deleteTask(task.id)
-                    setEditing(null)
-                  }}
-                />
-              </div>
-            )
-          }
-
-          return (
-            <div
-              key={task.id}
-              onClick={() => setEditing(task.id)}
-              className="group p-4 bg-slate-955/40 hover:bg-slate-900 rounded-2xl border border-slate-800/80 shadow-sm cursor-pointer hover:border-cyan-500/25 transition-all duration-200 flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="font-bold text-slate-200 text-[15px] tracking-wide">
-                    {task.title}
-                  </span>
-                  <span className="text-[10px] font-mono font-bold tracking-wider text-slate-400 bg-slate-950 border border-slate-850 px-2 py-0.5 rounded">
-                    w:{task.weight} | {task.durationMinutes}m
-                  </span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {tasks.map((task) => (
+          <div
+            key={task.id}
+            className="bg-slate-900/40 border border-slate-850 p-4 rounded-2xl space-y-3 hover:border-slate-800 transition-colors"
+          >
+            {editing === task.id ? (
+              <TaskEditor
+                initial={task}
+                onSave={(updated) => {
+                  updateTask(task.id, updated)
+                  setEditing(null)
+                }}
+                onCancel={() => setEditing(null)}
+                onDelete={() => {
+                  deleteTask(task.id)
+                  setEditing(null)
+                }}
+              />
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h4 className="font-bold text-slate-200 text-sm">{task.title}</h4>
+                    <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-400 mt-0.5">
+                      <span>⚡ W: {task.weight}</span>
+                      <span>• ⏱️ {task.durationMinutes}m</span>
+                      {task.knobs.isMother && <span>• 🔗 Mother</span>}
+                      {task.knobs.hasWeightCurve && <span>• 🎚️ Curve</span>}
+                      {task.knobs.hasExpiry && <span>• ⏰ Expiry</span>}
+                      {task.knobs.hasFixedEndTime && task.fixedEndTime !== undefined && (
+                        <span>• 🛑 End: {Math.floor(task.fixedEndTime / 60)}:{(task.fixedEndTime % 60).toString().padStart(2, '0')}</span>
+                      )}
+                      {task.knobs.hasAlterEgos && task.alterEgos && task.alterEgos.length > 0 && (
+                        <span>• 🎭 {task.alterEgos.length} Alter-Ego(s)</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setEditing(task.id)}
+                      className="text-xs font-semibold text-slate-400 hover:text-cyan-400 px-2 py-1 rounded bg-slate-950 border border-slate-850 transition-colors cursor-pointer"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deleteTask(task.id)}
+                      className="text-slate-500 hover:text-rose-400 p-1 transition-colors cursor-pointer"
+                      title="Delete Task"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {task.knobs.isMother && task.links && task.links.length > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-teal-955/35 text-teal-400 border border-teal-905/30">
-                      <LinkIcon /> Links: {task.links.length}
-                    </span>
-                  )}
-                  {task.parentId && (
-                    <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-950 text-slate-500 border border-slate-850">
-                      Child
-                    </span>
-                  )}
-                </div>
+                {/* Alter Egos summary badges */}
+                {task.knobs.hasAlterEgos && task.alterEgos && task.alterEgos.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {task.alterEgos.map((ae) => (
+                      <span key={ae.id} className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-955/40 border border-cyan-900/30 text-cyan-300">
+                        🎭 {ae.name}: {ae.durationMinutes}m {ae.triggerDelayMinutes !== undefined ? `(≥${ae.triggerDelayMinutes}m delay)` : ''}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-
-              <div className="flex justify-end pt-3 mt-3 border-t border-slate-850 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-[11px] font-bold text-cyan-400">
-                  Edit Task Details
-                </span>
-              </div>
-            </div>
-          )
-        })}
-
-        {tasks.length === 0 && !creating && (
-          <p className="text-sm italic text-slate-500 py-4 col-span-2">
-            No tasks registered yet. Add a task to get started.
-          </p>
-        )}
+            )}
+          </div>
+        ))}
       </div>
+
+      {tasks.length === 0 && !creating && (
+        <div className="text-center py-12 bg-slate-900/20 border border-dashed border-slate-800 rounded-2xl">
+          <p className="text-sm font-semibold text-slate-500">No tasks in catalog yet.</p>
+        </div>
+      )}
     </div>
   )
 }
 
 function TaskEditor({
   initial,
-  allTasks,
   onSave,
   onCancel,
   onDelete,
 }: {
   initial?: Task
-  allTasks: Task[]
   onSave: (task: Task) => void
   onCancel: () => void
   onDelete?: () => void
 }) {
+  const { tasks: allTasks } = useTaskStore()
   const [title, setTitle] = useState(initial?.title ?? '')
   const [weight, setWeight] = useState(initial?.weight ?? 100)
   const [duration, setDuration] = useState(initial?.durationMinutes ?? 30)
@@ -161,6 +168,7 @@ function TaskEditor({
   const [hasWeightCurve, setHasWeightCurve] = useState(initial?.knobs.hasWeightCurve ?? false)
   const [hasExpiry, setHasExpiry] = useState(initial?.knobs.hasExpiry ?? false)
   const [hasFixedEndTime, setHasFixedEndTime] = useState(initial?.knobs.hasFixedEndTime ?? false)
+  const [hasAlterEgos, setHasAlterEgos] = useState(initial?.knobs.hasAlterEgos ?? false)
 
   // Links
   const [links, setLinks] = useState<TaskLink[]>(initial?.links ?? [])
@@ -176,6 +184,9 @@ function TaskEditor({
   // Fixed End Time
   const [fixedEndTime, setFixedEndTime] = useState<number | undefined>(initial?.fixedEndTime)
 
+  // Alter Egos
+  const [alterEgos, setAlterEgos] = useState<TaskAlterEgo[]>(initial?.alterEgos ?? [])
+
   const handleSave = () => {
     if (!title.trim() || duration <= 0) return
     onSave({
@@ -187,9 +198,10 @@ function TaskEditor({
       weightCurve: hasWeightCurve ? weightCurve : undefined,
       expiresAt: hasExpiry ? expiresAt : undefined,
       fixedEndTime: hasFixedEndTime ? fixedEndTime : undefined,
+      alterEgos: hasAlterEgos ? alterEgos : undefined,
       spawnedIds: initial?.spawnedIds,
       parentId: initial?.parentId,
-      knobs: { isMother, hasWeightCurve, hasExpiry, hasFixedEndTime },
+      knobs: { isMother, hasWeightCurve, hasExpiry, hasFixedEndTime, hasAlterEgos },
     })
   }
 
@@ -246,6 +258,7 @@ function TaskEditor({
             { id: 'hasWeightCurve', label: 'Weight Curve', checked: hasWeightCurve, set: setHasWeightCurve },
             { id: 'hasExpiry', label: 'Expiry Date', checked: hasExpiry, set: setHasExpiry },
             { id: 'hasFixedEndTime', label: 'Fixed End Time', checked: hasFixedEndTime, set: setHasFixedEndTime },
+            { id: 'hasAlterEgos', label: 'Weight Presets (Alter-Ego)', checked: hasAlterEgos, set: setHasAlterEgos },
           ].map((k) => (
             <label
               key={k.id}
@@ -270,8 +283,8 @@ function TaskEditor({
       {/* Link chains */}
       {isMother && (
         <div className="space-y-3 pl-4 border-l-2 border-cyan-505 bg-slate-900/10 p-3 rounded-2xl">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-            Chain Links
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            <LinkIcon /> Chain Links
           </span>
           
           <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
@@ -425,6 +438,99 @@ function TaskEditor({
       )}
 
 
+
+      {/* Alter-Ego Presets Manager */}
+      {hasAlterEgos && (
+        <div className="space-y-3 pl-4 border-l-2 border-cyan-500 bg-slate-900/10 p-3 rounded-2xl">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider block">
+              🎭 Alter-Ego Presets & Modes
+            </span>
+          </div>
+
+          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+            {alterEgos.map((ae, i) => (
+              <div key={ae.id} className="bg-slate-950 border border-slate-850 p-2.5 rounded-xl space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={ae.name}
+                    onChange={(e) => {
+                      const updated = [...alterEgos]
+                      updated[i] = { ...updated[i], name: e.target.value }
+                      setAlterEgos(updated)
+                    }}
+                    placeholder="Preset Name (e.g. Express, Long)"
+                    className="text-xs px-2.5 py-1 bg-slate-900 border border-slate-800 rounded text-slate-200 focus:outline-none"
+                  />
+                  <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded px-2">
+                    <span className="text-[10px] text-slate-450 font-bold">Dur:</span>
+                    <input
+                      type="number"
+                      value={ae.durationMinutes}
+                      onChange={(e) => {
+                        const updated = [...alterEgos]
+                        updated[i] = { ...updated[i], durationMinutes: Number(e.target.value) || 5 }
+                        setAlterEgos(updated)
+                      }}
+                      className="text-xs py-1 bg-transparent border-none text-slate-200 focus:outline-none w-full"
+                    />
+                    <span className="text-[10px] text-slate-500 font-bold">m</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={ae.titleOverride ?? ''}
+                    onChange={(e) => {
+                      const updated = [...alterEgos]
+                      updated[i] = { ...updated[i], titleOverride: e.target.value || undefined }
+                      setAlterEgos(updated)
+                    }}
+                    placeholder="Title Override (Optional)"
+                    className="text-xs px-2.5 py-1 bg-slate-900 border border-slate-800 rounded text-slate-300 focus:outline-none"
+                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded px-2 w-full">
+                      <span className="text-[10px] text-slate-450 font-bold whitespace-nowrap">≥ Delay:</span>
+                      <input
+                        type="number"
+                        value={ae.triggerDelayMinutes ?? ''}
+                        onChange={(e) => {
+                          const updated = [...alterEgos]
+                          updated[i] = { ...updated[i], triggerDelayMinutes: e.target.value ? Number(e.target.value) : undefined }
+                          setAlterEgos(updated)
+                        }}
+                        placeholder="mins"
+                        className="text-xs py-1 bg-transparent border-none text-slate-200 focus:outline-none w-full"
+                      />
+                    </div>
+                    <button
+                      onClick={() => setAlterEgos(alterEgos.filter((_, j) => j !== i))}
+                      className="p-1.5 text-slate-500 hover:text-rose-400 cursor-pointer transition-colors"
+                    >
+                      <XIcon />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={() =>
+              setAlterEgos([
+                ...alterEgos,
+                { id: crypto.randomUUID(), name: `Preset ${alterEgos.length + 1}`, durationMinutes: duration },
+              ])
+            }
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-950 hover:bg-slate-900 text-cyan-400 border border-slate-850 transition-all cursor-pointer"
+          >
+            <PlusIcon /> Add Alter-Ego Preset
+          </button>
+        </div>
+      )}
 
       {/* Save / Discard Actions */}
       <div className="flex items-center justify-between border-t border-slate-800 pt-4 mt-4">

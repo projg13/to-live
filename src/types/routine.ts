@@ -12,6 +12,7 @@ export interface RoutineTaskConfig {
   expiresAfterMinutes?: number                       // task dies after this many minutes from its ANCHOR start
   idealTime?: number                                 // minutes from midnight — ideal start time for this task
   idealEndTime?: number                              // minutes from midnight — hard ideal end boundary for this task
+  selectedAlterEgoId?: string                        // selected Alter-Ego preset ID for this routine
 }
 
 // Per-block scheduling within a routine — just maps a block to an anchor

@@ -429,13 +429,32 @@ function resolveDay(
 
         const itemIdealEndTime = taskConfig?.idealEndTime ?? (cand.task.knobs?.hasFixedEndTime ? cand.task.fixedEndTime : undefined)
 
+        // Alter-Ego resolution (Manual routine selection > Auto delay trigger from ideal)
+        const delayFromIdeal = Math.max(0, idealStart - taskIdealTime)
+        let activeAlterEgo: import('../types/task').TaskAlterEgo | undefined = undefined
+        if (taskConfig?.selectedAlterEgoId) {
+          activeAlterEgo = cand.task.alterEgos?.find((a) => a.id === taskConfig.selectedAlterEgoId)
+        } else if (cand.task.knobs?.hasAlterEgos && cand.task.alterEgos && cand.task.alterEgos.length > 0) {
+          const matching = cand.task.alterEgos
+            .filter((a) => a.triggerDelayMinutes !== undefined && delayFromIdeal >= a.triggerDelayMinutes)
+            .sort((a, b) => (b.triggerDelayMinutes ?? 0) - (a.triggerDelayMinutes ?? 0))
+          if (matching.length > 0) activeAlterEgo = matching[0]
+        }
+
+        const effectiveTitle = activeAlterEgo?.titleOverride
+          ? activeAlterEgo.titleOverride
+          : activeAlterEgo?.name
+          ? `${cand.task.title} (${activeAlterEgo.name})`
+          : cand.task.title
+        const effectiveDuration = activeAlterEgo?.durationMinutes ?? cand.task.durationMinutes
+
         if (cand.entry.isBackground) {
            items.push({
             taskId: cand.task.id,
             instanceKey: routineIKey,
-            title: cand.task.title,
+            title: effectiveTitle,
             startMinutes: idealStart,
-            endMinutes: idealStart + cand.task.durationMinutes,
+            endMinutes: idealStart + effectiveDuration,
             isBackground: true,
             source: 'routine',
             weight: offsetWeight,
@@ -451,9 +470,9 @@ function resolveDay(
           items.push({
             taskId: cand.task.id,
             instanceKey: routineIKey,
-            title: cand.task.title,
+            title: effectiveTitle,
             startMinutes: idealStart,
-            endMinutes: idealStart + cand.task.durationMinutes,
+            endMinutes: idealStart + effectiveDuration,
             isBackground: false,
             source: 'routine',
             weight: offsetWeight,
@@ -465,7 +484,7 @@ function resolveDay(
             idealEndTime: itemIdealEndTime,
             expiryTime: itemExpiryTime,
           })
-          cursor = idealStart + cand.task.durationMinutes
+          cursor = idealStart + effectiveDuration
 
           // Inline anchor push: if cursor overflowed past any subsequent anchors, push them now
           // so the next routine/candidate sees the updated times

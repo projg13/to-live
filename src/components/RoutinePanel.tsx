@@ -484,6 +484,27 @@ function RoutineEditor({
                     </div>
                   </div>
 
+                  {/* Alter-Ego preset selector */}
+                  {task?.knobs?.hasAlterEgos && task.alterEgos && task.alterEgos.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-slate-850 flex items-center justify-between gap-2">
+                      <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">
+                        🎭 Selected Alter-Ego Preset:
+                      </label>
+                      <select
+                        value={config?.selectedAlterEgoId ?? ''}
+                        onChange={(e) => setTaskConfig(taskId, { selectedAlterEgoId: e.target.value || undefined })}
+                        className="text-xs px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none cursor-pointer"
+                      >
+                        <option value="">(Auto-detect by start delay)</option>
+                        {task.alterEgos.map((ae) => (
+                          <option key={ae.id} value={ae.id}>
+                            {ae.name} ({ae.durationMinutes}m)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   {/* Slot weights */}
                   <div className="space-y-2 mt-2">
                     <div className="flex items-center justify-between">
