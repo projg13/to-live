@@ -50,10 +50,23 @@ export interface Recipe {
   calories?: number          // Calorie count (kcal per serving)
 }
 
-// Meal slot assignment on a specific day
+// Meal slot assignment on a specific day (supports single or multiple recipes)
 export interface DayMealSlot {
-  recipeId?: string
+  recipeId?: string          // Legacy single recipe ID
+  recipeIds?: string[]       // Array of recipe IDs for multi-recipe meals!
   customName?: string
+}
+
+// Helper to extract array of recipe IDs from a slot safely
+export function getSlotRecipeIds(slot?: DayMealSlot): string[] {
+  if (!slot) return []
+  if (slot.recipeIds && Array.isArray(slot.recipeIds)) {
+    return slot.recipeIds.filter(Boolean)
+  }
+  if (slot.recipeId) {
+    return [slot.recipeId]
+  }
+  return []
 }
 
 // Single day menu plan across eating slots

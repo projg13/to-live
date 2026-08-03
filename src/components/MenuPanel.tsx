@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMenuStore, DEFAULT_EATING_SLOTS } from '../store/menuStore'
 import type { Ingredient, PrePrepItem, Recipe, EatingSlot } from '../types/menu'
+import { getSlotRecipeIds } from '../types/menu'
 
 // Icons
 const PlusIcon = () => (
@@ -45,7 +46,7 @@ export default function MenuPanel() {
             🥗 Menu & Recipe Manager
           </h2>
           <p className="text-xs text-slate-400">
-            Plan meals, track daily calories, customize eating slots, catalog recipes & aggregate groceries.
+            Plan meals with multiple dishes per slot, track daily calories, catalog recipes & aggregate groceries.
           </p>
         </div>
 
@@ -84,10 +85,10 @@ export default function MenuPanel() {
 }
 
 /* =========================================================================
-   1. DAY PLANNER VIEW, CALORIES & AGGREGATOR
+   1. DAY PLANNER VIEW, MULTI-RECIPE SLOTS & CALORIES
    ========================================================================= */
 function WeeklyPlannerView() {
-  const { weekPlan, recipes, ingredients, prePrepItems, eatingSlots, setSlotRecipe, randomizeWeekPlan, clearWeekPlan } =
+  const { weekPlan, recipes, ingredients, prePrepItems, eatingSlots, addSlotRecipe, removeSlotRecipe, randomizeWeekPlan, clearWeekPlan } =
     useMenuStore()
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0) // Default: Monday (0)
 
@@ -112,12 +113,13 @@ function WeeklyPlannerView() {
     let total = 0
     activeSlots.forEach((slot) => {
       const assignment = getSlotAssignment(slot.id)
-      if (assignment?.recipeId) {
-        const recipe = recipes.find((r) => r.id === assignment.recipeId)
+      const recipeIds = getSlotRecipeIds(assignment)
+      recipeIds.forEach((rid) => {
+        const recipe = recipes.find((r) => r.id === rid)
         if (recipe?.calories) {
           total += recipe.calories
         }
-      }
+      })
     })
     return total
   }
@@ -128,14 +130,15 @@ function WeeklyPlannerView() {
     Object.values(weekPlan).forEach((dayPlan) => {
       activeSlots.forEach((slot) => {
         const assignment = dayPlan.slots?.[slot.id] || (dayPlan as any)[slot.id]
-        if (assignment?.recipeId) {
-          const recipe = recipes.find((r) => r.id === assignment.recipeId)
+        const recipeIds = getSlotRecipeIds(assignment)
+        recipeIds.forEach((rid) => {
+          const recipe = recipes.find((r) => r.id === rid)
           if (recipe) {
             recipe.ingredients.forEach((ing) => {
               totals[ing.ingredientId] = (totals[ing.ingredientId] || 0) + ing.quantity
             })
           }
-        }
+        })
       })
     })
     return totals
@@ -147,14 +150,15 @@ function WeeklyPlannerView() {
     Object.values(weekPlan).forEach((dayPlan) => {
       activeSlots.forEach((slot) => {
         const assignment = dayPlan.slots?.[slot.id] || (dayPlan as any)[slot.id]
-        if (assignment?.recipeId) {
-          const recipe = recipes.find((r) => r.id === assignment.recipeId)
+        const recipeIds = getSlotRecipeIds(assignment)
+        recipeIds.forEach((rid) => {
+          const recipe = recipes.find((r) => r.id === rid)
           if (recipe && recipe.prePrepItems) {
             recipe.prePrepItems.forEach((pp) => {
               totals[pp.prePrepId] = (totals[pp.prePrepId] || 0) + pp.quantity
             })
           }
-        }
+        })
       })
     })
     return totals
@@ -172,7 +176,7 @@ function WeeklyPlannerView() {
           <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
             📅 Day Menu Planner: <span className="text-cyan-400 font-extrabold">{DAY_NAMES[selectedDayIndex]}</span>
           </h3>
-          <p className="text-xs text-slate-400">Configure eating slots, meal schedules, and total calorie targets.</p>
+          <p className="text-xs text-slate-400">Assign multiple recipes per eating slot, track target schedules & daily calories.</p>
         </div>
 
         {/* Daily Calorie Banner & Actions */}
@@ -215,7 +219,8 @@ function WeeklyPlannerView() {
             dPlan &&
             activeSlots.some((s) => {
               const slotData = dPlan.slots?.[s.id] || (dPlan as any)[s.id]
-              return slotData?.recipeId
+              const rIds = getSlotRecipeIds(slotData)
+              return rIds.length > 0
             })
 
           return (
@@ -237,19 +242,23 @@ function WeeklyPlannerView() {
         })}
       </div>
 
-      {/* Dynamic Single-Day Eating Slot Cards Panel */}
+      {/* Dynamic Single-Day Multi-Recipe Eating Slot Cards Panel */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {activeSlots.map((slot) => {
           const assignment = getSlotAssignment(slot.id)
-          const selectedRecipe = recipes.find((r) => r.id === assignment?.recipeId)
+          const recipeIds = getSlotRecipeIds(assignment)
+          const slotRecipes = recipeIds.map((id) => recipes.find((r) => r.id === id)).filter(Boolean) as Recipe[]
           const groupRecipes = recipes.filter((r) => r.mealGroup === slot.id)
+
+          // Calculate slot total calories
+          const slotCalories = slotRecipes.reduce((sum, r) => sum + (r.calories || 0), 0)
 
           return (
             <div
               key={slot.id}
               className="bg-slate-900/40 border border-slate-800 p-4 rounded-3xl space-y-3.5 shadow-lg flex flex-col justify-between"
             >
-              {/* Header with Slot Name, Scheduled Time, and Calories */}
+              {/* Header with Slot Name, Scheduled Time, and Slot Calories */}
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
                 <h4 className="text-sm font-extrabold tracking-wide text-slate-100 flex items-center gap-2">
                   <span>{slot.icon || '🍱'}</span>
@@ -262,95 +271,140 @@ function WeeklyPlannerView() {
                       <ClockIcon /> {slot.scheduledTime}
                     </span>
                   )}
-                  {selectedRecipe?.calories && (
+                  {slotCalories > 0 && (
                     <span className="px-2 py-0.5 rounded bg-amber-955/60 border border-amber-900/40 text-amber-400 font-bold flex items-center gap-1">
-                      <FireIcon /> {selectedRecipe.calories} kcal
+                      <FireIcon /> {slotCalories} kcal
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Recipe Selector */}
+              {/* Multi-Recipe Pills List */}
+              {slotRecipes.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-450 block">
+                    Assigned Dishes ({slotRecipes.length}):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {slotRecipes.map((recipe) => (
+                      <div
+                        key={recipe.id}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-semibold text-slate-100 shadow-inner"
+                      >
+                        <span>{recipe.title}</span>
+                        {recipe.calories && (
+                          <span className="text-[10px] font-mono text-amber-400 font-bold">
+                            {recipe.calories}kcal
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeSlotRecipe(selectedDayIndex, slot.id, recipe.id)}
+                          className="text-slate-500 hover:text-rose-400 ml-1 cursor-pointer font-bold"
+                          title="Remove from slot"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* + Add Recipe to Slot Dropdown */}
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-slate-450 block">
-                  Assign Recipe:
+                  + Add Recipe to Slot:
                 </label>
                 <select
-                  value={assignment?.recipeId ?? ''}
-                  onChange={(e) => setSlotRecipe(selectedDayIndex, slot.id, e.target.value || undefined)}
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      addSlotRecipe(selectedDayIndex, slot.id, e.target.value)
+                    }
+                  }}
                   className="text-xs px-3 py-2 w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none cursor-pointer"
                 >
-                  <option value="">-- No Recipe Assigned --</option>
-                  {groupRecipes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.title} {r.calories ? `(${r.calories} kcal)` : ''}
-                    </option>
-                  ))}
-                  {groupRecipes.length === 0 &&
-                    recipes.map((r) => (
+                  <option value="">-- Add another dish to {slot.name} --</option>
+                  {groupRecipes
+                    .filter((r) => !recipeIds.includes(r.id))
+                    .map((r) => (
                       <option key={r.id} value={r.id}>
-                        {r.title} ({r.mealGroup}) {r.calories ? `(${r.calories} kcal)` : ''}
+                        + {r.title} {r.calories ? `(${r.calories} kcal)` : ''}
+                      </option>
+                    ))}
+                  {recipes
+                    .filter((r) => r.mealGroup !== slot.id && !recipeIds.includes(r.id))
+                    .map((r) => (
+                      <option key={r.id} value={r.id}>
+                        + {r.title} ({r.mealGroup}) {r.calories ? `(${r.calories} kcal)` : ''}
                       </option>
                     ))}
                 </select>
               </div>
 
-              {/* Recipe Details Preview Card */}
-              {selectedRecipe ? (
+              {/* Multi-Recipe Ingredients & Pre-Prep Combined Breakdown */}
+              {slotRecipes.length > 0 ? (
                 <div className="bg-slate-950/80 border border-slate-850 p-3 rounded-2xl space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-100">{selectedRecipe.title}</span>
-                    <div className="flex items-center gap-1.5">
-                      {selectedRecipe.prepTimeMinutes && (
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
-                          ⏱️ {selectedRecipe.prepTimeMinutes}m
-                        </span>
-                      )}
-                      {selectedRecipe.calories && (
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-955/50 border border-amber-900/30 text-amber-300 font-bold">
-                          🔥 {selectedRecipe.calories} kcal
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  {/* Aggregated Raw Ingredients for this Slot */}
+                  {(() => {
+                    const slotIngs: Record<string, number> = {}
+                    slotRecipes.forEach((r) => {
+                      r.ingredients.forEach((ing) => {
+                        slotIngs[ing.ingredientId] = (slotIngs[ing.ingredientId] || 0) + ing.quantity
+                      })
+                    })
+                    const entries = Object.entries(slotIngs)
+                    if (entries.length === 0) return null
 
-                  {/* Raw Ingredients breakdown */}
-                  {selectedRecipe.ingredients.length > 0 && (
-                    <div className="pt-1.5 border-t border-slate-850/80">
-                      <span className="text-[10px] font-bold uppercase text-slate-450 block mb-1">Raw Groceries:</span>
-                      <div className="flex flex-wrap gap-1">
-                        {selectedRecipe.ingredients.map((ingRef, idx) => {
-                          const ing = ingredients.find((i) => i.id === ingRef.ingredientId)
-                          return (
-                            <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
-                              {ing?.name ?? 'Item'}: {ingRef.quantity} {ing?.unit ?? ''}
-                            </span>
-                          )
-                        })}
+                    return (
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-slate-450 block mb-1">Raw Groceries Needed:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {entries.map(([ingId, qty], idx) => {
+                            const ing = ingredients.find((i) => i.id === ingId)
+                            return (
+                              <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                                {ing?.name ?? 'Item'}: {qty} {ing?.unit ?? ''}
+                              </span>
+                            )
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
 
-                  {/* Pre-Prep breakdown */}
-                  {selectedRecipe.prePrepItems && selectedRecipe.prePrepItems.length > 0 && (
-                    <div className="pt-1.5 border-t border-slate-850/80">
-                      <span className="text-[10px] font-bold uppercase text-purple-400 block mb-1">Batch Pre-Prep:</span>
-                      <div className="flex flex-wrap gap-1">
-                        {selectedRecipe.prePrepItems.map((ppRef, idx) => {
-                          const pp = prePrepItems.find((p) => p.id === ppRef.prePrepId)
-                          return (
-                            <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-955/40 border border-purple-900/30 text-purple-300">
-                              🔪 {pp?.name ?? 'Prep'}: {ppRef.quantity} {pp?.unit ?? ''}
-                            </span>
-                          )
-                        })}
+                  {/* Aggregated Pre-Prep for this Slot */}
+                  {(() => {
+                    const slotPreps: Record<string, number> = {}
+                    slotRecipes.forEach((r) => {
+                      r.prePrepItems?.forEach((pp) => {
+                        slotPreps[pp.prePrepId] = (slotPreps[pp.prePrepId] || 0) + pp.quantity
+                      })
+                    })
+                    const entries = Object.entries(slotPreps)
+                    if (entries.length === 0) return null
+
+                    return (
+                      <div className="pt-1.5 border-t border-slate-850/80">
+                        <span className="text-[10px] font-bold uppercase text-purple-400 block mb-1">Batch Pre-Prep:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {entries.map(([ppId, qty], idx) => {
+                            const pp = prePrepItems.find((p) => p.id === ppId)
+                            return (
+                              <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-955/40 border border-purple-900/30 text-purple-300">
+                                🔪 {pp?.name ?? 'Prep'}: {qty} {pp?.unit ?? ''}
+                              </span>
+                            )
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
                 </div>
               ) : (
                 <div className="bg-slate-950/40 border border-dashed border-slate-850 p-3.5 rounded-2xl text-center">
-                  <p className="text-xs text-slate-500 italic">No meal scheduled for {slot.name}.</p>
+                  <p className="text-xs text-slate-500 italic">No dishes assigned to {slot.name}.</p>
                 </div>
               )}
             </div>

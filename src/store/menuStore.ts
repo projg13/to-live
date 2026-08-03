@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Ingredient, PrePrepItem, Recipe, WeekMenuPlan, EatingSlot, DayMealSlot } from '../types/menu'
+import { getSlotRecipeIds } from '../types/menu'
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -16,7 +17,7 @@ function createEmptyWeekPlan(slotsList: EatingSlot[] = DEFAULT_EATING_SLOTS): We
   DAY_NAMES.forEach((dayName, dayIndex) => {
     const slotsMap: Record<string, DayMealSlot> = {}
     slotsList.forEach((slot) => {
-      slotsMap[slot.id] = {}
+      slotsMap[slot.id] = { recipeIds: [] }
     })
     plan[dayIndex] = {
       dayIndex,
@@ -59,8 +60,11 @@ interface MenuStore {
   updateRecipe: (id: string, updates: Partial<Recipe>) => void
   deleteRecipe: (id: string) => void
 
-  // Week Plan Actions
+  // Week Plan Actions (Multi-Recipe Slot Support)
   setSlotRecipe: (dayIndex: number, slotId: string, recipeId?: string, customName?: string) => void
+  addSlotRecipe: (dayIndex: number, slotId: string, recipeId: string) => void
+  removeSlotRecipe: (dayIndex: number, slotId: string, recipeId: string) => void
+  setSlotRecipes: (dayIndex: number, slotId: string, recipeIds: string[]) => void
   randomizeWeekPlan: () => void
   clearWeekPlan: () => void
 }
@@ -136,16 +140,25 @@ export const useMenuStore = create<MenuStore>()(
             slots: {},
           }
 
-          const updatedSlots = {
-            ...(currentDay.slots || {}),
-            [slotId]: { recipeId, customName },
+          const existingSlot = currentDay.slots?.[slotId] || (currentDay as any)[slotId] || {}
+          const newRecipeIds = recipeId ? [recipeId] : []
+
+          const updatedSlot: DayMealSlot = {
+            ...existingSlot,
+            recipeId,
+            recipeIds: newRecipeIds,
+            customName,
           }
 
-          // Backward compatibility mappings
-          if (slotId === 'breakfast') currentDay.breakfast = updatedSlots['breakfast']
-          if (slotId === 'lunch') currentDay.lunch = updatedSlots['lunch']
-          if (slotId === 'dinner') currentDay.dinner = updatedSlots['dinner']
-          if (slotId === 'snack') currentDay.snack = updatedSlots['snack']
+          const updatedSlots = {
+            ...(currentDay.slots || {}),
+            [slotId]: updatedSlot,
+          }
+
+          if (slotId === 'breakfast') currentDay.breakfast = updatedSlot
+          if (slotId === 'lunch') currentDay.lunch = updatedSlot
+          if (slotId === 'dinner') currentDay.dinner = updatedSlot
+          if (slotId === 'snack') currentDay.snack = updatedSlot
 
           return {
             weekPlan: {
@@ -153,7 +166,107 @@ export const useMenuStore = create<MenuStore>()(
               [dayIndex]: {
                 ...currentDay,
                 slots: updatedSlots,
-                [slotId]: { recipeId, customName },
+                [slotId]: updatedSlot,
+              },
+            },
+          }
+        }),
+
+      addSlotRecipe: (dayIndex, slotId, recipeId) =>
+        set((state) => {
+          const currentDay = state.weekPlan[dayIndex] || {
+            dayIndex,
+            dayName: DAY_NAMES[dayIndex] || `Day ${dayIndex + 1}`,
+            slots: {},
+          }
+
+          const existingSlot = currentDay.slots?.[slotId] || (currentDay as any)[slotId] || {}
+          const currentRecipeIds = getSlotRecipeIds(existingSlot)
+          if (currentRecipeIds.includes(recipeId)) return state
+
+          const newRecipeIds = [...currentRecipeIds, recipeId]
+          const updatedSlot: DayMealSlot = {
+            ...existingSlot,
+            recipeId: newRecipeIds[0],
+            recipeIds: newRecipeIds,
+          }
+
+          const updatedSlots = {
+            ...(currentDay.slots || {}),
+            [slotId]: updatedSlot,
+          }
+
+          return {
+            weekPlan: {
+              ...state.weekPlan,
+              [dayIndex]: {
+                ...currentDay,
+                slots: updatedSlots,
+                [slotId]: updatedSlot,
+              },
+            },
+          }
+        }),
+
+      removeSlotRecipe: (dayIndex, slotId, recipeId) =>
+        set((state) => {
+          const currentDay = state.weekPlan[dayIndex]
+          if (!currentDay) return state
+
+          const existingSlot = currentDay.slots?.[slotId] || (currentDay as any)[slotId] || {}
+          const currentRecipeIds = getSlotRecipeIds(existingSlot)
+          const newRecipeIds = currentRecipeIds.filter((id) => id !== recipeId)
+
+          const updatedSlot: DayMealSlot = {
+            ...existingSlot,
+            recipeId: newRecipeIds[0],
+            recipeIds: newRecipeIds,
+          }
+
+          const updatedSlots = {
+            ...(currentDay.slots || {}),
+            [slotId]: updatedSlot,
+          }
+
+          return {
+            weekPlan: {
+              ...state.weekPlan,
+              [dayIndex]: {
+                ...currentDay,
+                slots: updatedSlots,
+                [slotId]: updatedSlot,
+              },
+            },
+          }
+        }),
+
+      setSlotRecipes: (dayIndex, slotId, recipeIds) =>
+        set((state) => {
+          const currentDay = state.weekPlan[dayIndex] || {
+            dayIndex,
+            dayName: DAY_NAMES[dayIndex] || `Day ${dayIndex + 1}`,
+            slots: {},
+          }
+
+          const existingSlot = currentDay.slots?.[slotId] || (currentDay as any)[slotId] || {}
+          const updatedSlot: DayMealSlot = {
+            ...existingSlot,
+            recipeId: recipeIds[0],
+            recipeIds: recipeIds,
+          }
+
+          const updatedSlots = {
+            ...(currentDay.slots || {}),
+            [slotId]: updatedSlot,
+          }
+
+          return {
+            weekPlan: {
+              ...state.weekPlan,
+              [dayIndex]: {
+                ...currentDay,
+                slots: updatedSlots,
+                [slotId]: updatedSlot,
               },
             },
           }
@@ -174,11 +287,12 @@ export const useMenuStore = create<MenuStore>()(
             const selected = pool[randomIndex]
             if (selected) {
               if (!newPlan[dayIndex].slots) newPlan[dayIndex].slots = {}
-              newPlan[dayIndex].slots[slot.id] = { recipeId: selected.id }
-              if (slot.id === 'breakfast') newPlan[dayIndex].breakfast = { recipeId: selected.id }
-              if (slot.id === 'lunch') newPlan[dayIndex].lunch = { recipeId: selected.id }
-              if (slot.id === 'dinner') newPlan[dayIndex].dinner = { recipeId: selected.id }
-              if (slot.id === 'snack') newPlan[dayIndex].snack = { recipeId: selected.id }
+              const slotVal: DayMealSlot = { recipeId: selected.id, recipeIds: [selected.id] }
+              newPlan[dayIndex].slots[slot.id] = slotVal
+              if (slot.id === 'breakfast') newPlan[dayIndex].breakfast = slotVal
+              if (slot.id === 'lunch') newPlan[dayIndex].lunch = slotVal
+              if (slot.id === 'dinner') newPlan[dayIndex].dinner = slotVal
+              if (slot.id === 'snack') newPlan[dayIndex].snack = slotVal
             }
           })
         })
@@ -195,11 +309,9 @@ export const useMenuStore = create<MenuStore>()(
       name: 'to-live-menu',
       migrate: (persistedState: any) => {
         if (!persistedState) return persistedState
-        // Ensure eatingSlots is present
         if (!persistedState.eatingSlots || persistedState.eatingSlots.length === 0) {
           persistedState.eatingSlots = DEFAULT_EATING_SLOTS
         }
-        // Ensure slots record exists on weekPlan days
         if (persistedState.weekPlan) {
           Object.values(persistedState.weekPlan).forEach((dayPlan: any) => {
             if (!dayPlan.slots) {
@@ -210,7 +322,13 @@ export const useMenuStore = create<MenuStore>()(
                 snack: dayPlan.snack || {},
               }
             }
-          })
+            // Ensure recipeIds array exists on all slots
+            Object.values(dayPlan.slots).forEach((s: any) => {
+              if (s && !s.recipeIds && s.recipeId) {
+                s.recipeIds = [s.recipeId]
+              }
+            })
+          });
         }
         return persistedState
       },
