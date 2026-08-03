@@ -10,6 +10,7 @@ import EventPanel from './components/EventPanel'
 import RecoveryPanel from './components/RecoveryPanel'
 import RotPanel from './components/RotPanel'
 import SettingsPanel from './components/SettingsPanel'
+import MenuPanel from './components/MenuPanel'
 
 
 const managePanels = [
@@ -28,14 +29,14 @@ const managePanels = [
 type ManagePanel = (typeof managePanels)[number]
 
 function App() {
-  const [tab, setTab] = useState<'dashboard' | 'manage'>('dashboard')
+  const [tab, setTab] = useState<'dashboard' | 'manage' | 'menu'>('dashboard')
   const [activePanel, setActivePanel] = useState<ManagePanel>('Anchors')
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans pb-10 transition-colors duration-300">
       {/* Top Segmented Controls */}
       <header className="border-b border-slate-900/60 bg-[#0b0f19]/80 backdrop-blur-md sticky top-0 z-30 px-4 py-3">
-        <nav className="flex justify-center p-1 bg-slate-950/90 rounded-2xl max-w-sm mx-auto border border-slate-800/80 shadow-inner">
+        <nav className="flex justify-center p-1 bg-slate-950/90 rounded-2xl max-w-md mx-auto border border-slate-800/80 shadow-inner">
           <button
             onClick={() => setTab('dashboard')}
             className={`flex-1 py-1.5 text-center text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer active:scale-95 ${
@@ -55,6 +56,16 @@ function App() {
             }`}
           >
             Manage
+          </button>
+          <button
+            onClick={() => setTab('menu')}
+            className={`flex-1 py-1.5 text-center text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer active:scale-95 ${
+              tab === 'menu'
+                ? 'bg-slate-900 text-cyan-400 shadow-md shadow-cyan-950/40 border border-slate-800'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Menu
           </button>
         </nav>
       </header>
@@ -101,6 +112,11 @@ function App() {
               {activePanel === 'Rot' && <RotPanel />}
               {activePanel === 'Settings' && <SettingsPanel />}
             </div>
+          </div>
+        )}
+        {tab === 'menu' && (
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <MenuPanel />
           </div>
         )}
       </main>

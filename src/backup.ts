@@ -15,7 +15,8 @@ export function serializeAppState(): string {
     'to-live-routines',
     'to-live-scheduler',
     'to-live-tasks',
-    'to-live-settings'
+    'to-live-settings',
+    'to-live-menu'
   ]
   for (const key of keys) {
     const val = localStorage.getItem(key)
