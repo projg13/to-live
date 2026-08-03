@@ -848,7 +848,7 @@ function placeItems(
     }
   }
 
-  // Build parent map for ordering (only for tasks in the same block)
+  // Build parent map for ordering (only for tasks in the SAME routine/block instance)
   const parentMap = new Map<string, string>()
   for (const t of tasks) {
     if (t.parentId) {
@@ -881,7 +881,7 @@ function placeItems(
     }
   }
 
-  // Topological fixup: ensure child tasks always come AFTER their parent
+  // Topological fixup: ensure child tasks always come AFTER their parent IN THE SAME SOURCE
   if (parentMap.size > 0) {
     let changed = true
     let passes = 0
@@ -891,7 +891,8 @@ function placeItems(
       for (let i = 0; i < active.length; i++) {
         const parentId = parentMap.get(active[i].taskId)
         if (!parentId) continue
-        const parentIdx = active.findIndex((a) => a.taskId === parentId)
+        // Parent must be from the SAME source instance
+        const parentIdx = active.findIndex((a) => a.taskId === parentId && a.source === active[i].source && a.sourceId === active[i].sourceId)
         if (parentIdx > i) {
           const [child] = active.splice(i, 1)
           active.splice(parentIdx, 0, child)
@@ -905,21 +906,26 @@ function placeItems(
   const occupied: { start: number; end: number }[] = []
   const placed: ScheduledItem[] = [...background]
   const overflow: ScheduledItem[] = []
+  const placedInstanceKeys = new Set<string>()
   const placedTaskIds = new Set<string>()
 
-  // Place all items independently by weight order
-  const placedEndByTaskId = new Map<string, number>()
+  // Place all items independently by weight order — keyed by instanceKey
+  const placedEndByInstanceKey = new Map<string, number>()
 
   for (const item of active) {
     const duration = item.endMinutes - item.startMinutes
     let start = item.startMinutes
 
-    // Child tasks always wait for their parent to finish (same-block only)
+    // Child tasks wait for their parent to finish ONLY within the same source instance
     const pid = parentMap.get(item.taskId)
     if (pid) {
-      const parentEnd = placedEndByTaskId.get(pid)
-      if (parentEnd !== undefined && start < parentEnd) {
-        start = parentEnd
+      // Find parent in the same source instance
+      const parentItem = placed.find((p) => p.taskId === pid && p.source === item.source && p.sourceId === item.sourceId)
+      if (parentItem) {
+        const parentEnd = parentItem.endMinutes
+        if (start < parentEnd) {
+          start = parentEnd
+        }
       }
     }
 
@@ -935,8 +941,9 @@ function placeItems(
       item.endMinutes = start + duration
       occupied.push({ start, end: start + duration })
       placed.push(item)
+      placedInstanceKeys.add(item.instanceKey)
       placedTaskIds.add(item.taskId)
-      placedEndByTaskId.set(item.taskId, start + duration)
+      placedEndByInstanceKey.set(item.instanceKey, start + duration)
       continue
     }
 
@@ -951,8 +958,9 @@ function placeItems(
         item.endMinutes = cursor + duration
         occupied.push({ start: cursor, end: cursor + duration })
         placed.push(item)
+        placedInstanceKeys.add(item.instanceKey)
         placedTaskIds.add(item.taskId)
-        placedEndByTaskId.set(item.taskId, cursor + duration)
+        placedEndByInstanceKey.set(item.instanceKey, cursor + duration)
         found = true
         break
       }
