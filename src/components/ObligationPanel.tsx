@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useObligationStore } from '../store/obligationStore'
 import { useTaskStore } from '../store/taskStore'
 import type { Obligation, ObligationTask, WeightBracket, ObligationRecurrence, MonthlyRecurrenceType, WeekOfMonthSelection, DayOfWeekSelection } from '../types/obligation'
@@ -31,10 +31,15 @@ const XIcon = () => (
 )
 
 function ObligationPanel() {
-  const { obligations, addObligation, updateObligation, deleteObligation, toggleEnabled, doneTasks: obligationDoneTasks, unmarkObligationDone, clearObligationDone } = useObligationStore()
+  const { obligations, addObligation, updateObligation, deleteObligation, toggleEnabled, doneTasks: obligationDoneTasks, unmarkObligationDone, clearObligationDone, purgeStaleDone } = useObligationStore()
   const { tasks } = useTaskStore()
   const [editing, setEditing] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0]
+    purgeStaleDone(today)
+  }, [purgeStaleDone])
 
   return (
     <div className="space-y-6">

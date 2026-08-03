@@ -88,7 +88,7 @@ export function resolveObligationDeadline(ob: Obligation, dateStr: string): stri
 }
 
 function resolveMonthlyDeadline(ob: Obligation, dateStr: string): string | undefined {
-  const currentDate = new Date(dateStr)
+  const currentDate = new Date(dateStr + 'T00:00:00')
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
 

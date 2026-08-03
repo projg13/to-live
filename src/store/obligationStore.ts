@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Obligation } from '../types/obligation'
+import { resolveObligationDeadline } from '../types/obligation'
 
 interface ObligationStore {
   obligations: Obligation[]
@@ -12,6 +13,7 @@ interface ObligationStore {
   markObligationDone: (completionKey: string) => void
   unmarkObligationDone: (instanceKey: string) => void
   clearObligationDone: (obId?: string) => void
+  purgeStaleDone: (todayStr: string) => void
 }
 
 export const useObligationStore = create<ObligationStore>()(
@@ -41,6 +43,23 @@ export const useObligationStore = create<ObligationStore>()(
             ? state.doneTasks.filter((k) => !k.startsWith(`obligation:${obId}:`))
             : [],
         })),
+      purgeStaleDone: (todayStr) =>
+        set((state) => {
+          if (state.doneTasks.length === 0) return state
+          const activeDeadlines = new Set<string>()
+          for (const ob of state.obligations) {
+            if (!ob.enabled) continue
+            const dl = resolveObligationDeadline(ob, todayStr)
+            if (dl) activeDeadlines.add(dl)
+          }
+          const freshDone = state.doneTasks.filter((key) => {
+            const lastColon = key.lastIndexOf(':')
+            if (lastColon === -1) return false
+            const suffix = key.slice(lastColon + 1)
+            return activeDeadlines.has(suffix)
+          })
+          return freshDone.length !== state.doneTasks.length ? { doneTasks: freshDone } : state
+        }),
     }),
     {
       name: 'to-live-obligations',

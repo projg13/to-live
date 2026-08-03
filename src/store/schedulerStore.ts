@@ -509,7 +509,7 @@ function resolveDay(
       if (debug) console.log(`  ⏭ "${ob.name}": disabled`)
       continue
     }
-    if (ob.deadline && ob.recurrence !== 'one-time' && dateStr > ob.deadline) {
+    if (ob.deadline && ob.recurrence === 'one-time' && dateStr > ob.deadline) {
       if (debug) console.log(`  ⏭ "${ob.name}": past deadline ${ob.deadline}`)
       continue
     }
@@ -1076,25 +1076,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
         })
 
         // Purge stale obligation done keys from obligation store
-        // Keep only keys whose period suffix matches a current active deadline
-        const obStore = useObligationStore.getState()
-        if (obStore.doneTasks.length > 0) {
-          const activeDeadlines = new Set<string>()
-          for (const ob of context.obligations) {
-            if (!ob.enabled) continue
-            const dl = resolveObligationDeadline(ob, today)
-            if (dl) activeDeadlines.add(dl)
-          }
-          const freshObDone = obStore.doneTasks.filter((key) => {
-            const lastColon = key.lastIndexOf(':')
-            if (lastColon === -1) return false
-            const suffix = key.slice(lastColon + 1)
-            return activeDeadlines.has(suffix)
-          })
-          if (freshObDone.length !== obStore.doneTasks.length) {
-            useObligationStore.setState({ doneTasks: freshObDone })
-          }
-        }
+        useObligationStore.getState().purgeStaleDone(today)
 
         const days: DaySchedule[] = []
         for (let i = 0; i < 7; i++) {
