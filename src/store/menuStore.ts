@@ -355,7 +355,12 @@ export const useMenuStore = create<MenuStore>()(
         const { recipes, eatingSlots } = get()
         if (recipes.length === 0) return
 
-        const activeSlots = eatingSlots.length > 0 ? eatingSlots : DEFAULT_EATING_SLOTS
+        const rawSlots = eatingSlots.length > 0 ? eatingSlots : DEFAULT_EATING_SLOTS
+        const activeSlots = [...rawSlots].sort((a, b) => {
+          const timeA = a.scheduledTime || '99:99'
+          const timeB = b.scheduledTime || '99:99'
+          return timeA.localeCompare(timeB)
+        })
         const newPlan = createEmptyWeekPlan(activeSlots)
 
         DAY_NAMES.forEach((_dayName, dayIndex) => {

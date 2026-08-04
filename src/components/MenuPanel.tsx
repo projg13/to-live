@@ -34,6 +34,16 @@ const FireIcon = () => (
   </svg>
 )
 
+// Helper to get eating slots sorted in ascending order by scheduled time
+function getSortedEatingSlots(slots?: EatingSlot[]): EatingSlot[] {
+  const raw = slots && slots.length > 0 ? slots : DEFAULT_EATING_SLOTS
+  return [...raw].sort((a, b) => {
+    const timeA = a.scheduledTime || '99:99'
+    const timeB = b.scheduledTime || '99:99'
+    return timeA.localeCompare(timeB)
+  })
+}
+
 export default function MenuPanel() {
   const [subTab, setSubTab] = useState<'planner' | 'templates' | 'recipes' | 'ingredients' | 'preprep' | 'slots'>('planner')
 
@@ -96,7 +106,7 @@ function WeeklyPlannerView() {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [templateNameInput, setTemplateNameInput] = useState('')
 
-  const activeSlots = eatingSlots && eatingSlots.length > 0 ? eatingSlots : DEFAULT_EATING_SLOTS
+  const activeSlots = getSortedEatingSlots(eatingSlots)
   const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   const selectedDayPlan = weekPlan[selectedDayIndex] || {
     dayIndex: selectedDayIndex,
@@ -570,7 +580,7 @@ function RecipesView() {
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null)
   const [isCreating, setIsCreating] = useState(false)
 
-  const activeSlots = eatingSlots && eatingSlots.length > 0 ? eatingSlots : DEFAULT_EATING_SLOTS
+  const activeSlots = getSortedEatingSlots(eatingSlots)
 
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
@@ -725,7 +735,7 @@ function RecipeEditor({
   onCancel: () => void
 }) {
   const { ingredients, prePrepItems, eatingSlots } = useMenuStore()
-  const activeSlots = eatingSlots && eatingSlots.length > 0 ? eatingSlots : DEFAULT_EATING_SLOTS
+  const activeSlots = getSortedEatingSlots(eatingSlots)
 
   const [title, setTitle] = useState(initial?.title ?? '')
   const [mealGroup, setMealGroup] = useState<string>(initial?.mealGroup ?? activeSlots[0]?.id ?? 'lunch')
@@ -1345,7 +1355,7 @@ function EatingSlotsView() {
   const [editingSlot, setEditingSlot] = useState<EatingSlot | null>(null)
   const [isCreating, setIsCreating] = useState(false)
 
-  const activeSlots = eatingSlots && eatingSlots.length > 0 ? eatingSlots : DEFAULT_EATING_SLOTS
+  const activeSlots = getSortedEatingSlots(eatingSlots)
 
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
@@ -1521,7 +1531,7 @@ function EatingSlotEditor({
 function DayTemplatesView() {
   const { dayMenuTemplates, recipes, eatingSlots, applyTemplateToDay, deleteDayMenuTemplate } = useMenuStore()
   const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-  const activeSlots = eatingSlots && eatingSlots.length > 0 ? eatingSlots : DEFAULT_EATING_SLOTS
+  const activeSlots = getSortedEatingSlots(eatingSlots)
 
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
