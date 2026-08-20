@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import AnchorPanel from './components/AnchorPanel'
+import AdhocPanel from './components/AdhocPanel'
 import Dashboard from './components/Dashboard'
 import TaskPanel from './components/TaskPanel'
 import BlockPanel from './components/BlockPanel'
@@ -15,6 +16,7 @@ import MenuPanel from './components/MenuPanel'
 
 const managePanels = [
   'Tasks',
+  'Ad Hoc',
   'Blocks',
   'Routines',
   'Anchors',
@@ -102,6 +104,7 @@ function App() {
             {/* Panel views in a themed slate card */}
             <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-5 md:p-6 shadow-xl shadow-slate-950/20">
               {activePanel === 'Anchors' && <AnchorPanel />}
+              {activePanel === 'Ad Hoc' && <AdhocPanel />}
               {activePanel === 'Day Planner' && <DayPlannerPanel />}
               {activePanel === 'Tasks' && <TaskPanel />}
               {activePanel === 'Blocks' && <BlockPanel />}
