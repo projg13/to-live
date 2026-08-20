@@ -953,7 +953,18 @@ function placeItems(
     while (cursor < cutoff) {
       if (item.expiryTime !== undefined && cursor >= item.expiryTime && !(cursor <= nowMinutes && nowMinutes < cursor + duration)) break
       if (item.idealEndTime !== undefined && cursor + duration > item.idealEndTime) break
-      if (!hasConflict(cursor, duration, occupied)) {
+
+      // Find the earliest conflicting occupied interval
+      let earliestConflict: { start: number; end: number } | null = null
+      for (const o of occupied) {
+        if (cursor < o.end && cursor + duration > o.start) {
+          if (!earliestConflict || o.start < earliestConflict.start) {
+            earliestConflict = o
+          }
+        }
+      }
+
+      if (!earliestConflict) {
         item.startMinutes = cursor
         item.endMinutes = cursor + duration
         occupied.push({ start: cursor, end: cursor + duration })
@@ -964,7 +975,9 @@ function placeItems(
         found = true
         break
       }
-      cursor += 5
+
+      // Jump cursor past the conflicting block to eliminate gaps
+      cursor = Math.max(cursor + 1, earliestConflict.end)
     }
 
     // If can't fit before cutoff → overflow

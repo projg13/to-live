@@ -72,6 +72,7 @@ interface MenuStore {
   removeSlotRecipe: (dayIndex: number, slotId: string, recipeId: string) => void
   setSlotRecipes: (dayIndex: number, slotId: string, recipeIds: string[]) => void
   randomizeWeekPlan: () => void
+  clearDayPlan: (dayIndex: number) => void
   clearWeekPlan: () => void
 }
 
@@ -382,6 +383,35 @@ export const useMenuStore = create<MenuStore>()(
         })
 
         set({ weekPlan: newPlan })
+      },
+
+      clearDayPlan: (dayIndex) => {
+        const { eatingSlots, weekPlan } = get()
+        const rawSlots = eatingSlots.length > 0 ? eatingSlots : DEFAULT_EATING_SLOTS
+        const emptySlots: Record<string, DayMealSlot> = {}
+        rawSlots.forEach((slot) => {
+          emptySlots[slot.id] = { recipeIds: [] }
+        })
+
+        const currentDay = weekPlan[dayIndex] || {
+          dayIndex,
+          dayName: DAY_NAMES[dayIndex] || `Day ${dayIndex + 1}`,
+          slots: {},
+        }
+
+        set({
+          weekPlan: {
+            ...weekPlan,
+            [dayIndex]: {
+              ...currentDay,
+              slots: emptySlots,
+              breakfast: emptySlots['breakfast'],
+              lunch: emptySlots['lunch'],
+              dinner: emptySlots['dinner'],
+              snack: emptySlots['snack'],
+            },
+          },
+        })
       },
 
       clearWeekPlan: () => {

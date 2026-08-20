@@ -3,7 +3,7 @@ import { useMenuStore, DEFAULT_EATING_SLOTS } from '../store/menuStore'
 import type { Ingredient, PrePrepItem, Recipe, EatingSlot } from '../types/menu'
 import { getSlotRecipeIds } from '../types/menu'
 
-// Icons
+// --- Custom SVGs for a polished look ---
 const PlusIcon = () => (
   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -44,54 +44,84 @@ function getSortedEatingSlots(slots?: EatingSlot[]): EatingSlot[] {
   })
 }
 
+const menuSubTabs = [
+  { id: 'planner', label: 'Day Planner', icon: '📅' },
+  { id: 'templates', label: 'Day Templates', icon: '🗂️' },
+  { id: 'recipes', label: 'Recipes', icon: '🍲' },
+  { id: 'ingredients', label: 'Ingredients', icon: '🥬' },
+  { id: 'preprep', label: 'Pre-Prep', icon: '🔪' },
+  { id: 'slots', label: 'Eating Slots', icon: '⚙️' },
+] as const
+
+type MenuSubTab = (typeof menuSubTabs)[number]['id']
+
 export default function MenuPanel() {
-  const [subTab, setSubTab] = useState<'planner' | 'templates' | 'recipes' | 'ingredients' | 'preprep' | 'slots'>('planner')
+  const [subTab, setSubTab] = useState<MenuSubTab>('planner')
 
   return (
-    <div className="space-y-6">
-      {/* Unified Top Header & Navigation Pane */}
-      <div className="border-b border-slate-800 pb-3 flex flex-wrap justify-between items-center gap-3">
-        <div>
-          <h2 className="text-xl font-black tracking-wide text-slate-100 flex items-center gap-2">
-            🥗 Menu & Recipe Manager
-          </h2>
-          <p className="text-xs text-slate-400">
-            Plan meals, save reusable day templates, track calories, catalog recipes & aggregate groceries.
-          </p>
-        </div>
-
-        {/* Sleek Navigation Pane Tabs */}
-        <div className="flex flex-wrap gap-1 bg-slate-950 p-1 rounded-2xl border border-slate-850 shadow-inner">
-          {[
-            { id: 'planner', label: '📅 Day Planner' },
-            { id: 'templates', label: '🗂️ Day Templates' },
-            { id: 'recipes', label: '🍲 Recipes' },
-            { id: 'ingredients', label: '🥬 Ingredients' },
-            { id: 'preprep', label: '🔪 Pre-Prep' },
-            { id: 'slots', label: '⚙️ Eating Slots' },
-          ].map((t) => (
+    <div className="space-y-4">
+      {/* Mobile Scrollable Horizontal Bar (Single row, never wraps) */}
+      <div className="md:hidden flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar p-1.5 bg-slate-950/80 rounded-2xl border border-slate-850">
+        {menuSubTabs.map((t) => {
+          const isActive = subTab === t.id
+          return (
             <button
               key={t.id}
-              onClick={() => setSubTab(t.id as any)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                subTab === t.id
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-955 shadow-md shadow-cyan-950/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50'
+              onClick={() => setSubTab(t.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-95 ${
+                isActive
+                  ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-950/40'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
               }`}
             >
-              {t.label}
+              <span>{t.icon}</span>
+              <span>{t.label}</span>
             </button>
-          ))}
-        </div>
+          )
+        })}
       </div>
 
-      {/* Render Sub View */}
-      {subTab === 'planner' && <WeeklyPlannerView />}
-      {subTab === 'templates' && <DayTemplatesView />}
-      {subTab === 'recipes' && <RecipesView />}
-      {subTab === 'ingredients' && <IngredientsView />}
-      {subTab === 'preprep' && <PrePrepView />}
-      {subTab === 'slots' && <EatingSlotsView />}
+      {/* Desktop 2-Column Sidebar Layout */}
+      <div className="md:grid md:grid-cols-[200px_1fr] gap-6 items-start">
+        {/* Left Side-Tab Navigation */}
+        <aside className="hidden md:flex flex-col gap-1.5 bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-3xl p-3.5 sticky top-20 shadow-lg shadow-slate-950/20">
+          <div className="px-2.5 py-1 mb-1">
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              Menu Sections
+            </span>
+          </div>
+          {menuSubTabs.map((t) => {
+            const isActive = subTab === t.id
+            return (
+              <button
+                key={t.id}
+                onClick={() => setSubTab(t.id)}
+                className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer relative ${
+                  isActive
+                    ? 'bg-cyan-950/50 text-cyan-300 border border-cyan-800/50 shadow-sm shadow-cyan-950/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850/50'
+                }`}
+              >
+                <span className="text-sm">{t.icon}</span>
+                <span className="truncate">{t.label}</span>
+                {isActive && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 ml-auto shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
+                )}
+              </button>
+            )
+          })}
+        </aside>
+
+        {/* Main Content Area */}
+        <div className="min-w-0">
+          {subTab === 'planner' && <WeeklyPlannerView />}
+          {subTab === 'templates' && <DayTemplatesView />}
+          {subTab === 'recipes' && <RecipesView />}
+          {subTab === 'ingredients' && <IngredientsView />}
+          {subTab === 'preprep' && <PrePrepView />}
+          {subTab === 'slots' && <EatingSlotsView />}
+        </div>
+      </div>
     </div>
   )
 }
@@ -100,11 +130,27 @@ export default function MenuPanel() {
    1. DAY PLANNER VIEW, MULTI-RECIPE SLOTS & CALORIES
    ========================================================================= */
 function WeeklyPlannerView() {
-  const { weekPlan, recipes, ingredients, prePrepItems, eatingSlots, dayMenuTemplates, addSlotRecipe, removeSlotRecipe, saveDayAsTemplate, applyTemplateToDay, randomizeWeekPlan, clearWeekPlan } =
-    useMenuStore()
-  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0) // Default: Monday (0)
+  const {
+    weekPlan,
+    recipes,
+    ingredients,
+    prePrepItems,
+    eatingSlots,
+    dayMenuTemplates,
+    addSlotRecipe,
+    removeSlotRecipe,
+    saveDayAsTemplate,
+    applyTemplateToDay,
+    randomizeWeekPlan,
+    clearDayPlan,
+    clearWeekPlan,
+  } = useMenuStore()
+
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0) // 0 = Monday
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [templateNameInput, setTemplateNameInput] = useState('')
+  const [confirmClearDay, setConfirmClearDay] = useState(false)
+  const [confirmClearWeek, setConfirmClearWeek] = useState(false)
 
   const activeSlots = getSortedEatingSlots(eatingSlots)
   const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -114,7 +160,7 @@ function WeeklyPlannerView() {
     slots: {},
   }
 
-  // Helper to resolve slot data from day plan (supports both slots record & legacy properties)
+  // Helper to resolve slot data from day plan
   const getSlotAssignment = (slotId: string) => {
     if (selectedDayPlan.slots && selectedDayPlan.slots[slotId]) {
       return selectedDayPlan.slots[slotId]
@@ -183,22 +229,24 @@ function WeeklyPlannerView() {
   const prePrepTotals = getAggregatedPrePrep()
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
+    <div className="space-y-5 animate-in fade-in duration-200">
       {/* Top Header & Calorie Total Counter */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-4 border border-slate-800 rounded-3xl shadow-lg">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 backdrop-blur-md p-4 border border-slate-800/80 rounded-3xl shadow-lg">
         <div>
-          <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-            📅 Day Menu Planner: <span className="text-cyan-400 font-extrabold">{DAY_NAMES[selectedDayIndex]}</span>
+          <h3 className="text-base font-black text-slate-100 flex items-center gap-2">
+            <span>📅</span> Menu Planner: <span className="text-cyan-400 font-extrabold">{DAY_NAMES[selectedDayIndex]}</span>
           </h3>
-          <p className="text-xs text-slate-400">Assign multiple recipes per eating slot, save reusable day templates & track daily calories.</p>
+          <p className="text-xs text-slate-400">
+            Assign recipes to eating slots, track calories, and manage groceries.
+          </p>
         </div>
 
         {/* Daily Calorie Banner & Actions */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <div className="bg-slate-950 px-3.5 py-1.5 rounded-2xl border border-amber-500/30 flex items-center gap-2 shadow-inner">
             <FireIcon />
             <div className="text-left">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-450 block leading-tight">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block leading-tight">
                 Daily Calories
               </span>
               <span className="text-sm font-black text-amber-400 font-mono">
@@ -207,75 +255,130 @@ function WeeklyPlannerView() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Apply Template Dropdown */}
-            {dayMenuTemplates && dayMenuTemplates.length > 0 && (
-              <select
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) {
-                    applyTemplateToDay(selectedDayIndex, e.target.value)
-                  }
-                }}
-                className="text-xs px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-cyan-400 font-bold focus:outline-none cursor-pointer"
-              >
-                <option value="">📋 Apply Template…</option>
-                {dayMenuTemplates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    Load "{t.name}"
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {/* Save Day as Template Button */}
-            <button
-              onClick={() => {
-                setTemplateNameInput(`${DAY_NAMES[selectedDayIndex]} Menu`)
-                setShowSaveModal(true)
+          {/* Apply Template Dropdown */}
+          {dayMenuTemplates && dayMenuTemplates.length > 0 && (
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  applyTemplateToDay(selectedDayIndex, e.target.value)
+                }
               }}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-950 hover:bg-slate-900 text-cyan-400 border border-cyan-800/40 transition-all cursor-pointer active:scale-95 flex items-center gap-1.5"
+              className="text-xs px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-cyan-400 font-bold focus:outline-none cursor-pointer"
             >
-              💾 Save Day as Template
-            </button>
+              <option value="">📋 Template…</option>
+              {dayMenuTemplates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  Load "{t.name}"
+                </option>
+              ))}
+            </select>
+          )}
 
+          {/* Save Day as Template Button */}
+          <button
+            onClick={() => {
+              setTemplateNameInput(`${DAY_NAMES[selectedDayIndex]} Menu`)
+              setShowSaveModal(true)
+            }}
+            className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-950 hover:bg-slate-900 text-cyan-400 border border-cyan-800/40 transition-all cursor-pointer active:scale-95 flex items-center gap-1.5"
+            title="Save today's meal plan as a reusable template"
+          >
+            <span>💾</span> Save Template
+          </button>
+
+          {/* Randomize Week */}
+          <button
+            onClick={() => randomizeWeekPlan()}
+            className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white shadow-md shadow-indigo-950/40 transition-all active:scale-95 cursor-pointer"
+            title="Randomize meals for the entire week"
+          >
+            <ShuffleIcon /> Randomize
+          </button>
+
+          {/* Clear Day Button with Confirmation */}
+          {confirmClearDay ? (
+            <div className="flex items-center gap-1 animate-in fade-in duration-150">
+              <span className="text-[10px] font-bold text-rose-400 uppercase">Clear {DAY_NAMES[selectedDayIndex]}?</span>
+              <button
+                onClick={() => {
+                  clearDayPlan(selectedDayIndex)
+                  setConfirmClearDay(false)
+                }}
+                className="px-2.5 py-1.5 rounded-lg text-[10px] font-black bg-rose-500 text-white hover:bg-rose-600 active:scale-95 cursor-pointer"
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => setConfirmClearDay(false)}
+                className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
+              >
+                No
+              </button>
+            </div>
+          ) : (
             <button
-              onClick={() => randomizeWeekPlan()}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white shadow-md shadow-indigo-950/40 transition-all active:scale-95 cursor-pointer"
+              onClick={() => setConfirmClearDay(true)}
+              className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-950 hover:bg-rose-950/30 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-900/40 transition-all cursor-pointer"
+              title="Clear today's planned meals only"
             >
-              <ShuffleIcon /> 🎲 Randomize Week
+              Clear Day
             </button>
+          )}
+
+          {/* Clear Full Week Button */}
+          {confirmClearWeek ? (
+            <div className="flex items-center gap-1 animate-in fade-in duration-150">
+              <span className="text-[10px] font-bold text-rose-400 uppercase">Clear all 7 days?</span>
+              <button
+                onClick={() => {
+                  clearWeekPlan()
+                  setConfirmClearWeek(false)
+                }}
+                className="px-2.5 py-1.5 rounded-lg text-[10px] font-black bg-rose-500 text-white hover:bg-rose-600 active:scale-95 cursor-pointer"
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => setConfirmClearWeek(false)}
+                className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
+              >
+                No
+              </button>
+            </div>
+          ) : (
             <button
-              onClick={() => clearWeekPlan()}
-              className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-950 hover:bg-slate-900 text-slate-400 border border-slate-800 transition-colors cursor-pointer"
+              onClick={() => setConfirmClearWeek(true)}
+              className="p-2 rounded-xl text-xs text-slate-500 hover:text-slate-300 bg-slate-950 border border-slate-850 hover:border-slate-750 transition-all cursor-pointer"
+              title="Clear full week's menu"
             >
-              Clear Plan
+              <TrashIcon />
             </button>
-          </div>
+          )}
         </div>
       </div>
 
       {/* Save Day Template Modal */}
       {showSaveModal && (
-        <div className="fixed inset-0 bg-slate-955/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 md:p-6 max-w-md w-full space-y-4 shadow-2xl">
             <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
               💾 Save {DAY_NAMES[selectedDayIndex]}'s Menu as Template
             </h3>
             <p className="text-xs text-slate-400">
-              Save all assigned recipes for {DAY_NAMES[selectedDayIndex]} so you can quickly apply it to any day of the week anytime!
+              Save all assigned recipes for {DAY_NAMES[selectedDayIndex]} so you can quickly apply them to any day anytime.
             </p>
 
             <div>
-              <label className="text-[10px] font-bold text-slate-450 uppercase block mb-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
                 Template Name
               </label>
               <input
                 type="text"
                 value={templateNameInput}
                 onChange={(e) => setTemplateNameInput(e.target.value)}
-                placeholder="e.g. High Protein Workout Day, Keto Weekend"
-                className="text-xs px-3.5 py-2 w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none"
+                placeholder="e.g. High Protein Day, Keto Weekend"
+                className="text-xs px-3.5 py-2 w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none"
               />
             </div>
 
@@ -295,7 +398,7 @@ function WeeklyPlannerView() {
                     setShowSaveModal(false)
                   }
                 }}
-                className="px-5 py-1.5 text-xs font-bold bg-cyan-500 text-slate-955 rounded-xl shadow-md active:scale-95 cursor-pointer"
+                className="px-5 py-1.5 text-xs font-bold bg-cyan-500 text-slate-950 rounded-xl shadow-md active:scale-95 cursor-pointer"
               >
                 Save Template
               </button>
@@ -304,8 +407,8 @@ function WeeklyPlannerView() {
         </div>
       )}
 
-      {/* Sleek Day Selector Tab Bar */}
-      <div className="flex items-center justify-between bg-slate-950/80 p-1.5 rounded-2xl border border-slate-850 overflow-x-auto gap-1">
+      {/* Sleek Day Selector Strip (Single non-wrapping bar) */}
+      <div className="flex items-center justify-between bg-slate-950/80 p-1.5 rounded-2xl border border-slate-850 overflow-x-auto no-scrollbar gap-1">
         {DAY_NAMES.map((dayName, idx) => {
           const isSelected = selectedDayIndex === idx
           const dPlan = weekPlan[idx]
@@ -321,7 +424,7 @@ function WeeklyPlannerView() {
             <button
               key={idx}
               onClick={() => setSelectedDayIndex(idx)}
-              className={`flex-1 min-w-[95px] py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer text-center relative active:scale-95 ${
+              className={`flex-1 min-w-[90px] py-2 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center relative active:scale-95 ${
                 isSelected
                   ? 'bg-slate-900 text-cyan-400 border border-slate-800 shadow-md shadow-cyan-950/40'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/40'
@@ -350,7 +453,7 @@ function WeeklyPlannerView() {
           return (
             <div
               key={slot.id}
-              className="bg-slate-900/40 border border-slate-800 p-4 rounded-3xl space-y-3.5 shadow-lg flex flex-col justify-between"
+              className="bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-4 rounded-3xl space-y-3.5 shadow-lg flex flex-col justify-between"
             >
               {/* Header with Slot Name, Scheduled Time, and Slot Calories */}
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
@@ -361,12 +464,12 @@ function WeeklyPlannerView() {
 
                 <div className="flex items-center gap-2 font-mono text-[10px]">
                   {slot.scheduledTime && (
-                    <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-cyan-400 font-bold flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded-lg bg-slate-950 border border-slate-800 text-cyan-400 font-bold flex items-center gap-1">
                       <ClockIcon /> {slot.scheduledTime}
                     </span>
                   )}
                   {slotCalories > 0 && (
-                    <span className="px-2 py-0.5 rounded bg-amber-955/60 border border-amber-900/40 text-amber-400 font-bold flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded-lg bg-amber-950/60 border border-amber-900/40 text-amber-400 font-bold flex items-center gap-1">
                       <FireIcon /> {slotCalories} kcal
                     </span>
                   )}
@@ -376,25 +479,25 @@ function WeeklyPlannerView() {
               {/* Multi-Recipe Pills List */}
               {slotRecipes.length > 0 && (
                 <div className="space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-450 block">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                     Assigned Dishes ({slotRecipes.length}):
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {slotRecipes.map((recipe) => (
                       <div
                         key={recipe.id}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-semibold text-slate-100 shadow-inner"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-semibold text-slate-100 shadow-inner group"
                       >
                         <span>{recipe.title}</span>
                         {recipe.calories && (
                           <span className="text-[10px] font-mono text-amber-400 font-bold">
-                            {recipe.calories}kcal
+                            {recipe.calories} kcal
                           </span>
                         )}
                         <button
                           type="button"
                           onClick={() => removeSlotRecipe(selectedDayIndex, slot.id, recipe.id)}
-                          className="text-slate-500 hover:text-rose-400 ml-1 cursor-pointer font-bold"
+                          className="text-slate-500 hover:text-rose-400 ml-1 cursor-pointer font-bold transition-colors"
                           title="Remove from slot"
                         >
                           ✕
@@ -407,7 +510,7 @@ function WeeklyPlannerView() {
 
               {/* + Add Recipe to Slot Dropdown */}
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-450 block">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                   + Add Recipe to Slot:
                 </label>
                 <select
@@ -453,12 +556,12 @@ function WeeklyPlannerView() {
 
                     return (
                       <div>
-                        <span className="text-[10px] font-bold uppercase text-slate-450 block mb-1">Raw Groceries Needed:</span>
+                        <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Raw Groceries:</span>
                         <div className="flex flex-wrap gap-1">
                           {entries.map(([ingId, qty], idx) => {
                             const ing = ingredients.find((i) => i.id === ingId)
                             return (
-                              <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                              <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300">
                                 {ing?.name ?? 'Item'}: {qty} {ing?.unit ?? ''}
                               </span>
                             )
@@ -486,7 +589,7 @@ function WeeklyPlannerView() {
                           {entries.map(([ppId, qty], idx) => {
                             const pp = prePrepItems.find((p) => p.id === ppId)
                             return (
-                              <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-955/40 border border-purple-900/30 text-purple-300">
+                              <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-purple-950/40 border border-purple-900/30 text-purple-300">
                                 🔪 {pp?.name ?? 'Prep'}: {qty} {pp?.unit ?? ''}
                               </span>
                             )
@@ -509,24 +612,24 @@ function WeeklyPlannerView() {
       {/* DUAL AGGREGATORS: Grocery Requirements & Pre-Prep Batch Requirements */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* 🛒 Aggregated Groceries List */}
-        <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-2xl space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-850 pb-2">
+        <div className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-3xl space-y-3 shadow-lg">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
             <h4 className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
-              🛒 Weekly Grocery Requirements
+              <span>🛒</span> Weekly Grocery Requirements
             </h4>
-            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-400">
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400">
               {Object.keys(ingredientTotals).length} items
             </span>
           </div>
 
           {Object.keys(ingredientTotals).length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
               {Object.entries(ingredientTotals).map(([ingId, qty]) => {
                 const ing = ingredients.find((i) => i.id === ingId)
                 return (
                   <div key={ingId} className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-850 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-300">{ing?.name ?? 'Unknown'}</span>
-                    <span className="text-xs font-mono font-bold text-cyan-400">
+                    <span className="text-xs font-semibold text-slate-300 truncate">{ing?.name ?? 'Unknown'}</span>
+                    <span className="text-xs font-mono font-bold text-cyan-400 ml-2 shrink-0">
                       {qty} {ing?.unit ?? ''}
                     </span>
                   </div>
@@ -534,29 +637,29 @@ function WeeklyPlannerView() {
               })}
             </div>
           ) : (
-            <p className="text-xs text-slate-500 italic py-2 text-center">No grocery items required for this week's plan.</p>
+            <p className="text-xs text-slate-500 italic py-3 text-center">No grocery items required for this week's plan.</p>
           )}
         </div>
 
         {/* 🔪 Aggregated Pre-Prep Batch List */}
-        <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-2xl space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-850 pb-2">
+        <div className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-3xl space-y-3 shadow-lg">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
             <h4 className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
-              🔪 Batch Pre-Prep Requirements
+              <span>🔪</span> Batch Pre-Prep Requirements
             </h4>
-            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-purple-400">
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-slate-950 border border-slate-800 text-purple-400">
               {Object.keys(prePrepTotals).length} items
             </span>
           </div>
 
           {Object.keys(prePrepTotals).length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
               {Object.entries(prePrepTotals).map(([ppId, qty]) => {
                 const pp = prePrepItems.find((p) => p.id === ppId)
                 return (
-                  <div key={ppId} className="bg-purple-955/30 p-2.5 rounded-xl border border-purple-900/30 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-purple-200">{pp?.name ?? 'Unknown'}</span>
-                    <span className="text-xs font-mono font-bold text-purple-400">
+                  <div key={ppId} className="bg-purple-950/30 p-2.5 rounded-xl border border-purple-900/30 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-purple-200 truncate">{pp?.name ?? 'Unknown'}</span>
+                    <span className="text-xs font-mono font-bold text-purple-400 ml-2 shrink-0">
                       {qty} {pp?.unit ?? ''}
                     </span>
                   </div>
@@ -564,7 +667,7 @@ function WeeklyPlannerView() {
               })}
             </div>
           ) : (
-            <p className="text-xs text-slate-500 italic py-2 text-center">No batch pre-prep items required for this week's plan.</p>
+            <p className="text-xs text-slate-500 italic py-3 text-center">No batch pre-prep items required for this week's plan.</p>
           )}
         </div>
       </div>
@@ -585,9 +688,11 @@ function RecipesView() {
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
       {/* Catalog Header & Action */}
-      <div className="flex items-center justify-between bg-slate-900/60 p-4 border border-slate-800 rounded-2xl">
+      <div className="flex items-center justify-between bg-slate-900/60 p-4 border border-slate-800/80 rounded-3xl">
         <div>
-          <h3 className="text-sm font-bold text-slate-200">Recipe Catalog</h3>
+          <h3 className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+            <span>🍲</span> Recipe Catalog
+          </h3>
           <p className="text-xs text-slate-400">Store recipes, raw ingredient quantities, calories & pre-prep items.</p>
         </div>
         <button
@@ -595,7 +700,7 @@ function RecipesView() {
             setEditingRecipe(null)
             setIsCreating(true)
           }}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-955 transition-all cursor-pointer shadow-md shadow-cyan-950/40 active:scale-95"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-all cursor-pointer shadow-md shadow-cyan-950/40 active:scale-95"
         >
           <PlusIcon /> Add Recipe
         </button>
@@ -606,16 +711,16 @@ function RecipesView() {
         {recipes.map((recipe) => {
           const slot = activeSlots.find((s) => s.id === recipe.mealGroup)
           return (
-            <div key={recipe.id} className="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl space-y-3 shadow-md flex flex-col justify-between">
+            <div key={recipe.id} className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-3xl space-y-3 shadow-md flex flex-col justify-between">
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-slate-100">{recipe.title}</h4>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] uppercase font-extrabold text-cyan-400 bg-cyan-955/50 border border-cyan-900/40 px-2 py-0.5 rounded">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-sm font-bold text-slate-100 truncate">{recipe.title}</h4>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[10px] uppercase font-extrabold text-cyan-400 bg-cyan-950/50 border border-cyan-900/40 px-2 py-0.5 rounded-lg">
                       {slot?.name || recipe.mealGroup}
                     </span>
                     {recipe.calories && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-955/50 border border-amber-900/30 text-amber-300 font-bold flex items-center gap-1">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-amber-950/50 border border-amber-900/30 text-amber-300 font-bold flex items-center gap-1">
                         <FireIcon /> {recipe.calories} kcal
                       </span>
                     )}
@@ -629,12 +734,12 @@ function RecipesView() {
                 {/* Raw Ingredients */}
                 {recipe.ingredients.length > 0 && (
                   <div className="space-y-1">
-                    <span className="text-[10px] font-bold uppercase text-slate-450 block">Groceries:</span>
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Groceries:</span>
                     <div className="flex flex-wrap gap-1">
                       {recipe.ingredients.map((ingRef, idx) => {
                         const ing = ingredients.find((i) => i.id === ingRef.ingredientId)
                         return (
-                          <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-950 border border-slate-850 text-slate-300">
+                          <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-slate-950 border border-slate-850 text-slate-300">
                             {ing?.name ?? 'Item'}: {ingRef.quantity} {ing?.unit ?? ''}
                           </span>
                         )
@@ -651,7 +756,7 @@ function RecipesView() {
                       {recipe.prePrepItems.map((ppRef, idx) => {
                         const pp = prePrepItems.find((p) => p.id === ppRef.prePrepId)
                         return (
-                          <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-955/40 border border-purple-900/30 text-purple-300">
+                          <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-purple-950/40 border border-purple-900/30 text-purple-300">
                             🔪 {pp?.name ?? 'Prep'}: {ppRef.quantity} {pp?.unit ?? ''}
                           </span>
                         )
@@ -670,13 +775,13 @@ function RecipesView() {
                     setEditingRecipe(recipe)
                     setIsCreating(false)
                   }}
-                  className="text-xs px-3 py-1 rounded-lg bg-slate-950 hover:bg-slate-900 text-slate-300 border border-slate-800 cursor-pointer"
+                  className="text-xs px-3 py-1 rounded-xl bg-slate-950 hover:bg-slate-900 text-slate-300 border border-slate-800 cursor-pointer"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => deleteRecipe(recipe.id)}
-                  className="text-xs px-3 py-1 rounded-lg bg-rose-955/40 hover:bg-rose-950 text-rose-300 border border-rose-900/40 cursor-pointer"
+                  className="text-xs px-3 py-1 rounded-xl bg-rose-950/40 hover:bg-rose-950 text-rose-300 border border-rose-900/40 cursor-pointer"
                 >
                   Delete
                 </button>
@@ -685,7 +790,7 @@ function RecipesView() {
           )
         })}
         {recipes.length === 0 && (
-          <div className="col-span-full bg-slate-900/20 border border-dashed border-slate-800 p-8 rounded-2xl text-center">
+          <div className="col-span-full bg-slate-900/20 border border-dashed border-slate-800 p-8 rounded-3xl text-center">
             <p className="text-sm text-slate-400">No recipes added yet.</p>
           </div>
         )}
@@ -693,7 +798,7 @@ function RecipesView() {
 
       {/* Editor Modal */}
       {(isCreating || editingRecipe) && (
-        <div className="fixed inset-0 bg-slate-955/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 md:p-6 max-w-xl w-full space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl">
             <h3 className="text-base font-bold text-slate-100">
               {editingRecipe ? 'Edit Recipe' : 'Add New Recipe'}
@@ -768,7 +873,7 @@ function RecipeEditor({
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div className="sm:col-span-2">
-          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
             Recipe Title
           </label>
           <input
@@ -780,7 +885,7 @@ function RecipeEditor({
           />
         </div>
         <div>
-          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
             Eating Slot
           </label>
           <select
@@ -796,7 +901,7 @@ function RecipeEditor({
           </select>
         </div>
         <div>
-          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
             Calories (kcal)
           </label>
           <input
@@ -811,7 +916,7 @@ function RecipeEditor({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
             Prep Time (mins)
           </label>
           <input
@@ -823,7 +928,7 @@ function RecipeEditor({
           />
         </div>
         <div>
-          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
             Instructions / Notes
           </label>
           <input
@@ -959,7 +1064,7 @@ function RecipeEditor({
         <button
           type="button"
           onClick={handleSave}
-          className="px-5 py-2 text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-955 rounded-xl transition-all cursor-pointer shadow-md active:scale-95"
+          className="px-5 py-2 text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl transition-all cursor-pointer shadow-md active:scale-95"
         >
           Save Recipe
         </button>
@@ -969,7 +1074,7 @@ function RecipeEditor({
 }
 
 /* =========================================================================
-   3. INGREDIENTS DIRECTORY VIEW (PICTURE TAB)
+   3. INGREDIENTS DIRECTORY VIEW
    ========================================================================= */
 function IngredientsView() {
   const { ingredients, addIngredient, updateIngredient, deleteIngredient } = useMenuStore()
@@ -978,9 +1083,11 @@ function IngredientsView() {
 
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
-      <div className="flex items-center justify-between bg-slate-900/60 p-4 border border-slate-800 rounded-2xl">
+      <div className="flex items-center justify-between bg-slate-900/60 p-4 border border-slate-800/80 rounded-3xl">
         <div>
-          <h3 className="text-sm font-bold text-slate-200">Ingredients Directory</h3>
+          <h3 className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+            <span>🥬</span> Ingredients Directory
+          </h3>
           <p className="text-xs text-slate-400">Store raw ingredients, picture reference URLs, measurement units & stock notes.</p>
         </div>
         <button
@@ -988,7 +1095,7 @@ function IngredientsView() {
             setEditingIngredient(null)
             setIsCreating(true)
           }}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-955 transition-all cursor-pointer shadow-md active:scale-95"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-all cursor-pointer shadow-md active:scale-95"
         >
           <PlusIcon /> Add Ingredient
         </button>
@@ -996,20 +1103,20 @@ function IngredientsView() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {ingredients.map((ing) => (
-          <div key={ing.id} className="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl space-y-3 shadow-md flex flex-col justify-between">
+          <div key={ing.id} className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-3xl space-y-3 shadow-md flex flex-col justify-between">
             <div className="space-y-2">
               {ing.imageUrl && (
-                <div className="w-full h-32 rounded-xl overflow-hidden bg-slate-950 border border-slate-850">
+                <div className="w-full h-32 rounded-2xl overflow-hidden bg-slate-950 border border-slate-850">
                   <img src={ing.imageUrl} alt={ing.name} className="w-full h-full object-cover" />
                 </div>
               )}
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-bold text-slate-100">{ing.name}</h4>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-cyan-400">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-bold text-slate-100 truncate">{ing.name}</h4>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-slate-950 border border-slate-800 text-cyan-400 shrink-0">
                   {ing.unit}
                 </span>
               </div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{ing.category}</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{ing.category}</p>
               {ing.notes && <p className="text-xs text-slate-400 italic">{ing.notes}</p>}
             </div>
 
@@ -1019,13 +1126,13 @@ function IngredientsView() {
                   setEditingIngredient(ing)
                   setIsCreating(false)
                 }}
-                className="text-xs px-3 py-1 rounded-lg bg-slate-950 hover:bg-slate-900 text-slate-300 border border-slate-800 cursor-pointer"
+                className="text-xs px-3 py-1 rounded-xl bg-slate-950 hover:bg-slate-900 text-slate-300 border border-slate-800 cursor-pointer"
               >
                 Edit
               </button>
               <button
                 onClick={() => deleteIngredient(ing.id)}
-                className="text-xs px-3 py-1 rounded-lg bg-rose-955/40 hover:bg-rose-950 text-rose-300 border border-rose-900/40 cursor-pointer"
+                className="text-xs px-3 py-1 rounded-xl bg-rose-950/40 hover:bg-rose-950 text-rose-300 border border-rose-900/40 cursor-pointer"
               >
                 Delete
               </button>
@@ -1033,14 +1140,14 @@ function IngredientsView() {
           </div>
         ))}
         {ingredients.length === 0 && (
-          <div className="col-span-full bg-slate-900/20 border border-dashed border-slate-800 p-8 rounded-2xl text-center">
+          <div className="col-span-full bg-slate-900/20 border border-dashed border-slate-800 p-8 rounded-3xl text-center">
             <p className="text-sm text-slate-400">No ingredients added yet.</p>
           </div>
         )}
       </div>
 
       {(isCreating || editingIngredient) && (
-        <div className="fixed inset-0 bg-slate-955/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 md:p-6 max-w-md w-full space-y-4 shadow-2xl">
             <h3 className="text-base font-bold text-slate-100">
               {editingIngredient ? 'Edit Ingredient' : 'Add New Ingredient'}
@@ -1099,7 +1206,7 @@ function IngredientEditor({
   return (
     <div className="space-y-3">
       <div>
-        <label className="text-[10px] font-bold text-slate-450 uppercase block mb-1">Ingredient Name</label>
+        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Ingredient Name</label>
         <input
           type="text"
           value={name}
@@ -1111,7 +1218,7 @@ function IngredientEditor({
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-[10px] font-bold text-slate-450 uppercase block mb-1">Category</label>
+          <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Category</label>
           <input
             type="text"
             value={category}
@@ -1121,7 +1228,7 @@ function IngredientEditor({
           />
         </div>
         <div>
-          <label className="text-[10px] font-bold text-slate-450 uppercase block mb-1">Unit</label>
+          <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Unit</label>
           <input
             type="text"
             value={unit}
@@ -1133,7 +1240,7 @@ function IngredientEditor({
       </div>
 
       <div>
-        <label className="text-[10px] font-bold text-slate-450 uppercase block mb-1">Picture Reference URL</label>
+        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Picture Reference URL</label>
         <input
           type="url"
           value={imageUrl}
@@ -1144,7 +1251,7 @@ function IngredientEditor({
       </div>
 
       <div>
-        <label className="text-[10px] font-bold text-slate-450 uppercase block mb-1">Inventory Notes</label>
+        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Inventory Notes</label>
         <input
           type="text"
           value={notes}
@@ -1158,14 +1265,14 @@ function IngredientEditor({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-1.5 text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 rounded-xl"
+          className="px-4 py-1.5 text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 rounded-xl cursor-pointer"
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={handleSave}
-          className="px-4 py-1.5 text-xs font-bold bg-cyan-500 text-slate-955 rounded-xl shadow-md active:scale-95"
+          className="px-4 py-1.5 text-xs font-bold bg-cyan-500 text-slate-950 rounded-xl shadow-md active:scale-95 cursor-pointer"
         >
           Save
         </button>
@@ -1184,9 +1291,11 @@ function PrePrepView() {
 
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
-      <div className="flex items-center justify-between bg-slate-900/60 p-4 border border-slate-800 rounded-2xl">
+      <div className="flex items-center justify-between bg-slate-900/60 p-4 border border-slate-800/80 rounded-3xl">
         <div>
-          <h3 className="text-sm font-bold text-purple-300">Pre-Prep Items Directory</h3>
+          <h3 className="text-sm font-bold text-purple-300 flex items-center gap-1.5">
+            <span>🔪</span> Pre-Prep Items Directory
+          </h3>
           <p className="text-xs text-slate-400">Manage batch pre-prep items (e.g. Chopped Onions, Pastes, Boiled Items) for multiple recipes.</p>
         </div>
         <button
@@ -1202,11 +1311,11 @@ function PrePrepView() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {prePrepItems.map((item) => (
-          <div key={item.id} className="bg-purple-955/20 border border-purple-900/30 p-4 rounded-2xl space-y-3 shadow-md flex flex-col justify-between">
+          <div key={item.id} className="bg-purple-950/20 border border-purple-900/30 p-4 rounded-3xl space-y-3 shadow-md flex flex-col justify-between">
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-bold text-purple-200">🔪 {item.name}</h4>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-950 border border-purple-900/40 text-purple-300">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-bold text-purple-200 truncate">🔪 {item.name}</h4>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-slate-950 border border-purple-900/40 text-purple-300 shrink-0">
                   {item.unit}
                 </span>
               </div>
@@ -1219,13 +1328,13 @@ function PrePrepView() {
                   setEditingItem(item)
                   setIsCreating(false)
                 }}
-                className="text-xs px-3 py-1 rounded-lg bg-slate-950 hover:bg-slate-900 text-slate-300 border border-slate-800 cursor-pointer"
+                className="text-xs px-3 py-1 rounded-xl bg-slate-950 hover:bg-slate-900 text-slate-300 border border-slate-800 cursor-pointer"
               >
                 Edit
               </button>
               <button
                 onClick={() => deletePrePrepItem(item.id)}
-                className="text-xs px-3 py-1 rounded-lg bg-rose-955/40 hover:bg-rose-950 text-rose-300 border border-rose-900/40 cursor-pointer"
+                className="text-xs px-3 py-1 rounded-xl bg-rose-950/40 hover:bg-rose-950 text-rose-300 border border-rose-900/40 cursor-pointer"
               >
                 Delete
               </button>
@@ -1233,7 +1342,7 @@ function PrePrepView() {
           </div>
         ))}
         {prePrepItems.length === 0 && (
-          <div className="col-span-full bg-slate-900/20 border border-dashed border-slate-800 p-8 rounded-2xl text-center">
+          <div className="col-span-full bg-slate-900/20 border border-dashed border-slate-800 p-8 rounded-3xl text-center">
             <p className="text-sm text-slate-400">No pre-prep items added yet.</p>
           </div>
         )}
@@ -1295,7 +1404,7 @@ function PrePrepEditor({
   return (
     <div className="space-y-3">
       <div>
-        <label className="text-[10px] font-bold text-slate-450 uppercase block mb-1">Pre-Prep Item Name</label>
+        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Pre-Prep Item Name</label>
         <input
           type="text"
           value={name}
@@ -1306,7 +1415,7 @@ function PrePrepEditor({
       </div>
 
       <div>
-        <label className="text-[10px] font-bold text-slate-450 uppercase block mb-1">Unit</label>
+        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Unit</label>
         <input
           type="text"
           value={unit}
@@ -1317,7 +1426,7 @@ function PrePrepEditor({
       </div>
 
       <div>
-        <label className="text-[10px] font-bold text-slate-450 uppercase block mb-1">Storage & Shelf-Life Notes</label>
+        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Storage & Shelf-Life Notes</label>
         <input
           type="text"
           value={notes}
@@ -1331,14 +1440,14 @@ function PrePrepEditor({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-1.5 text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 rounded-xl"
+          className="px-4 py-1.5 text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 rounded-xl cursor-pointer"
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={handleSave}
-          className="px-4 py-1.5 text-xs font-bold bg-purple-500 text-white rounded-xl shadow-md active:scale-95"
+          className="px-4 py-1.5 text-xs font-bold bg-purple-500 text-white rounded-xl shadow-md active:scale-95 cursor-pointer"
         >
           Save
         </button>
@@ -1359,9 +1468,11 @@ function EatingSlotsView() {
 
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
-      <div className="flex items-center justify-between bg-slate-900/60 p-4 border border-slate-800 rounded-2xl">
+      <div className="flex items-center justify-between bg-slate-900/60 p-4 border border-slate-800/80 rounded-3xl">
         <div>
-          <h3 className="text-sm font-bold text-slate-200">Variable Eating Slots & Meal Schedule</h3>
+          <h3 className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+            <span>⚙️</span> Eating Slots & Schedule
+          </h3>
           <p className="text-xs text-slate-400">Add, adjust, or rename eating slots and target scheduled meal times.</p>
         </div>
         <button
@@ -1369,7 +1480,7 @@ function EatingSlotsView() {
             setEditingSlot(null)
             setIsCreating(true)
           }}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-955 transition-all cursor-pointer shadow-md active:scale-95"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-all cursor-pointer shadow-md active:scale-95"
         >
           <PlusIcon /> Add Eating Slot
         </button>
@@ -1378,7 +1489,7 @@ function EatingSlotsView() {
       {/* Eating Slots Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {activeSlots.map((slot) => (
-          <div key={slot.id} className="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl space-y-3 shadow-md flex flex-col justify-between">
+          <div key={slot.id} className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-3xl space-y-3 shadow-md flex flex-col justify-between">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
@@ -1386,7 +1497,7 @@ function EatingSlotsView() {
                   <span>{slot.name}</span>
                 </h4>
                 {slot.scheduledTime && (
-                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-cyan-400 flex items-center gap-1">
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-lg bg-slate-950 border border-slate-800 text-cyan-400 flex items-center gap-1">
                     <ClockIcon /> {slot.scheduledTime}
                   </span>
                 )}
@@ -1400,13 +1511,13 @@ function EatingSlotsView() {
                   setEditingSlot(slot)
                   setIsCreating(false)
                 }}
-                className="text-xs px-3 py-1 rounded-lg bg-slate-950 hover:bg-slate-900 text-slate-300 border border-slate-800 cursor-pointer"
+                className="text-xs px-3 py-1 rounded-xl bg-slate-950 hover:bg-slate-900 text-slate-300 border border-slate-800 cursor-pointer"
               >
                 Edit
               </button>
               <button
                 onClick={() => deleteEatingSlot(slot.id)}
-                className="text-xs px-3 py-1 rounded-lg bg-rose-955/40 hover:bg-rose-950 text-rose-300 border border-rose-900/40 cursor-pointer"
+                className="text-xs px-3 py-1 rounded-xl bg-rose-955/40 hover:bg-rose-950 text-rose-300 border border-rose-900/40 cursor-pointer"
               >
                 Delete
               </button>
@@ -1473,7 +1584,7 @@ function EatingSlotEditor({
   return (
     <div className="space-y-3">
       <div>
-        <label className="text-[10px] font-bold text-slate-450 uppercase block mb-1">Slot Name</label>
+        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Slot Name</label>
         <input
           type="text"
           value={name}
@@ -1485,7 +1596,7 @@ function EatingSlotEditor({
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-[10px] font-bold text-slate-450 uppercase block mb-1">Scheduled Time (HH:MM)</label>
+          <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Scheduled Time (HH:MM)</label>
           <input
             type="time"
             value={scheduledTime}
@@ -1494,7 +1605,7 @@ function EatingSlotEditor({
           />
         </div>
         <div>
-          <label className="text-[10px] font-bold text-slate-450 uppercase block mb-1">Icon / Emoji</label>
+          <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Icon / Emoji</label>
           <input
             type="text"
             value={icon}
@@ -1509,14 +1620,14 @@ function EatingSlotEditor({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-1.5 text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 rounded-xl"
+          className="px-4 py-1.5 text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 rounded-xl cursor-pointer"
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={handleSave}
-          className="px-4 py-1.5 text-xs font-bold bg-cyan-500 text-slate-955 rounded-xl shadow-md active:scale-95"
+          className="px-4 py-1.5 text-xs font-bold bg-cyan-500 text-slate-950 rounded-xl shadow-md active:scale-95 cursor-pointer"
         >
           Save Slot
         </button>
@@ -1535,9 +1646,11 @@ function DayTemplatesView() {
 
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
-      <div className="flex items-center justify-between bg-slate-900/60 p-4 border border-slate-800 rounded-2xl">
+      <div className="flex items-center justify-between bg-slate-900/60 p-4 border border-slate-800/80 rounded-3xl">
         <div>
-          <h3 className="text-sm font-bold text-cyan-300">🗂️ Reusable Day Menu Templates</h3>
+          <h3 className="text-sm font-bold text-cyan-300 flex items-center gap-1.5">
+            <span>🗂️</span> Day Menu Templates
+          </h3>
           <p className="text-xs text-slate-400">Save full-day meal configurations and apply them to any day of the week with 1 click.</p>
         </div>
       </div>
@@ -1556,7 +1669,7 @@ function DayTemplatesView() {
           })
 
           return (
-            <div key={template.id} className="bg-slate-900/40 border border-slate-800 p-4 rounded-3xl space-y-3.5 shadow-lg flex flex-col justify-between">
+            <div key={template.id} className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-3xl space-y-3.5 shadow-lg flex flex-col justify-between">
               <div className="space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-850 pb-2">
                   <h4 className="text-base font-extrabold text-slate-100 flex items-center gap-2">
@@ -1565,7 +1678,7 @@ function DayTemplatesView() {
                   </h4>
 
                   {templateCalories > 0 && (
-                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-amber-955/60 border border-amber-900/40 text-amber-400 font-bold flex items-center gap-1">
+                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-lg bg-amber-955/60 border border-amber-900/40 text-amber-400 font-bold flex items-center gap-1">
                       <FireIcon /> {templateCalories} kcal
                     </span>
                   )}
@@ -1582,13 +1695,13 @@ function DayTemplatesView() {
 
                     return (
                       <div key={slot.id} className="bg-slate-950/80 p-2.5 rounded-2xl border border-slate-850 space-y-1">
-                        <span className="text-[10px] font-bold uppercase text-slate-450 flex items-center gap-1">
+                        <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
                           <span>{slot.icon || '🍱'}</span>
                           <span>{slot.name}</span>
                         </span>
                         <div className="flex flex-wrap gap-1">
                           {slotRecipes.map((r) => (
-                            <span key={r.id} className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-200">
+                            <span key={r.id} className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200">
                               {r.title} {r.calories ? `(${r.calories} kcal)` : ''}
                             </span>
                           ))}
@@ -1630,10 +1743,10 @@ function DayTemplatesView() {
         })}
 
         {(!dayMenuTemplates || dayMenuTemplates.length === 0) && (
-          <div className="col-span-full bg-slate-900/20 border border-dashed border-slate-800 p-8 rounded-2xl text-center">
+          <div className="col-span-full bg-slate-900/20 border border-dashed border-slate-800 p-8 rounded-3xl text-center">
             <p className="text-sm text-slate-400">No day menu templates saved yet.</p>
             <p className="text-xs text-slate-500 mt-1">
-              Go to the 📅 Day Planner tab and click "💾 Save Day as Template" to save your custom daily menus!
+              Go to the 📅 Day Planner tab and click "💾 Save Template" to save your custom daily menus!
             </p>
           </div>
         )}
