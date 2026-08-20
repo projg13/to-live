@@ -274,6 +274,13 @@ function Dashboard() {
               <UndoIcon />
               Undo
             </button>
+            <button
+              onClick={() => scheduler.clearSchedule()}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-slate-950/65 hover:bg-rose-950/30 text-rose-400 hover:text-rose-300 transition-all border border-slate-850 hover:border-rose-900/40 active:scale-95 cursor-pointer w-full"
+            >
+              <TrashIcon />
+              Reset Schedule
+            </button>
             {/* Custom time recalc */}
             <div className="flex items-center gap-1.5 w-full">
               <input
