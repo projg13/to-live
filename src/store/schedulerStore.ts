@@ -25,6 +25,7 @@ interface SchedulerStore {
   lastDoneAt: Record<number, number>   // day → minutes from midnight (latest done-at time)
   weightOffsets: Record<string, number> // instanceKey → weight offset
   committedTasks: Record<string, number> // instanceKey → commit time (minutes from midnight)
+  lastCommitTime: number | null        // most recent commit timestamp (persists across completion)
   resolveVersion: number               // bumped to trigger re-resolve from actions
   debugMode: boolean                   // persisted debug toggle
 
@@ -1094,6 +1095,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
       postponedTasks: [],
       weightOffsets: {},
       committedTasks: {},
+      lastCommitTime: null,
       resolveVersion: 0,
       debugMode: false,
       lastDoneAt: {},
@@ -1371,6 +1373,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
       commitTask: (instanceKey, atMinutes) =>
         set((state) => ({
           committedTasks: { ...state.committedTasks, [instanceKey]: atMinutes },
+          lastCommitTime: atMinutes,
         })),
 
       uncommitTask: (instanceKey) =>
@@ -1415,7 +1418,7 @@ export const useSchedulerStore = create<SchedulerStore>()(
       },
 
       clearSchedule: () =>
-        set({ schedule: null, confirmedAnchors: [], adhocTasks: [], skippedTaskIds: [], doneTasks: [], doneItems: [], postponedTasks: [], weightOffsets: {}, committedTasks: {}, lastDoneAt: {} }),
+        set({ schedule: null, confirmedAnchors: [], adhocTasks: [], skippedTaskIds: [], doneTasks: [], doneItems: [], postponedTasks: [], weightOffsets: {}, committedTasks: {}, lastCommitTime: null, lastDoneAt: {} }),
     }),
     {
       name: 'to-live-scheduler',

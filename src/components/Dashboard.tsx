@@ -251,29 +251,44 @@ function Dashboard() {
               <ResetIcon />
               Recalculate
             </button>
-            {/* Recalculate from committed time */}
-            {Object.keys(scheduler.committedTasks).length > 0 && (() => {
-              const commitTime = Object.values(scheduler.committedTasks)[0]
+            {/* Unified Commit Return + Undo Span */}
+            {(() => {
+              const activeCommit = Object.values(scheduler.committedTasks)[0]
+              const commitTime = activeCommit ?? scheduler.lastCommitTime ?? null
+              const isViewingSnapshot = commitTime !== null && debugTimeOverride === commitTime
+
               return (
-                <button
-                  onClick={() => {
-                    setDebugTimeOverride(commitTime)
-                    scheduler.recalibrateFrom(commitTime, selectedDay)
-                  }}
-                  className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-emerald-950/30 hover:bg-emerald-900/30 text-emerald-400 border border-emerald-800/30 transition-all active:scale-95 cursor-pointer w-full"
-                  title={`Recalculate from commit time (${formatTime(commitTime)})`}
-                >
-                  📍 From {formatTime(commitTime)}
-                </button>
+                <div className="flex items-stretch w-full rounded-xl border border-slate-850 bg-slate-950/65 overflow-hidden shadow-sm">
+                  {commitTime !== null && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setDebugTimeOverride(commitTime)
+                          scheduler.recalibrateFrom(commitTime, selectedDay)
+                        }}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold transition-all active:scale-95 cursor-pointer truncate ${
+                          isViewingSnapshot
+                            ? 'bg-emerald-950/50 text-emerald-300 font-bold'
+                            : 'bg-emerald-950/20 hover:bg-emerald-900/30 text-emerald-400'
+                        }`}
+                        title={`Recalculate from commit time (${formatTime(commitTime)})`}
+                      >
+                        📍 From {formatTime(commitTime)}
+                      </button>
+                      <div className="w-[1px] bg-slate-800 self-stretch" />
+                    </>
+                  )}
+                  <button
+                    onClick={() => scheduler.undo()}
+                    className={`${commitTime !== null ? 'px-4' : 'flex-1'} flex items-center justify-center gap-1.5 py-2 text-sm font-semibold hover:bg-slate-900 text-slate-300 transition-all active:scale-95 cursor-pointer`}
+                    title="Undo last action"
+                  >
+                    <UndoIcon />
+                    Undo
+                  </button>
+                </div>
               )
             })()}
-            <button
-              onClick={() => scheduler.undo()}
-              className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-slate-950/65 hover:bg-slate-900 text-slate-300 transition-all border border-slate-850 active:scale-95 cursor-pointer w-full"
-            >
-              <UndoIcon />
-              Undo
-            </button>
             <button
               onClick={() => scheduler.clearSchedule()}
               className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-slate-950/65 hover:bg-rose-950/30 text-rose-400 hover:text-rose-300 transition-all border border-slate-850 hover:border-rose-900/40 active:scale-95 cursor-pointer w-full"
