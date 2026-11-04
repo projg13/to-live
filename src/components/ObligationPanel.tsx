@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useObligationStore } from '../store/obligationStore'
 import { useTaskStore } from '../store/taskStore'
+import { useSchedulerStore } from '../store/schedulerStore'
+import { getObligationWeight } from '../types/obligation'
 import type { Obligation, ObligationTask, WeightBracket, ObligationRecurrence, MonthlyRecurrenceType, WeekOfMonthSelection, DayOfWeekSelection } from '../types/obligation'
 import { resolveObligationDeadline, getActiveBracket } from '../types/obligation'
 import { formatTime } from '../types/anchor'
@@ -33,13 +35,15 @@ const XIcon = () => (
 function ObligationPanel() {
   const { obligations, addObligation, updateObligation, deleteObligation, toggleEnabled, doneTasks: obligationDoneTasks, unmarkObligationDone, clearObligationDone, purgeStaleDone } = useObligationStore()
   const { tasks } = useTaskStore()
+  const { debugDateOverride, debugTimeOverride } = useSchedulerStore()
+  const activeSimDate = debugDateOverride ?? new Date().toISOString().split('T')[0]
+  const activeSimTime = debugTimeOverride ?? (new Date().getHours() * 60 + new Date().getMinutes())
   const [editing, setEditing] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0]
-    purgeStaleDone(today)
-  }, [purgeStaleDone])
+    purgeStaleDone(activeSimDate)
+  }, [purgeStaleDone, activeSimDate])
 
   return (
     <div className="space-y-6">
@@ -91,7 +95,7 @@ function ObligationPanel() {
             )
           }
 
-          const today = new Date().toISOString().split('T')[0]
+          const today = activeSimDate
           const resolvedDeadline = resolveObligationDeadline(ob, today)
           const daysLeft = resolvedDeadline
             ? Math.ceil((new Date(resolvedDeadline).getTime() - new Date(today).getTime()) / 86400000)
@@ -155,7 +159,7 @@ function ObligationPanel() {
                     {ob.startDate && <span>🚀 Starts: {ob.startDate}</span>}
                     {ob.recurrence !== 'one-time' && resolvedDeadline && <span>📅 Next: {resolvedDeadline}</span>}
                     {activeBracket && (
-                      <span>⚖️ Bracket: ≤{activeBracket.maxDaysRemaining}d → peak {Math.max(...activeBracket.timeCurve.map(p => p.value))}w</span>
+                      <span>⚖️ Bracket: ≤{activeBracket.maxDaysRemaining}d → peak {Math.max(...activeBracket.timeCurve.map(p => p.value))}w (now @ {formatTime(activeSimTime)}: {Math.round(getObligationWeight(activeBracket.timeCurve, activeSimTime))}w)</span>
                     )}
                   </div>
                 )}

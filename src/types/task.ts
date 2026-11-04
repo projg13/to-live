@@ -6,7 +6,7 @@ export interface TaskLink {
   continuity?: ContinuityRule // resumable = all-or-nothing, breakable = parent can exist without child
 }
 
-// Piecewise weight: weight varies over time of day (24h circular)
+// Piecewise weight or duration point: varies over time of day (24h circular or offset)
 export interface WeightPoint {
   time: number                // minutes from midnight (0–1439)
   value: number
@@ -27,6 +27,7 @@ export interface TaskKnobs {
   hasExpiry: boolean       // enables expiresAt
   hasFixedEndTime?: boolean // enables fixedEndTime
   hasAlterEgos?: boolean   // enables alterEgos[]
+  hasDurationCurve?: boolean // enables continuous durationCurve[] + minDurationMinutes
 }
 
 // Task: a quantum of time consumption
@@ -36,6 +37,7 @@ export interface Task {
   title: string
   weight: number
   durationMinutes: number         // the measure — always required
+  minDurationMinutes?: number     // floor for continuous shrinkage / head-clipping on fixedEndTime
 
   // Knobbed: isMother (links to other tasks)
   links?: TaskLink[]
@@ -43,11 +45,14 @@ export interface Task {
   // Knobbed: hasWeightCurve (24h circular weight over time of day)
   weightCurve?: WeightPoint[]
 
+  // Knobbed: hasDurationCurve (continuous duration compression over time of day)
+  durationCurve?: WeightPoint[]
+
   // Knobbed: hasExpiry
   expiresAt?: string              // ISO datetime — when this task gets killed
 
   // Knobbed: hasFixedEndTime
-  fixedEndTime?: number           // minutes from midnight (0–1439)
+  fixedEndTime?: number           // minutes from midnight (0–1439 or >1440 for post-midnight wall)
 
   // Knobbed: hasAlterEgos
   alterEgos?: TaskAlterEgo[]

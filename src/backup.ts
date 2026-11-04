@@ -170,7 +170,6 @@ export async function listSnapshots(): Promise<SnapshotEntry[]> {
 /** Restore from a specific snapshot slot */
 export async function restoreFromSnapshot(filename: string): Promise<void> {
   if (!isConfigured()) throw new Error('Incomplete GitHub settings')
-  if (!confirm(`Restore from ${filename}? This will overwrite your local state and reload.`)) return
 
   const json = await getFileContent(filename)
   restoreAppState(json)
@@ -179,7 +178,6 @@ export async function restoreFromSnapshot(filename: string): Promise<void> {
 /** Legacy: restore from state.json (backward compat) */
 export async function restoreFromGitHub(): Promise<void> {
   if (!isConfigured()) throw new Error('Incomplete GitHub settings')
-  if (!confirm('Overwrite local state with this backup? The app will reload.')) return
 
   const json = await getFileContent('state.json')
   restoreAppState(json)

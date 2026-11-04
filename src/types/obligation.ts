@@ -18,7 +18,7 @@ export type DayOfWeekSelection =
   | 'weekday'
   | 'weekend-day'
 
-// Time-of-day weight point (same as anchor — minutes from midnight → weight)
+// Time-of-day weight point (minutes from midnight -> weight)
 export interface TimeWeight {
   time: number    // minutes from midnight
   value: number
@@ -76,10 +76,8 @@ export function resolveObligationDeadline(ob: Obligation, dateStr: string): stri
   }
 
   if (ob.recurrence === 'monthly') {
-    // Try current month first, then next month if deadline already passed
     const result = resolveMonthlyDeadline(ob, dateStr)
     if (result && result < dateStr) {
-      // Deadline passed — resolve for next month
       const d = new Date(dateStr)
       d.setMonth(d.getMonth() + 1, 1)
       const nextMonthStr = d.toISOString().split('T')[0]
@@ -88,7 +86,6 @@ export function resolveObligationDeadline(ob: Obligation, dateStr: string): stri
     return result
   }
 
-  // Fallback to absolute deadline if custom/yearly/quarterly
   return ob.deadline
 }
 
@@ -146,38 +143,48 @@ export function getActiveBracket(
   brackets: WeightBracket[],
   daysRemaining: number
 ): WeightBracket | undefined {
-  // Sorted ascending by maxDaysRemaining — first where daysRemaining <= max
   const sorted = [...brackets].sort((a, b) => a.maxDaysRemaining - b.maxDaysRemaining)
   return sorted.find((b) => daysRemaining <= b.maxDaysRemaining)
 }
 
-// Interpolate the time-of-day weight within a bracket (circular 24h wrapping)
+/**
+ * Patch 0005: Windowed Slab Piecewise-Linear Weight Evaluation.
+ * - If `timeCurve.length === 0`: returns 0.
+ * - If `timeCurve.length === 1`: resilient fallback — treats single point as flat over `[point.time, 1440)`.
+ * - If `timeCurve.length >= 2`: strictly evaluates within the defined slab `[first.time, last.time]`.
+ *   Outside `[first.time, last.time]`, returns `0` (no circular midnight wrap!).
+ */
 export function getObligationWeight(
   timeCurve: TimeWeight[],
   timeMinutes: number
 ): number {
   if (timeCurve.length === 0) return 0
-  if (timeCurve.length === 1) return timeCurve[0].value
-
   const DAY = 1440
-  const t = ((timeMinutes % DAY) + DAY) % DAY
+  const t = timeMinutes >= DAY ? timeMinutes % DAY : Math.max(0, timeMinutes)
 
-  const first = timeCurve[0]
-  const last = timeCurve[timeCurve.length - 1]
+  if (timeCurve.length === 1) {
+    return t >= timeCurve[0].time ? timeCurve[0].value : 0
+  }
 
-  for (let i = 0; i < timeCurve.length - 1; i++) {
-    const a = timeCurve[i]
-    const b = timeCurve[i + 1]
+  const sorted = [...timeCurve].sort((a, b) => a.time - b.time)
+  const first = sorted[0]
+  const last = sorted[sorted.length - 1]
+
+  // Strictly 0 outside the defined slab [first.time, last.time]
+  if (t < first.time || t > last.time) {
+    return 0
+  }
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i]
+    const b = sorted[i + 1]
     if (t >= a.time && t <= b.time) {
-      const frac = (t - a.time) / (b.time - a.time)
+      const span = b.time - a.time
+      if (span <= 0) return a.value
+      const frac = (t - a.time) / span
       return a.value + frac * (b.value - a.value)
     }
   }
 
-  // Wrap around midnight
-  const wrapDistance = (DAY - last.time) + first.time
-  if (wrapDistance <= 0) return last.value
-  const distFromLast = t >= last.time ? (t - last.time) : (DAY - last.time + t)
-  const frac = distFromLast / wrapDistance
-  return last.value + frac * (first.value - last.value)
+  return 0
 }

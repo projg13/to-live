@@ -45,7 +45,7 @@ export function getRecoveryWeight(
 ): number {
   if (!plan.triggered) return 0
 
-  // Interpolate base time curve
+  // Interpolate base time curve (strictly within slab)
   const base = interpolateTimeCurve(plan.baseTimeCurve, timeMinutes)
   if (base === 0) return 0
 
@@ -63,31 +63,31 @@ export function getRecoveryWeight(
 
 function interpolateTimeCurve(curve: TimeWeight[], timeMinutes: number): number {
   if (curve.length === 0) return 0
-  if (curve.length === 1) return curve[0].value
+  const DAY = 1440
+  const t = timeMinutes >= DAY ? timeMinutes % DAY : Math.max(0, timeMinutes)
 
-  const DAY = 1440 // minutes in 24 hours
-  const t = ((timeMinutes % DAY) + DAY) % DAY // normalize to [0, 1440)
+  if (curve.length === 1) {
+    return t >= curve[0].time ? curve[0].value : 0
+  }
 
-  // Sorted curve assumed (by time ascending)
-  const first = curve[0]
-  const last = curve[curve.length - 1]
+  const sorted = [...curve].sort((a, b) => a.time - b.time)
+  const first = sorted[0]
+  const last = sorted[sorted.length - 1]
 
-  // Check if time falls between two adjacent points
-  for (let i = 0; i < curve.length - 1; i++) {
-    const a = curve[i]
-    const b = curve[i + 1]
+  if (t < first.time || t > last.time) {
+    return 0
+  }
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i]
+    const b = sorted[i + 1]
     if (t >= a.time && t <= b.time) {
-      const frac = (t - a.time) / (b.time - a.time)
+      const span = b.time - a.time
+      if (span <= 0) return a.value
+      const frac = (t - a.time) / span
       return a.value + frac * (b.value - a.value)
     }
   }
 
-  // Time is outside the defined points → wrap around midnight
-  // Interpolate between last point and first point through midnight
-  const wrapDistance = (DAY - last.time) + first.time
-  if (wrapDistance <= 0) return last.value
-
-  const distFromLast = t >= last.time ? (t - last.time) : (DAY - last.time + t)
-  const frac = distFromLast / wrapDistance
-  return last.value + frac * (first.value - last.value)
+  return 0
 }

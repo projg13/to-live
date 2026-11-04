@@ -8,6 +8,7 @@ import { useObligationStore } from '../store/obligationStore'
 import { useRecoveryStore } from '../store/recoveryStore'
 import { usePlannerStore } from '../store/plannerStore'
 import { formatTime } from '../types/anchor'
+import { loadDemoPresetIntoStores, type DemoPresetId } from '../migration'
 import type { AdhocTask, ScheduledItem } from '../types/scheduler'
 import type { ResolveContext } from '../store/schedulerStore'
 
@@ -97,17 +98,12 @@ function Dashboard() {
   const [offsetValue, setOffsetValue] = useState('')
   const [customRecalcTime, setCustomRecalcTime] = useState('')
 
-  const showDebug = false
-  const [showCompleted, setShowCompleted] = useState(false)
-  // Initialize time override from persisted commit or lastDoneAt
-  const [debugTimeOverride, setDebugTimeOverride] = useState<number | null>(() => {
-    const commitVals = Object.values(scheduler.committedTasks)
-    if (commitVals.length > 0) return commitVals[0]
-    const lastDone = scheduler.lastDoneAt[0] // day 0 = today
-    if (lastDone !== undefined) return lastDone
-    return null
-  })
-  const [debugDateOverride, setDebugDateOverride] = useState<string | null>(null)
+  const showDebug = scheduler.debugMode
+  const [showCompleted, setShowCompleted] = useState(true)
+  const debugTimeOverride = scheduler.debugTimeOverride
+  const setDebugTimeOverride = scheduler.setDebugTimeOverride
+  const debugDateOverride = scheduler.debugDateOverride
+  const setDebugDateOverride = scheduler.setDebugDateOverride
 
   // Live clock — auto-updates every 30 seconds
   const [currentTime, setCurrentTime] = useState(getCurrentMinutes)
@@ -154,8 +150,8 @@ function Dashboard() {
     scheduler.resolveVersion,
     scheduler.lastDoneAt,
     debugDateOverride,
-    // NOTE: virtualTime intentionally excluded — resolve only on data changes
-    // or manual Recalculate (which bumps resolveVersion)
+    debugTimeOverride,
+    virtualTime,
   ])
 
   const schedule = scheduler.schedule
@@ -486,6 +482,79 @@ function Dashboard() {
             </div>
           )}
 
+          {/* Quick Scenario Preset Switcher for Testing Patches 0001–0005 in the Full App */}
+          <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3.5 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-400">
+                ⚡ Engine Preset Loader (Populates Live Stores)
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Switch presets or edit items directly in the Manage tab
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { id: 'user_migrated', label: '👤 My Migrated Data (36 Tasks / 23 Blocks)' },
+                { id: 'all_features', label: '🌟 Demo: All Patches Combined' },
+                { id: 'p5_intruder', label: '14B: Intruder Shrink' },
+                { id: 'p5_equal_share', label: '14C: Equal-Weight Share (33m+17m)' },
+                { id: 'p5_weight_tie', label: '14C: Weight-Tie Callout' },
+                { id: 'p5_rescue', label: '14D: 2-Hop Expiry Rescue' },
+                { id: 'p4_cooking', label: 'Patch 0004: Cooking Sequencer' },
+                { id: 'p3_laundry', label: 'Patch 0003: Laundry DAG' },
+                { id: 'p2_football', label: 'Patch 0002: Football Head-Clip' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    loadDemoPresetIntoStores(p.id as DemoPresetId)
+                    setDebugTimeOverride(420)
+                  }}
+                  className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-slate-900 hover:bg-cyan-950/60 text-slate-300 hover:text-cyan-300 border border-slate-800 hover:border-cyan-700/50 transition-all cursor-pointer"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Patch 0005: Solver Diagnostics & Exact-Fit Callouts Banner */}
+          {daySchedule?.diagnostics && daySchedule.diagnostics.length > 0 && (
+            <div className="space-y-2">
+              {daySchedule.diagnostics.map((diag, dIdx) => {
+                const isTie = diag.kind === 'WEIGHT_TIE_AMBIGUITY'
+                const isShrunk = diag.kind === 'INTRUDER_SHRUNK'
+                const isShared = diag.kind === 'EQUAL_PRIORITY_SHARED'
+                const styleClass = isTie
+                  ? 'bg-rose-950/30 border-rose-500/40 text-rose-200'
+                  : isShrunk
+                    ? 'bg-amber-950/30 border-amber-500/40 text-amber-200'
+                    : isShared
+                      ? 'bg-indigo-950/30 border-indigo-500/40 text-indigo-200'
+                      : 'bg-slate-900/60 border-slate-700 text-slate-300'
+                return (
+                  <div key={dIdx} className={`p-3.5 rounded-2xl border text-xs space-y-1 ${styleClass}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono font-extrabold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-black/30">
+                        {diag.kind}
+                      </span>
+                      {diag.windowStart !== undefined && diag.windowEnd !== undefined && (
+                        <span className="font-mono text-[11px] opacity-80">
+                          Window: {formatTime(diag.windowStart)}–{formatTime(diag.windowEnd)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-semibold">{diag.message}</p>
+                    {diag.suggestion && (
+                      <p className="text-[11px] opacity-85 italic">💡 {diag.suggestion}</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
           {/* Timeline: anchors + tasks interleaved */}
           <div className="relative pl-6 ml-4 border-l-2 border-dashed border-slate-800 space-y-6">
             {timelineItems.length === 0 && (
@@ -630,6 +699,11 @@ function Dashboard() {
                         <span className="text-[10px] text-slate-500 font-bold tracking-wide">
                           w:{Math.round(item.weight)}
                         </span>
+                        {item.shrunkFromMinutes !== undefined && item.shrunkFromMinutes > (item.endMinutes - item.startMinutes) && (
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-amber-950/40 text-amber-300 border border-amber-700/40">
+                            🗜️ {item.shrunkFromMinutes}m → {item.endMinutes - item.startMinutes}m
+                          </span>
+                        )}
 
                         {/* Read-only: time remaining + expiry remaining */}
                         {(() => {

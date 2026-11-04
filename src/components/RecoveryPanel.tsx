@@ -45,7 +45,7 @@ function RecoveryPanel() {
   const [creating, setCreating] = useState(false)
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null)
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = scheduler.debugDateOverride ?? new Date().toISOString().split('T')[0]
 
   return (
     <div className="space-y-6">

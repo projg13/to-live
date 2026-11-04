@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useBlockStore } from '../store/blockStore'
 import { useTaskStore } from '../store/taskStore'
-import type { Block, BlockEntry } from '../types/block'
+import { type Block, type BlockEntry, validateBlockDag } from '../types/block'
 
 // Icons
 const PlusIcon = () => (
@@ -109,6 +109,11 @@ function BlockPanel() {
                   <span className="text-[10px] font-mono font-bold bg-slate-950 border border-slate-850 px-2 py-0.5 rounded text-slate-400">
                     {block.entries.length} task(s)
                   </span>
+                  {block.entries.some((e) => (e.requires?.length ?? 0) > 0) && (
+                    <span className="text-[10px] font-mono font-bold bg-cyan-950/50 border border-cyan-800/40 px-2 py-0.5 rounded text-cyan-300">
+                      DAG ({block.entries.reduce((acc, e) => acc + (e.requires?.length ?? 0), 0)} edges)
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -319,6 +324,24 @@ function BlockEditor({
                         />
                         background
                       </label>
+                      <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-300 cursor-pointer" title="Drop this task if any required parent is missed">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(entry.dropIfParentMissed)}
+                          onChange={(e) => updateEntry(i, { dropIfParentMissed: e.target.checked })}
+                          className="rounded border-slate-700 bg-slate-900 text-amber-500 h-4 w-4 cursor-pointer"
+                        />
+                        dropIfParentMissed
+                      </label>
+                      <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-300 cursor-pointer" title="Roll back parent if this task cannot fit">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(entry.dropParentIfMissed)}
+                          onChange={(e) => updateEntry(i, { dropParentIfMissed: e.target.checked })}
+                          className="rounded border-slate-700 bg-slate-900 text-rose-500 h-4 w-4 cursor-pointer"
+                        />
+                        dropParentIfMissed
+                      </label>
                     </div>
 
                     {/* Ordering arrows */}
@@ -342,6 +365,37 @@ function BlockEditor({
                       </button>
                     </div>
                   </div>
+
+                  {/* Multi-Parent DAG Requires Selector */}
+                  {entries.length > 1 && entry.taskId && (
+                    <div className="pt-2 border-t border-slate-900/60 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mr-1">Requires (DAG Parents):</span>
+                      {entries
+                        .filter((other) => other.taskId && other.taskId !== entry.taskId)
+                        .map((other) => {
+                          const otherTask = tasks.find((t) => t.id === other.taskId)
+                          const isReq = (entry.requires ?? []).includes(other.taskId)
+                          return (
+                            <button
+                              key={other.taskId}
+                              type="button"
+                              onClick={() => {
+                                const cur = entry.requires ?? []
+                                const next = isReq ? cur.filter((id) => id !== other.taskId) : [...cur, other.taskId]
+                                updateEntry(i, { requires: next.length > 0 ? next : undefined })
+                              }}
+                              className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border transition cursor-pointer ${
+                                isReq
+                                  ? 'bg-cyan-950/60 border-cyan-500/50 text-cyan-300 font-bold'
+                                  : 'bg-slate-900/60 border-slate-800 text-slate-500 hover:text-slate-300'
+                              }`}
+                            >
+                              {isReq ? '✓ ' : '+ '}{otherTask?.title ?? other.taskId}
+                            </button>
+                          )
+                        })}
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -356,6 +410,19 @@ function BlockEditor({
           </button>
         </div>
       </div>
+
+      {/* Live Kahn DAG Validation Banner */}
+      {(() => {
+        const dag = validateBlockDag(entries.filter((e) => Boolean(e.taskId)))
+        if (!dag.valid) {
+          return (
+            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/50 text-xs text-rose-200 font-mono">
+              ⚠️ Circular dependency detected by Kahn validator: {(dag.cycle ?? []).join(' → ')}
+            </div>
+          )
+        }
+        return null
+      })()}
 
       {/* Save / Discard Actions */}
       <div className="flex items-center justify-between border-t border-slate-800 pt-4 mt-4">

@@ -15,6 +15,23 @@ export interface ScheduledItem {
   idealTime?: number         // the ideal start time (from anchor or task config)
   idealEndTime?: number      // hard end boundary (from task config or adhoc task)
   expiryTime?: number        // idealTime + expiresAfterMinutes (when the task drops)
+  shrunkFromMinutes?: number // Patch 0005: set when task was compressed from its ideal duration
+}
+
+export type ScheduleDiagnosticKind =
+  | 'INTRUDER_SHRUNK'        // A lower-weight task was compressed so a higher-weight task could start on time
+  | 'EQUAL_PRIORITY_SHARED'  // Equal-weight tasks compressed proportionally to their slack to share a tight window
+  | 'WEIGHT_TIE_AMBIGUITY'   // Equal-weight tasks competed for a window too tight for both even at minDuration (user should adjust weight)
+  | 'STARVED_BY_HIGHER'      // A task expired or dropped because higher-weight tasks occupied its entire active slab
+
+export interface ScheduleDiagnostic {
+  kind: ScheduleDiagnosticKind
+  taskIds: string[]
+  instanceKeys: string[]
+  windowStart: number
+  windowEnd: number
+  message: string
+  suggestion: string
 }
 
 // An anchor confirmation (user-reported actual transition)
@@ -57,4 +74,5 @@ export interface DaySchedule {
   items: ScheduledItem[]     // resolved task placements, sorted by startMinutes
   overflowItems: ScheduledItem[]  // tasks that couldn't fit before cutoff
   adhocTasks: AdhocTask[]    // user-added on-the-fly tasks
+  diagnostics?: ScheduleDiagnostic[] // Patch 0005: explicit callouts for compression, ties, and starvation
 }

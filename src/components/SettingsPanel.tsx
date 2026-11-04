@@ -23,13 +23,185 @@ function SettingsPanel() {
   const [loadingSnapshots, setLoadingSnapshots] = useState(false)
   const [confirmingReset, setConfirmingReset] = useState(false)
 
-  const isSettingsComplete = githubOwner.trim() !== '' && githubRepo.trim() !== '' && githubToken.trim() !== ''
+  // Patch 0012: Direct Mobile/Browser GitHub Source Code Pusher state
+  const [targetBranch, setTargetBranch] = useState('refactor/exact-fit-v0012')
+  const [commitMessage, setCommitMessage] = useState(
+    'feat: Exact-Fit Solver, Task Templates, Routine Slot UI & Live Simulator (Patches 0001-0012)'
+  )
+  const [pushingCode, setPushingCode] = useState(false)
+  const [pushProgress, setPushProgress] = useState<string | null>(null)
+  const [pushResult, setPushResult] = useState<{
+    type: 'success' | 'error'
+    message: string
+    commitUrl?: string
+    prUrl?: string
+  } | null>(null)
+
+  // Default owner/repo to projg13/to-live if blank so mobile users don't have to type them
+  useEffect(() => {
+    if (!githubOwner.trim()) setGithubOwner('projg13')
+    if (!githubRepo.trim()) setGithubRepo('to-live')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const isSettingsComplete =
+    githubOwner.trim() !== '' && githubRepo.trim() !== '' && githubToken.trim() !== ''
 
   useEffect(() => {
     if (isSettingsComplete) {
       startHourlyBackup()
     }
   }, [isSettingsComplete])
+
+  const handlePushSourceCodeToGitHub = async () => {
+    const owner = githubOwner.trim() || 'projg13'
+    const repo = githubRepo.trim() || 'to-live'
+    const token = githubToken.trim()
+    const branch = targetBranch.trim() || 'refactor/exact-fit-v0012'
+    if (!token) {
+      setPushResult({
+        type: 'error',
+        message: 'Please paste your GitHub Personal Access Token (PAT) first.',
+      })
+      return
+    }
+
+    const rawSources: Record<string, string> | undefined = (window as any).__TO_LIVE_RAW_SOURCES__
+    if (!rawSources || Object.keys(rawSources).length === 0) {
+      setPushResult({
+        type: 'error',
+        message: 'Embedded source bundle not found in window.__TO_LIVE_RAW_SOURCES__.',
+      })
+      return
+    }
+
+    setPushingCode(true)
+    setPushResult(null)
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    }
+    const apiBase = `https://api.github.com/repos/${owner}/${repo}`
+
+    try {
+      // 1. Find default/base branch commit SHA (try targetBranch first, then main, then master)
+      setPushProgress('Step 1/4: Fetching base branch commit from GitHub...')
+      let baseCommitSha = ''
+      let baseBranchUsed = 'main'
+      for (const candidateBranch of [branch, 'main', 'master']) {
+        const refRes = await fetch(`${apiBase}/git/ref/heads/${candidateBranch}`, { headers })
+        if (refRes.ok) {
+          const refJson = await refRes.json()
+          baseCommitSha = refJson.object?.sha
+          baseBranchUsed = candidateBranch
+          if (baseCommitSha) break
+        }
+      }
+      if (!baseCommitSha) {
+        throw new Error(
+          `Could not read base branch (main/master) on ${owner}/${repo}. Verify your token has Repo Contents write permission.`
+        )
+      }
+
+      // Fetch base commit to get its tree SHA
+      const commitRes = await fetch(`${apiBase}/git/commits/${baseCommitSha}`, { headers })
+      if (!commitRes.ok) {
+        throw new Error(`Failed to read base commit ${baseCommitSha}: HTTP ${commitRes.status}`)
+      }
+      const commitJson = await commitRes.json()
+      const baseTreeSha = commitJson.tree?.sha
+
+      // 2. Create a single Git Tree with all 24 refactored files
+      const fileEntries = Object.entries(rawSources)
+      setPushProgress(`Step 2/4: Uploading ${fileEntries.length} refactored source files to Git Tree...`)
+      const treePayload = {
+        base_tree: baseTreeSha,
+        tree: fileEntries.map(([path, content]) => ({
+          path,
+          mode: '100644',
+          type: 'blob',
+          content,
+        })),
+      }
+      const treeRes = await fetch(`${apiBase}/git/trees`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(treePayload),
+      })
+      if (!treeRes.ok) {
+        const errText = await treeRes.text()
+        throw new Error(`Git Tree creation failed (${treeRes.status}): ${errText}`)
+      }
+      const newTree = await treeRes.json()
+
+      // 3. Create the Git Commit
+      setPushProgress('Step 3/4: Creating Git commit...')
+      const newCommitRes = await fetch(`${apiBase}/git/commits`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          message: commitMessage.trim() || 'feat: apply Patches 0001-0012 refactor',
+          tree: newTree.sha,
+          parents: [baseCommitSha],
+        }),
+      })
+      if (!newCommitRes.ok) {
+        const errText = await newCommitRes.text()
+        throw new Error(`Git Commit creation failed (${newCommitRes.status}): ${errText}`)
+      }
+      const newCommit = await newCommitRes.json()
+
+      // 4. Update existing branch ref or create new branch ref
+      setPushProgress(`Step 4/4: Updating branch refs/heads/${branch}...`)
+      const checkTargetRef = await fetch(`${apiBase}/git/ref/heads/${branch}`, { headers })
+      if (checkTargetRef.ok) {
+        const patchRes = await fetch(`${apiBase}/git/refs/heads/${branch}`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ sha: newCommit.sha, force: false }),
+        })
+        if (!patchRes.ok) {
+          const errText = await patchRes.text()
+          throw new Error(`Updating branch ${branch} failed (${patchRes.status}): ${errText}`)
+        }
+      } else {
+        const createRefRes = await fetch(`${apiBase}/git/refs`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            ref: `refs/heads/${branch}`,
+            sha: newCommit.sha,
+          }),
+        })
+        if (!createRefRes.ok) {
+          const errText = await createRefRes.text()
+          throw new Error(`Creating branch ${branch} failed (${createRefRes.status}): ${errText}`)
+        }
+      }
+
+      setPushProgress(null)
+      const commitUrl = `https://github.com/${owner}/${repo}/commit/${newCommit.sha}`
+      const prUrl =
+        branch !== baseBranchUsed
+          ? `https://github.com/${owner}/${repo}/compare/${baseBranchUsed}...${branch}?expand=1`
+          : `https://github.com/${owner}/${repo}/tree/${branch}`
+      setPushResult({
+        type: 'success',
+        message: `Pushed ${fileEntries.length} refactored files to ${owner}/${repo} on branch "${branch}" (commit ${newCommit.sha.slice(0, 7)})!`,
+        commitUrl,
+        prUrl,
+      })
+    } catch (err: any) {
+      setPushProgress(null)
+      setPushResult({
+        type: 'error',
+        message: err?.message || String(err),
+      })
+    } finally {
+      setPushingCode(false)
+    }
+  }
 
   const handleBackup = async () => {
     if (!isSettingsComplete) return
@@ -90,6 +262,165 @@ function SettingsPanel() {
 
   return (
     <div className="space-y-8">
+      {/* Patch 0012: One-Click Push Refactored Source Code to GitHub (Mobile / No PC Needed) */}
+      <div className="space-y-4">
+        <div className="border-b border-cyan-800/50 pb-2">
+          <h3 className="text-lg font-black tracking-wide text-cyan-400">
+            🚀 Push Refactored Codebase to GitHub (No PC Required)
+          </h3>
+          <p className="text-xs text-slate-300">
+            Directly commits all 24 refactored TypeScript/React files (Patches 0001–0012) from your browser/phone to your GitHub repository via the GitHub Git Trees API.
+          </p>
+        </div>
+
+        <div className="bg-cyan-950/15 border border-cyan-800/40 rounded-2xl p-5 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                GitHub Owner
+              </label>
+              <input
+                type="text"
+                value={githubOwner}
+                onChange={(e) => setGithubOwner(e.target.value)}
+                placeholder="projg13"
+                className="text-sm px-3.5 py-2 w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                Repository Name
+              </label>
+              <input
+                type="text"
+                value={githubRepo}
+                onChange={(e) => setGithubRepo(e.target.value)}
+                placeholder="to-live"
+                className="text-sm px-3.5 py-2 w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-cyan-400 uppercase tracking-wider block mb-1">
+                GitHub Personal Access Token (PAT)
+              </label>
+              <input
+                type="password"
+                value={githubToken}
+                onChange={(e) => setGithubToken(e.target.value)}
+                placeholder="Paste your GitHub token..."
+                className="text-sm px-3.5 py-2 w-full bg-slate-950 border border-cyan-800/50 rounded-xl text-slate-200 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-amber-400 uppercase tracking-wider block mb-1">
+                Target Branch (e.g. main or new branch)
+              </label>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={targetBranch}
+                  onChange={(e) => setTargetBranch(e.target.value)}
+                  placeholder="refactor/exact-fit-v0012 or main"
+                  className="text-sm px-3 py-2 flex-1 bg-slate-950 border border-amber-800/50 rounded-xl text-amber-300 font-mono focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setTargetBranch('main')}
+                  className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 cursor-pointer"
+                >
+                  main
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
+              Commit Message
+            </label>
+            <input
+              type="text"
+              value={commitMessage}
+              onChange={(e) => setCommitMessage(e.target.value)}
+              className="text-xs px-3.5 py-2 w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-300 font-mono focus:outline-none"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={handlePushSourceCodeToGitHub}
+              disabled={pushingCode || !githubToken.trim()}
+              className={`px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer ${
+                !pushingCode && githubToken.trim()
+                  ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-950/40 active:scale-95'
+                  : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+              }`}
+            >
+              {pushingCode
+                ? '⏳ Pushing 24 Refactored Files...'
+                : `🚀 Push Refactored Code to ${githubOwner || 'projg13'}/${githubRepo || 'to-live'} (${targetBranch})`}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleBackup}
+              disabled={!isSettingsComplete || loading}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                isSettingsComplete && !loading
+                  ? 'bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border-emerald-700/50'
+                  : 'bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed'
+              }`}
+            >
+              💾 Also Snapshot Migrated State JSON
+            </button>
+          </div>
+
+          {pushProgress && (
+            <div className="p-3 rounded-xl bg-slate-950 border border-cyan-800/40 text-xs font-mono text-cyan-300 animate-pulse">
+              {pushProgress}
+            </div>
+          )}
+
+          {pushResult && (
+            <div
+              className={`p-3.5 rounded-xl border text-xs space-y-2 ${
+                pushResult.type === 'success'
+                  ? 'bg-emerald-950/40 border-emerald-700/50 text-emerald-300'
+                  : 'bg-rose-950/40 border-rose-700/50 text-rose-300'
+              }`}
+            >
+              <div className="font-bold">{pushResult.message}</div>
+              {pushResult.commitUrl && (
+                <div className="flex flex-wrap gap-3 pt-1">
+                  <a
+                    href={pushResult.commitUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline font-bold text-cyan-300 hover:text-cyan-200"
+                  >
+                    🔗 View Commit on GitHub →
+                  </a>
+                  {pushResult.prUrl && (
+                    <a
+                      href={pushResult.prUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline font-bold text-amber-300 hover:text-amber-200"
+                    >
+                      🔀 Open / Merge Pull Request on GitHub →
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Schedule Controls */}
       <div className="space-y-4">
         <div className="border-b border-slate-800 pb-2">
@@ -139,7 +470,7 @@ function SettingsPanel() {
                 const snapshot = await loadJSONFile()
                 importFullState(snapshot)
               } catch (err: any) {
-                alert(`Import failed: ${err.message}`)
+                setStatus({ type: 'error', message: `Import failed: ${err.message}` })
               }
             }}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-950/30 hover:bg-indigo-900/30 text-indigo-400 border border-indigo-800/30 transition-all active:scale-95 cursor-pointer"
@@ -159,12 +490,9 @@ function SettingsPanel() {
             onClick={async () => {
               try {
                 const snapshot = await loadJSONFile()
-                if (snapshot._meta?.type !== 'defaults') {
-                  if (!confirm('This file is not labeled as defaults. Import anyway?')) return
-                }
                 importFullState(snapshot)
               } catch (err: any) {
-                alert(`Load defaults failed: ${err.message}`)
+                setStatus({ type: 'error', message: `Load defaults failed: ${err.message}` })
               }
             }}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-slate-950/65 hover:bg-slate-900 text-slate-400 border border-slate-850 transition-all active:scale-95 cursor-pointer"
@@ -177,51 +505,12 @@ function SettingsPanel() {
       {/* GitHub State Backup */}
       <div className="space-y-4">
         <div className="border-b border-slate-800 pb-2">
-          <h3 className="text-lg font-black tracking-wide text-slate-100">GitHub State Backup</h3>
+          <h3 className="text-lg font-black tracking-wide text-slate-100">GitHub State Backup (Hourly Snapshots)</h3>
           <p className="text-xs text-slate-400">Auto-saves every hour. Keeps 5 rotating restore points.</p>
         </div>
 
         <div className="space-y-4 max-w-md bg-slate-950/20 p-5 border border-slate-800/80 rounded-2xl">
-          <div>
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              GitHub Username/Owner
-            </label>
-            <input
-              type="text"
-              value={githubOwner}
-              onChange={(e) => setGithubOwner(e.target.value)}
-              placeholder="e.g. projg13"
-              className="text-sm px-3.5 py-2 w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              GitHub Repository Name
-            </label>
-            <input
-              type="text"
-              value={githubRepo}
-              onChange={(e) => setGithubRepo(e.target.value)}
-              placeholder="e.g. to-live"
-              className="text-sm px-3.5 py-2 w-full bg-slate-955 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              GitHub Personal Access Token (PAT)
-            </label>
-            <input
-              type="password"
-              value={githubToken}
-              onChange={(e) => setGithubToken(e.target.value)}
-              placeholder="ghp_..."
-              className="text-sm px-3.5 py-2 w-full bg-slate-955 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none"
-            />
-          </div>
-
-          <div className="text-xs text-slate-500 border-t border-slate-850 pt-3">
+          <div className="text-xs text-slate-500">
             {lastSnapshotAt ? (
               <span className="text-cyan-400 font-semibold">
                 Last snapshot: {new Date(lastSnapshotAt).toLocaleString()}
@@ -231,13 +520,7 @@ function SettingsPanel() {
             )}
           </div>
 
-          {!isSettingsComplete && (
-            <p className="text-[10px] text-amber-500 font-bold uppercase tracking-wider animate-pulse">
-              ⚠️ Fill in Owner, Repo, and Token to enable backup/restore
-            </p>
-          )}
-
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-1">
             <button
               onClick={handleBackup}
               disabled={!isSettingsComplete || loading}
@@ -298,7 +581,7 @@ function SettingsPanel() {
                     <button
                       onClick={() => handleRestore(snap.filename)}
                       disabled={loading}
-                      className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg bg-amber-950/30 text-amber-400 border border-amber-800/30 hover:bg-amber-900/40 active:scale-95 transition-all cursor-pointer opacity-0 group-hover:opacity-100"
+                      className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg bg-amber-950/30 text-amber-400 border border-amber-800/30 hover:bg-amber-900/40 active:scale-95 transition-all cursor-pointer"
                     >
                       Restore
                     </button>
